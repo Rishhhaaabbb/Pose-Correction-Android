@@ -217,18 +217,18 @@ class EnhancedPoseMonitor:
             self._apply_adaptive_tolerances()
         
         # AGGRESSIVE HOLD TIME REDUCTION
-        speed_multipliers = {
-            'fast': 0.15,
-            'normal': 0.25,
-            'strict': 0.40
-        }
+        # speed_multipliers = {
+        #     'fast': 0.15,
+        #     'normal': 0.25,
+        #     'strict': 0.40
+        # }
         
-        hold_multiplier = speed_multipliers.get(speed_mode, 0.15)
+        # hold_multiplier = speed_multipliers.get(speed_mode, 0.15)
         
-        for state in self.graph.states:
-            original_hold = state.min_hold_duration
-            state.min_hold_duration = max(0.1, min(0.5, original_hold * hold_multiplier))
-            print(f"  State {state.state_id}: {original_hold:.2f}s → {state.min_hold_duration:.2f}s")
+        # for state in self.graph.states:
+        #     original_hold = state.min_hold_duration
+        #     state.min_hold_duration = max(0.1, min(0.5, original_hold * hold_multiplier))
+        #     print(f"  State {state.state_id}: {original_hold:.2f}s → {state.min_hold_duration:.2f}s")
         
         self.sequence_index = 0
         self.current_state: Optional[PoseState] = None
@@ -404,7 +404,10 @@ class EnhancedPoseMonitor:
             self.max_streak = max(self.max_streak, self.current_streak)
             self.last_was_correct = True
             
-            self.current_state_hold_time = current_time - self.current_state_start_time
+            delta = current_time - self.current_state_start_time
+            self.current_state_hold_time += delta
+            self.current_state_start_time = current_time
+
             hold_progress = self.current_state_hold_time / self.current_state.min_hold_duration
             
             if hold_progress >= 1.0:
@@ -431,7 +434,7 @@ class EnhancedPoseMonitor:
             self.last_was_correct = False
             self.current_streak = 0
             
-            self.current_state_hold_time = 0.0
+            # self.current_state_hold_time = 0.0
             self.current_state_start_time = current_time
             
             if current_time - self.last_feedback_time > self.feedback_delay:
