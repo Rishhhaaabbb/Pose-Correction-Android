@@ -179,13 +179,19 @@ class EnhancedPoseMonitor:
         feedback_delay: float = 0.3,
         max_reps: Optional[int] = None,
         enable_adaptive: bool = True,
-        speed_mode: str = 'fast'
+        speed_mode: str = 'fast'   
     ):
         print("Initializing Fast-Response Pose Monitor...")
         
         self.graph = pose_graph
         self.enable_adaptive = enable_adaptive
         self.speed_mode = speed_mode
+
+        # Add to __init__
+        self.guidance_duration = 2.0  # User-defined seconds for guidance
+        self.is_guidance_active = False
+        self.guidance_start_time = 0.0
+        self.next_state_preview = None
         
         if enable_adaptive:
             self.complexity = ExerciseComplexityAnalyzer.analyze(pose_graph)
@@ -354,6 +360,31 @@ class EnhancedPoseMonitor:
     def _update_state_machine(self, features: Optional[Dict[str, float]]) -> Dict:
         """Enhanced state machine with adaptive features."""
         current_time = time.time()
+
+        # ==========================================
+        # 1. NEW: Handle Guidance Timeout Phase
+        # ==========================================
+        if self.is_guidance_active:
+            elapsed = current_time - self.guidance_start_time
+            if elapsed >= self.guidance_duration:
+                # Phase over: Switch to the next state and start monitoring
+                self.is_guidance_active = False
+                self.current_state = self.next_state_preview
+                self.current_state_start_time = current_time
+                self.current_state_hold_time = 0.0
+                self.in_transition = True
+                self.transition_start_time = current_time
+            else:
+                # Still in guidance: skip matching and show a countdown
+                remaining = self.guidance_duration - elapsed
+                self.current_feedback = f"Get ready! Starting in {remaining:.1f}s"
+                # Return status immediately to skip the rest of the logic
+                return self._status(False, 0.0)
+            
+        # ==========================================
+        # 2. Existing Logic (Monitoring & Grading)
+        # ==========================================
+
         state_id = self.current_state.state_id
         
         if state_id not in self.state_attempt_counts:
@@ -449,10 +480,14 @@ class EnhancedPoseMonitor:
             return self._status(False, 0.0)
     
     def _transition_to_next_state(self):
-        """Transition with grace period and accuracy tracking."""
-        self.sequence_index += 1
+        """Modified to trigger a guidance phase before the next state starts."""
         
-        if self.sequence_index >= len(self.temporal_sequence):
+        # 1. Determine the index of the NEXT state
+        next_idx = self.sequence_index + 1
+        
+        # 2. Check if we just finished the last state of a rep
+        if next_idx >= len(self.temporal_sequence):
+            # Keep your existing accuracy tracking logic
             if self.evaluated_frames > 0:
                 rep_accuracy = (self.green_frames / self.evaluated_frames) * 100
                 self.rep_accuracies.append(rep_accuracy)
@@ -460,19 +495,50 @@ class EnhancedPoseMonitor:
             self.total_reps += 1
             print(f"  [REP {self.total_reps}] Completed!")
             
-            self.sequence_index = 0
-            
+            # Check if session is over
             if self.max_reps and self.total_reps >= self.max_reps:
                 self.session_complete = True
                 self._print_summary()
                 return
+                
+            next_idx = 0 # Loop back to the first state for the next rep
+
+        # 3. TRIGGER GUIDANCE MODE 
+        # Instead of setting self.current_state, we set a preview
+        self.next_state_preview = self.graph.get_state(self.temporal_sequence[next_idx])
+        self.is_guidance_active = True
+        self.guidance_start_time = time.time()
         
-        self.current_state = self.graph.get_state(self.temporal_sequence[self.sequence_index])
-        self.current_state_start_time = time.time()
-        self.current_state_hold_time = 0.0
+        # 4. Update the index so the Target Panel on the right updates immediately
+        self.sequence_index = next_idx
+    
+    # Note: We do NOT update self.current_state here. 
+    # We wait for the guidance timer to finish in the state machine.
+    # def _transition_to_next_state(self):
+    #     """Transition with grace period and accuracy tracking."""
+    #     self.sequence_index += 1
         
-        self.in_transition = True
-        self.transition_start_time = time.time()
+    #     if self.sequence_index >= len(self.temporal_sequence):
+    #         if self.evaluated_frames > 0:
+    #             rep_accuracy = (self.green_frames / self.evaluated_frames) * 100
+    #             self.rep_accuracies.append(rep_accuracy)
+            
+    #         self.total_reps += 1
+    #         print(f"  [REP {self.total_reps}] Completed!")
+            
+    #         self.sequence_index = 0
+            
+    #         if self.max_reps and self.total_reps >= self.max_reps:
+    #             self.session_complete = True
+    #             self._print_summary()
+    #             return
+        
+    #     self.current_state = self.graph.get_state(self.temporal_sequence[self.sequence_index])
+    #     self.current_state_start_time = time.time()
+    #     self.current_state_hold_time = 0.0
+        
+    #     self.in_transition = True
+    #     self.transition_start_time = time.time()
     
     def _print_summary(self):
         """Print enhanced summary."""
@@ -721,6 +787,80 @@ class EnhancedPoseMonitor:
         
         return frame
     
+    # def _draw_guidance_ghost(self, frame: np.ndarray, ref_kpts: np.ndarray) -> np.ndarray:
+        
+    #     """Draws a high-contrast guidance skeleton on the live feed area."""
+    #     h, w = frame.shape[:2]
+        
+    #     # Scale reference points to full camera size
+    #     scaled_ghost = self._scale_keypoints_to_panel(ref_kpts, w, h)
+        
+    #     # Bone connections for a human skeleton
+    #     pairs = [
+    #         (5, 6), (5, 11), (6, 12), (11, 12),  # Torso
+    #         (5, 7), (7, 9), (6, 8), (8, 10),      # Arms
+    #         (11, 13), (13, 15), (12, 14), (14, 16) # Legs
+    #     ]
+        
+    #     # Draw thicker lines for high visibility on the white background
+    #     for start_idx, end_idx in pairs:
+    #         # Check if keypoints are within the expected range
+    #         if start_idx < len(scaled_ghost) and end_idx < len(scaled_ghost):
+    #             pt1 = (int(scaled_ghost[start_idx][0]), int(scaled_ghost[start_idx][1]))
+    #             pt2 = (int(scaled_ghost[end_idx][0]), int(scaled_ghost[end_idx][1]))
+                
+    #             # Use thickness=8 for a bold, diagram-like look
+    #             cv2.line(frame, pt1, pt2, color, 8)
+                
+    #             # Add small circles at joints to make it look professional
+    #             cv2.circle(frame, pt1, 5, color, -1)
+    #             cv2.circle(frame, pt2, 5, color, -1)
+                
+    #     return frame
+    #     # h, w = frame.shape[:2]
+    #     # # Scale reference points to the live frame size
+    #     # scaled_ghost = self._scale_keypoints_to_panel(ref_kpts, w, h)
+        
+    #     # # Draw simple lines for the ghost in Cyan (255, 255, 0)
+    #     # pairs = [(5,6), (5,11), (6,12), (11,12), (5,7), (7,9), (6,8), (8,10), (11,13), (13,15), (12,14), (14,16)]
+    #     # for start_idx, end_idx in pairs:
+    #     #     pt1 = (int(scaled_ghost[start_idx][0]), int(scaled_ghost[start_idx][1]))
+    #     #     pt2 = (int(scaled_ghost[end_idx][0]), int(scaled_ghost[end_idx][1]))
+    #     #     cv2.line(frame, pt1, pt2, (255, 255, 0), 6)
+    #     # return frame
+
+    def _draw_guidance_ghost(self, frame: np.ndarray, ref_kpts: np.ndarray, color=(255, 255, 0)) -> np.ndarray:
+        """Draws a high-contrast guidance skeleton. Fixed to accept 'color' argument."""
+        h, w = frame.shape[:2]
+        
+        # 1. Scale reference points to fit the live feed area
+        scaled_ghost = self._scale_keypoints_to_panel(ref_kpts, w, h)
+        
+        # 2. Define the skeleton connections (standard 17-point COCO format)
+        # Torso: shoulders, hips, and shoulder-to-hip
+        # Arms: shoulders to elbows, elbows to wrists
+        # Legs: hips to knees, knees to ankles
+        pairs = [
+            (5, 6), (5, 11), (6, 12), (11, 12),  
+            (5, 7), (7, 9), (6, 8), (8, 10),      
+            (11, 13), (13, 15), (12, 14), (14, 16) 
+        ]
+        
+        # 3. Draw the lines with the provided color
+        for start_idx, end_idx in pairs:
+            if start_idx < len(scaled_ghost) and end_idx < len(scaled_ghost):
+                pt1 = (int(scaled_ghost[start_idx][0]), int(scaled_ghost[start_idx][1]))
+                pt2 = (int(scaled_ghost[end_idx][0]), int(scaled_ghost[end_idx][1]))
+                
+                # Use thickness=10 for that bold "Instruction Manual" look on white backgrounds
+                cv2.line(frame, pt1, pt2, color, 10)
+                
+                # Add joint caps for a cleaner aesthetic
+                cv2.circle(frame, pt1, 6, color, -1)
+                cv2.circle(frame, pt2, 6, color, -1)
+                
+        return frame
+
     def _annotate_frame(self, frame: np.ndarray, status: Dict) -> np.ndarray:
         """Improved annotation with better layout and no rep performance section."""
         h, w = frame.shape[:2]
@@ -728,49 +868,115 @@ class EnhancedPoseMonitor:
         # Smaller right panel for better proportions
         panel_width = int(w * 0.22)
         total_width = w + panel_width
-        
         canvas = np.zeros((h, total_width, 3), dtype=np.uint8)
         
         # Left side - Live feed with skeleton
         live = frame.copy()
-        if self.last_keypoints is not None:
+
+        # 2. Handle Guidance Phase (High Contrast Mode)
+        if self.is_guidance_active and self.next_state_preview:
+            # Fill the entire live area with WHITE
+            cv2.rectangle(live, (0, 0), (w, h), (255, 255, 255), -1)
+            
+            ref_kpts_raw = getattr(self.next_state_preview, "mean_keypoints", None)
+            if ref_kpts_raw is not None:
+                # Draw the ghost (Next State) in solid BLACK
+                ref_kpts = np.array(ref_kpts_raw)
+                live = self._draw_guidance_ghost(live, ref_kpts, color=(0, 0, 0))
+                
+                # Add high-contrast text
+                elapsed = time.time() - self.guidance_start_time
+                remaining = max(0, self.guidance_duration - elapsed)
+                
+                cv2.putText(live, "NEXT POSE PREVIEW", (w//2 - 180, 100), 
+                            cv2.FONT_HERSHEY_DUPLEX, 1.2, (50, 50, 50), 2)
+                
+                cv2.putText(live, f"STARTING IN: {remaining:.1f}s", (w//2 - 150, h - 100), 
+                            cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+        # 3. Draw User's Current Skeleton (Active Monitoring)
+        elif self.last_keypoints is not None:
             live = self._draw_live_skeleton_with_errors(live)
         
         canvas[:, :w] = live
+
+        # # Add this inside the 'Left side - Live feed' section
+        # if self.is_guidance_active and self.next_state_preview:
+        #     ref_kpts_raw = getattr(self.next_state_preview, "mean_keypoints", None)
+        #     if ref_kpts_raw is not None:
+        #         # Create a transparent overlay for the "Ghost" guide
+        #         overlay = live.copy()
+        #         ref_kpts = np.array(ref_kpts_raw)
+                
+        #         # Draw the ghost skeleton in a distinct color (e.g., Cyan or Bright Yellow)
+        #         # We use a simple draw method or modify your humanlike one to use a fixed color
+        #         overlay = self._draw_guidance_ghost(overlay, ref_kpts)
+                
+        #         # Blend the ghost with the live frame
+        #         cv2.addWeighted(overlay, 0.4, live, 0.6, 0, live)
+                
+        #         # Add a "Get Ready" countdown
+        #         remaining = max(0, self.guidance_duration - (time.time() - self.guidance_start_time))
+        #         cv2.putText(live, f"PREVIEW: {remaining:.1f}s", (w//2 - 100, h//2), 
+        #                     cv2.FONT_HERSHEY_DUPLEX, 1.2, (0, 255, 255), 3)
+        # Place live feed on canvas
+        canvas[:, :w] = live
         
         # RIGHT PANEL - Reference Pose
-        ref_panel = np.ones((h, panel_width, 3), dtype=np.uint8) * 250
+        # ref_panel = np.ones((h, panel_width, 3), dtype=np.uint8) * 250
         
-        # Subtle gradient
+        # # Subtle gradient
+        # for i in range(100):
+        #     color_val = 250 - int(i * 0.5)
+        #     cv2.line(ref_panel, (0, i), (panel_width, i), (color_val, color_val, color_val), 1)
+        
+        # cv2.putText(ref_panel, "TARGET POSE",
+        #            (panel_width//2 - 80, 35), cv2.FONT_HERSHEY_DUPLEX, 0.8, (40, 40, 40), 2)
+        
+        # current_state_id = self.temporal_sequence[self.sequence_index]
+        # cv2.putText(ref_panel, f"State {current_state_id + 1}",
+        #            (panel_width//2 - 40, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (80, 80, 80), 2)
+        
+        # if self.current_state:
+        #     ref_kpts_raw = getattr(self.current_state, "mean_keypoints", None)
+        #     if ref_kpts_raw is not None:
+        #         ref_kpts = np.array(ref_kpts_raw)
+        #         ref_panel = self._draw_reference_skeleton(ref_panel, ref_kpts)
+        
+        # pose_indicator_y = h - 50
+        # cv2.rectangle(ref_panel, (20, pose_indicator_y - 30), (panel_width - 20, pose_indicator_y + 20), 
+        #               (240, 240, 240), -1)
+        # cv2.rectangle(ref_panel, (20, pose_indicator_y - 30), (panel_width - 20, pose_indicator_y + 20), 
+        #               (200, 200, 200), 2)
+        
+        # pose_text = f"Pose {status['sequence_index']+1}/{len(self.temporal_sequence)}"
+        # text_size = cv2.getTextSize(pose_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+        # text_x = (panel_width - text_size[0]) // 2
+        # cv2.putText(ref_panel, pose_text,
+        #            (text_x, pose_indicator_y), 
+        #            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (60, 60, 60), 2)
+        
+        # canvas[:, w:] = ref_panel
+
+        ref_panel = np.ones((h, panel_width, 3), dtype=np.uint8) * 250
+    
+        # Subtle gradient for header
         for i in range(100):
             color_val = 250 - int(i * 0.5)
             cv2.line(ref_panel, (0, i), (panel_width, i), (color_val, color_val, color_val), 1)
         
         cv2.putText(ref_panel, "TARGET POSE",
-                   (panel_width//2 - 80, 35), cv2.FONT_HERSHEY_DUPLEX, 0.8, (40, 40, 40), 2)
+                (panel_width//2 - 80, 35), cv2.FONT_HERSHEY_DUPLEX, 0.8, (40, 40, 40), 2)
         
-        current_state_id = self.temporal_sequence[self.sequence_index]
-        cv2.putText(ref_panel, f"State {current_state_id + 1}",
-                   (panel_width//2 - 40, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (80, 80, 80), 2)
+        # Determine which state to show in the small reference window
+        display_state = self.next_state_preview if self.is_guidance_active else self.current_state
         
-        if self.current_state:
-            ref_kpts_raw = getattr(self.current_state, "mean_keypoints", None)
+        if display_state:
+            cv2.putText(ref_panel, f"State {display_state.state_id + 1}",
+                    (panel_width//2 - 40, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (80, 80, 80), 2)
+            
+            ref_kpts_raw = getattr(display_state, "mean_keypoints", None)
             if ref_kpts_raw is not None:
-                ref_kpts = np.array(ref_kpts_raw)
-                ref_panel = self._draw_reference_skeleton(ref_panel, ref_kpts)
-        
-        pose_indicator_y = h - 50
-        cv2.rectangle(ref_panel, (20, pose_indicator_y - 30), (panel_width - 20, pose_indicator_y + 20), 
-                      (240, 240, 240), -1)
-        cv2.rectangle(ref_panel, (20, pose_indicator_y - 30), (panel_width - 20, pose_indicator_y + 20), 
-                      (200, 200, 200), 2)
-        
-        pose_text = f"Pose {status['sequence_index']+1}/{len(self.temporal_sequence)}"
-        text_size = cv2.getTextSize(pose_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
-        text_x = (panel_width - text_size[0]) // 2
-        cv2.putText(ref_panel, pose_text,
-                   (text_x, pose_indicator_y), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (60, 60, 60), 2)
+                ref_panel = self._draw_reference_skeleton(ref_panel, np.array(ref_kpts_raw))
         
         canvas[:, w:] = ref_panel
         
