@@ -187,6 +187,10 @@ class EnhancedPoseMonitor:
         self.enable_adaptive = enable_adaptive
         self.speed_mode = speed_mode
 
+        # skip button and accuracy 
+        self.state_best_accuracies: Dict[int, List[float]] = {} 
+        self.skipped_states: List[int] = []
+
         # Add to __init__
         self.guidance_duration = 2.0  # User-defined seconds for guidance
         self.is_guidance_active = False
@@ -479,46 +483,15 @@ class EnhancedPoseMonitor:
             
             return self._status(False, 0.0)
     
-    def _transition_to_next_state(self):
-        """Modified to trigger a guidance phase before the next state starts."""
-        
-        # 1. Determine the index of the NEXT state
-        next_idx = self.sequence_index + 1
-        
-        # 2. Check if we just finished the last state of a rep
-        if next_idx >= len(self.temporal_sequence):
-            # Keep your existing accuracy tracking logic
-            if self.evaluated_frames > 0:
-                rep_accuracy = (self.green_frames / self.evaluated_frames) * 100
-                self.rep_accuracies.append(rep_accuracy)
-            
-            self.total_reps += 1
-            print(f"  [REP {self.total_reps}] Completed!")
-            
-            # Check if session is over
-            if self.max_reps and self.total_reps >= self.max_reps:
-                self.session_complete = True
-                self._print_summary()
-                return
-                
-            next_idx = 0 # Loop back to the first state for the next rep
-
-        # 3. TRIGGER GUIDANCE MODE 
-        # Instead of setting self.current_state, we set a preview
-        self.next_state_preview = self.graph.get_state(self.temporal_sequence[next_idx])
-        self.is_guidance_active = True
-        self.guidance_start_time = time.time()
-        
-        # 4. Update the index so the Target Panel on the right updates immediately
-        self.sequence_index = next_idx
-    
-    # Note: We do NOT update self.current_state here. 
-    # We wait for the guidance timer to finish in the state machine.
     # def _transition_to_next_state(self):
-    #     """Transition with grace period and accuracy tracking."""
-    #     self.sequence_index += 1
+    #     """Modified to trigger a guidance phase before the next state starts."""
         
-    #     if self.sequence_index >= len(self.temporal_sequence):
+    #     # 1. Determine the index of the NEXT state
+    #     next_idx = self.sequence_index + 1
+        
+    #     # 2. Check if we just finished the last state of a rep
+    #     if next_idx >= len(self.temporal_sequence):
+    #         # Keep your existing accuracy tracking logic
     #         if self.evaluated_frames > 0:
     #             rep_accuracy = (self.green_frames / self.evaluated_frames) * 100
     #             self.rep_accuracies.append(rep_accuracy)
@@ -526,41 +499,118 @@ class EnhancedPoseMonitor:
     #         self.total_reps += 1
     #         print(f"  [REP {self.total_reps}] Completed!")
             
-    #         self.sequence_index = 0
-            
+    #         # Check if session is over
     #         if self.max_reps and self.total_reps >= self.max_reps:
     #             self.session_complete = True
     #             self._print_summary()
     #             return
+                
+    #         next_idx = 0 # Loop back to the first state for the next rep
+
+    #     # 3. TRIGGER GUIDANCE MODE 
+    #     # Instead of setting self.current_state, we set a preview
+    #     self.next_state_preview = self.graph.get_state(self.temporal_sequence[next_idx])
+    #     self.is_guidance_active = True
+    #     self.guidance_start_time = time.time()
         
-    #     self.current_state = self.graph.get_state(self.temporal_sequence[self.sequence_index])
-    #     self.current_state_start_time = time.time()
-    #     self.current_state_hold_time = 0.0
+    #     # 4. Update the index so the Target Panel on the right updates immediately
+    #     self.sequence_index = next_idx
+
+    def _transition_to_next_state(self, skipped: bool = False):
+        """Modified to handle manual skips and accuracy logging."""
+        current_state_id = self.temporal_sequence[self.sequence_index]
         
-    #     self.in_transition = True
-    #     self.transition_start_time = time.time()
+        # 1. Log Accuracy for the state being left
+        if skipped:
+            acc = 0.0
+            self.skipped_states.append(current_state_id)
+            print(f"  [SKIP] State {current_state_id + 1} skipped.")
+        else:
+            # Calculate accuracy for this specific state session
+            acc = (self.green_frames / self.evaluated_frames * 100) if self.evaluated_frames > 0 else 0.0
+        
+        if current_state_id not in self.state_best_accuracies:
+            self.state_best_accuracies[current_state_id] = []
+        self.state_best_accuracies[current_state_id].append(acc)
+
+        # Reset frame counters for the next state
+        self.green_frames = 0
+        self.evaluated_frames = 0
+
+        # 2. Determine Next Index
+        next_idx = self.sequence_index + 1
+        
+        if next_idx >= len(self.temporal_sequence):
+            # Rep complete logic
+            self.total_reps += 1
+            print(f"  [REP {self.total_reps}] Completed!")
+            
+            if self.max_reps and self.total_reps >= self.max_reps:
+                self.session_complete = True
+                self._print_summary()
+                return
+            next_idx = 0 
+
+        # 3. Enter Guidance for Next State
+        self.next_state_preview = self.graph.get_state(self.temporal_sequence[next_idx])
+        self.is_guidance_active = True
+        self.guidance_start_time = time.time()
+        self.sequence_index = next_idx
     
+    # def _print_summary(self):
+    #     """Print enhanced summary."""
+    #     print("\n" + "="*60)
+    #     print("SESSION COMPLETE")
+    #     print("="*60)
+        
+    #     duration = time.time() - self.session_start_time
+        
+    #     print(f"\nReps: {self.total_reps}")
+    #     print(f"Duration: {duration:.1f}s ({duration/60:.1f} min)")
+        
+    #     if self.evaluated_frames > 0:
+    #         acc = (self.green_frames / self.evaluated_frames) * 100
+    #         print(f"Accuracy: {acc:.1f}%")
+        
+    #     print(f"Max Streak: {self.max_streak} correct frames")
+        
+    #     if len(self.frame_times) > 0:
+    #         print(f"Avg FPS: {1.0/np.mean(self.frame_times):.1f}")
+        
+    #     print("\n" + "="*60)
+
     def _print_summary(self):
-        """Print enhanced summary."""
+        """Prints a detailed breakdown of each pose's performance."""
         print("\n" + "="*60)
-        print("SESSION COMPLETE")
+        print("                EXERCISE PERFORMANCE REPORT")
         print("="*60)
         
-        duration = time.time() - self.session_start_time
+        total_acc = 0
+        state_count = 0
+
+        print(f"{'Pose ID':<15} | {'Avg Accuracy':<15} | {'Status':<15}")
+        print("-" * 55)
+
+        for state_id in range(len(self.graph.states)):
+            accuracies = self.state_best_accuracies.get(state_id, [0.0])
+            avg_state_acc = np.mean(accuracies)
+            
+            status = "✅ DONE" if avg_state_acc > 0 else "❌ SKIPPED"
+            if state_id in self.skipped_states and avg_state_acc == 0:
+                status = "⚠️ SKIPPED"
+
+            print(f"State {state_id + 1:<9} | {avg_state_acc:>12.1f}% | {status:<15}")
+            
+            total_acc += avg_state_acc
+            state_count += 1
+
+        overall_avg = total_acc / state_count if state_count > 0 else 0
         
-        print(f"\nReps: {self.total_reps}")
-        print(f"Duration: {duration:.1f}s ({duration/60:.1f} min)")
-        
-        if self.evaluated_frames > 0:
-            acc = (self.green_frames / self.evaluated_frames) * 100
-            print(f"Accuracy: {acc:.1f}%")
-        
-        print(f"Max Streak: {self.max_streak} correct frames")
-        
-        if len(self.frame_times) > 0:
-            print(f"Avg FPS: {1.0/np.mean(self.frame_times):.1f}")
-        
-        print("\n" + "="*60)
+        print("-" * 55)
+        print(f"OVERALL ACCURACY: {overall_avg:.1f}%")
+        print(f"TOTAL REPS:       {self.total_reps}")
+        print(f"TOTAL SKIPS:      {len(self.skipped_states)}")
+        print("="*60 + "\n")
     
     def _status(self, correct: bool, progress: float) -> Dict:
         """Create status dictionary."""
@@ -786,48 +836,6 @@ class EnhancedPoseMonitor:
             cv2.circle(frame, (int(x), int(y)), radius+2, (255, 255, 255), 2)
         
         return frame
-    
-    # def _draw_guidance_ghost(self, frame: np.ndarray, ref_kpts: np.ndarray) -> np.ndarray:
-        
-    #     """Draws a high-contrast guidance skeleton on the live feed area."""
-    #     h, w = frame.shape[:2]
-        
-    #     # Scale reference points to full camera size
-    #     scaled_ghost = self._scale_keypoints_to_panel(ref_kpts, w, h)
-        
-    #     # Bone connections for a human skeleton
-    #     pairs = [
-    #         (5, 6), (5, 11), (6, 12), (11, 12),  # Torso
-    #         (5, 7), (7, 9), (6, 8), (8, 10),      # Arms
-    #         (11, 13), (13, 15), (12, 14), (14, 16) # Legs
-    #     ]
-        
-    #     # Draw thicker lines for high visibility on the white background
-    #     for start_idx, end_idx in pairs:
-    #         # Check if keypoints are within the expected range
-    #         if start_idx < len(scaled_ghost) and end_idx < len(scaled_ghost):
-    #             pt1 = (int(scaled_ghost[start_idx][0]), int(scaled_ghost[start_idx][1]))
-    #             pt2 = (int(scaled_ghost[end_idx][0]), int(scaled_ghost[end_idx][1]))
-                
-    #             # Use thickness=8 for a bold, diagram-like look
-    #             cv2.line(frame, pt1, pt2, color, 8)
-                
-    #             # Add small circles at joints to make it look professional
-    #             cv2.circle(frame, pt1, 5, color, -1)
-    #             cv2.circle(frame, pt2, 5, color, -1)
-                
-    #     return frame
-    #     # h, w = frame.shape[:2]
-    #     # # Scale reference points to the live frame size
-    #     # scaled_ghost = self._scale_keypoints_to_panel(ref_kpts, w, h)
-        
-    #     # # Draw simple lines for the ghost in Cyan (255, 255, 0)
-    #     # pairs = [(5,6), (5,11), (6,12), (11,12), (5,7), (7,9), (6,8), (8,10), (11,13), (13,15), (12,14), (14,16)]
-    #     # for start_idx, end_idx in pairs:
-    #     #     pt1 = (int(scaled_ghost[start_idx][0]), int(scaled_ghost[start_idx][1]))
-    #     #     pt2 = (int(scaled_ghost[end_idx][0]), int(scaled_ghost[end_idx][1]))
-    #     #     cv2.line(frame, pt1, pt2, (255, 255, 0), 6)
-    #     # return frame
 
     def _draw_guidance_ghost(self, frame: np.ndarray, ref_kpts: np.ndarray, color=(255, 255, 0)) -> np.ndarray:
         """Draws a high-contrast guidance skeleton. Fixed to accept 'color' argument."""
@@ -898,65 +906,9 @@ class EnhancedPoseMonitor:
             live = self._draw_live_skeleton_with_errors(live)
         
         canvas[:, :w] = live
-
-        # # Add this inside the 'Left side - Live feed' section
-        # if self.is_guidance_active and self.next_state_preview:
-        #     ref_kpts_raw = getattr(self.next_state_preview, "mean_keypoints", None)
-        #     if ref_kpts_raw is not None:
-        #         # Create a transparent overlay for the "Ghost" guide
-        #         overlay = live.copy()
-        #         ref_kpts = np.array(ref_kpts_raw)
-                
-        #         # Draw the ghost skeleton in a distinct color (e.g., Cyan or Bright Yellow)
-        #         # We use a simple draw method or modify your humanlike one to use a fixed color
-        #         overlay = self._draw_guidance_ghost(overlay, ref_kpts)
-                
-        #         # Blend the ghost with the live frame
-        #         cv2.addWeighted(overlay, 0.4, live, 0.6, 0, live)
-                
-        #         # Add a "Get Ready" countdown
-        #         remaining = max(0, self.guidance_duration - (time.time() - self.guidance_start_time))
-        #         cv2.putText(live, f"PREVIEW: {remaining:.1f}s", (w//2 - 100, h//2), 
-        #                     cv2.FONT_HERSHEY_DUPLEX, 1.2, (0, 255, 255), 3)
-        # Place live feed on canvas
-        canvas[:, :w] = live
         
-        # RIGHT PANEL - Reference Pose
-        # ref_panel = np.ones((h, panel_width, 3), dtype=np.uint8) * 250
+        # canvas[:, :w] = live
         
-        # # Subtle gradient
-        # for i in range(100):
-        #     color_val = 250 - int(i * 0.5)
-        #     cv2.line(ref_panel, (0, i), (panel_width, i), (color_val, color_val, color_val), 1)
-        
-        # cv2.putText(ref_panel, "TARGET POSE",
-        #            (panel_width//2 - 80, 35), cv2.FONT_HERSHEY_DUPLEX, 0.8, (40, 40, 40), 2)
-        
-        # current_state_id = self.temporal_sequence[self.sequence_index]
-        # cv2.putText(ref_panel, f"State {current_state_id + 1}",
-        #            (panel_width//2 - 40, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (80, 80, 80), 2)
-        
-        # if self.current_state:
-        #     ref_kpts_raw = getattr(self.current_state, "mean_keypoints", None)
-        #     if ref_kpts_raw is not None:
-        #         ref_kpts = np.array(ref_kpts_raw)
-        #         ref_panel = self._draw_reference_skeleton(ref_panel, ref_kpts)
-        
-        # pose_indicator_y = h - 50
-        # cv2.rectangle(ref_panel, (20, pose_indicator_y - 30), (panel_width - 20, pose_indicator_y + 20), 
-        #               (240, 240, 240), -1)
-        # cv2.rectangle(ref_panel, (20, pose_indicator_y - 30), (panel_width - 20, pose_indicator_y + 20), 
-        #               (200, 200, 200), 2)
-        
-        # pose_text = f"Pose {status['sequence_index']+1}/{len(self.temporal_sequence)}"
-        # text_size = cv2.getTextSize(pose_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
-        # text_x = (panel_width - text_size[0]) // 2
-        # cv2.putText(ref_panel, pose_text,
-        #            (text_x, pose_indicator_y), 
-        #            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (60, 60, 60), 2)
-        
-        # canvas[:, w:] = ref_panel
-
         ref_panel = np.ones((h, panel_width, 3), dtype=np.uint8) * 250
     
         # Subtle gradient for header
@@ -1122,6 +1074,9 @@ class EnhancedPoseMonitor:
             cv2.putText(canvas, f"FPS: {fps:.0f}", (w - 100, h - 20),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
         
+        # skip button 
+        cv2.putText(canvas, "PRESS [S] TO SKIP POSE", (w - 250, h - 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 255), 1)
         return canvas
     
     def _annotate_session_complete(self, frame: np.ndarray) -> np.ndarray:
@@ -1233,24 +1188,69 @@ def main():
     fullscreen = False
     
     try:
+        # while True:
+
+        #     # Inside your while loop in main()
+        #     key = cv2.waitKey(1) & 0xFF
+
+        #     if key == ord("q"):
+        #         break
+        #     elif key == ord("s"):
+        #         print("\nℹ️  User requested skip")
+        #         monitor._transition_to_next_state(skipped=True)
+
+
+        #     ret, frame = cap.read()
+        #     if not ret:
+        #         print("✗ Failed to read frame")
+        #         break
+            
+        #     annotated, status = monitor.process_frame(frame)
+        #     cv2.imshow(window_name, annotated)
+            
+        #     if status.get("session_complete", False):
+        #         cv2.waitKey(2000)
+        #         break
+            
+        #     key = cv2.waitKey(1) & 0xFF
+            
+        #     if key == ord("q"):
+        #         print("\nℹ️  Stopped by user")
+        #         break
+        #     elif key == ord("f"):
+        #         fullscreen = not fullscreen
+        #         if fullscreen:
+        #             cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        #         else:
+        #             cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
+
+        
         while True:
             ret, frame = cap.read()
             if not ret:
                 print("✗ Failed to read frame")
                 break
             
+            # Process and show the frame
             annotated, status = monitor.process_frame(frame)
             cv2.imshow(window_name, annotated)
             
+            # Check if session ended naturally
             if status.get("session_complete", False):
                 cv2.waitKey(2000)
                 break
             
+            # ONE SINGLE CALL to waitKey
             key = cv2.waitKey(1) & 0xFF
             
+            # HANDLE ALL KEY PRESSES HERE
             if key == ord("q"):
                 print("\nℹ️  Stopped by user")
                 break
+            elif key == ord("s"):
+                # Use the leading underscore to match your method name
+                print("\nℹ️  User requested skip")
+                monitor._transition_to_next_state(skipped=True)
             elif key == ord("f"):
                 fullscreen = not fullscreen
                 if fullscreen:
