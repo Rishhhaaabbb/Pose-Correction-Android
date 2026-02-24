@@ -179,9 +179,12 @@ class EnhancedPoseMonitor:
         feedback_delay: float = 0.3,
         max_reps: Optional[int] = None,
         enable_adaptive: bool = True,
-        speed_mode: str = 'fast'   
+        speed_mode: str = 'fast', 
+        show_preview: bool = True   
     ):
         print("Initializing Fast-Response Pose Monitor...")
+        
+        # Use the value passed from the command line
         
         self.graph = pose_graph
         self.enable_adaptive = enable_adaptive
@@ -192,10 +195,14 @@ class EnhancedPoseMonitor:
         self.skipped_states: List[int] = []
 
         # Add to __init__
+        self.preview_enabled = show_preview
         self.guidance_duration = 2.0  # User-defined seconds for guidance
         self.is_guidance_active = False
         self.guidance_start_time = 0.0
         self.next_state_preview = None
+
+        # add preview or not 
+        # self.preview_enabled = True  # Default to ON
         
         if enable_adaptive:
             self.complexity = ExerciseComplexityAnalyzer.analyze(pose_graph)
@@ -483,41 +490,62 @@ class EnhancedPoseMonitor:
             
             return self._status(False, 0.0)
     
-    # def _transition_to_next_state(self):
-    #     """Modified to trigger a guidance phase before the next state starts."""
+    # def _transition_to_next_state(self, skipped: bool = False):
+    #     """Modified to handle manual skips and accuracy logging."""
+    #     current_state_id = self.temporal_sequence[self.sequence_index]
         
-    #     # 1. Determine the index of the NEXT state
+    #     # 1. Log Accuracy for the state being left
+    #     if skipped:
+    #         acc = 0.0
+    #         self.skipped_states.append(current_state_id)
+    #         print(f"  [SKIP] State {current_state_id + 1} skipped.")
+    #     else:
+    #         # Calculate accuracy for this specific state session
+    #         acc = (self.green_frames / self.evaluated_frames * 100) if self.evaluated_frames > 0 else 0.0
+        
+    #     if current_state_id not in self.state_best_accuracies:
+    #         self.state_best_accuracies[current_state_id] = []
+    #     self.state_best_accuracies[current_state_id].append(acc)
+
+    #     # Reset frame counters for the next state
+    #     self.green_frames = 0
+    #     self.evaluated_frames = 0
+
+    #     # 2. Determine Next Index
     #     next_idx = self.sequence_index + 1
         
-    #     # 2. Check if we just finished the last state of a rep
     #     if next_idx >= len(self.temporal_sequence):
-    #         # Keep your existing accuracy tracking logic
-    #         if self.evaluated_frames > 0:
-    #             rep_accuracy = (self.green_frames / self.evaluated_frames) * 100
-    #             self.rep_accuracies.append(rep_accuracy)
-            
+    #         # Rep complete logic
     #         self.total_reps += 1
     #         print(f"  [REP {self.total_reps}] Completed!")
             
-    #         # Check if session is over
     #         if self.max_reps and self.total_reps >= self.max_reps:
     #             self.session_complete = True
     #             self._print_summary()
     #             return
-                
-    #         next_idx = 0 # Loop back to the first state for the next rep
+    #         next_idx = 0 
 
-    #     # 3. TRIGGER GUIDANCE MODE 
-    #     # Instead of setting self.current_state, we set a preview
-    #     self.next_state_preview = self.graph.get_state(self.temporal_sequence[next_idx])
-    #     self.is_guidance_active = True
-    #     self.guidance_start_time = time.time()
-        
-    #     # 4. Update the index so the Target Panel on the right updates immediately
-    #     self.sequence_index = next_idx
+        # 3. Enter Guidance for Next State
+        # self.next_state_preview = self.graph.get_state(self.temporal_sequence[next_idx])
+        # self.is_guidance_active = True
+        # self.guidance_start_time = time.time()
+        # self.sequence_index = next_idx
+        # 3. TOGGLE LOGIC: Go to Guidance OR Go Direct
+        # if self.preview_enabled:
+        #     self.next_state_preview = next_state_obj
+        #     self.is_guidance_active = True
+        #     self.guidance_start_time = time.time()
+        # else:
+        #     # Skip guidance: Set current state immediately
+        #     self.is_guidance_active = False
+        #     self.current_state = next_state_obj
+        #     self.current_state_start_time = time.time()
+        #     self.current_state_hold_time = 0.0
+        #     self.in_transition = True
+        #     self.transition_start_time = time.time()
 
     def _transition_to_next_state(self, skipped: bool = False):
-        """Modified to handle manual skips and accuracy logging."""
+        """Modified to handle manual skips, accuracy logging, and optional previews."""
         current_state_id = self.temporal_sequence[self.sequence_index]
         
         # 1. Log Accuracy for the state being left
@@ -526,7 +554,6 @@ class EnhancedPoseMonitor:
             self.skipped_states.append(current_state_id)
             print(f"  [SKIP] State {current_state_id + 1} skipped.")
         else:
-            # Calculate accuracy for this specific state session
             acc = (self.green_frames / self.evaluated_frames * 100) if self.evaluated_frames > 0 else 0.0
         
         if current_state_id not in self.state_best_accuracies:
@@ -541,7 +568,6 @@ class EnhancedPoseMonitor:
         next_idx = self.sequence_index + 1
         
         if next_idx >= len(self.temporal_sequence):
-            # Rep complete logic
             self.total_reps += 1
             print(f"  [REP {self.total_reps}] Completed!")
             
@@ -551,34 +577,29 @@ class EnhancedPoseMonitor:
                 return
             next_idx = 0 
 
-        # 3. Enter Guidance for Next State
-        self.next_state_preview = self.graph.get_state(self.temporal_sequence[next_idx])
-        self.is_guidance_active = True
-        self.guidance_start_time = time.time()
-        self.sequence_index = next_idx
-    
-    # def _print_summary(self):
-    #     """Print enhanced summary."""
-    #     print("\n" + "="*60)
-    #     print("SESSION COMPLETE")
-    #     print("="*60)
-        
-    #     duration = time.time() - self.session_start_time
-        
-    #     print(f"\nReps: {self.total_reps}")
-    #     print(f"Duration: {duration:.1f}s ({duration/60:.1f} min)")
-        
-    #     if self.evaluated_frames > 0:
-    #         acc = (self.green_frames / self.evaluated_frames) * 100
-    #         print(f"Accuracy: {acc:.1f}%")
-        
-    #     print(f"Max Streak: {self.max_streak} correct frames")
-        
-    #     if len(self.frame_times) > 0:
-    #         print(f"Avg FPS: {1.0/np.mean(self.frame_times):.1f}")
-        
-    #     print("\n" + "="*60)
+        # --- FIX: Fetch the actual state object from the graph ---
+        next_state_id = self.temporal_sequence[next_idx]
+        next_state_obj = self.graph.get_state(next_state_id)
+        # ---------------------------------------------------------
 
+        # 3. TOGGLE LOGIC: Go to Guidance OR Go Direct
+        # Always update the sequence index so the UI shows the new pose
+        self.sequence_index = next_idx
+
+        if self.preview_enabled:
+            # Set the preview object for the "White Screen" phase
+            self.next_state_preview = next_state_obj
+            self.is_guidance_active = True
+            self.guidance_start_time = time.time()
+        else:
+            # Skip guidance: Start the next exercise immediately
+            self.is_guidance_active = False
+            self.current_state = next_state_obj
+            self.current_state_start_time = time.time()
+            self.current_state_hold_time = 0.0
+            self.in_transition = True
+            self.transition_start_time = time.time()
+    
     def _print_summary(self):
         """Prints a detailed breakdown of each pose's performance."""
         print("\n" + "="*60)
@@ -1077,6 +1098,13 @@ class EnhancedPoseMonitor:
         # skip button 
         cv2.putText(canvas, "PRESS [S] TO SKIP POSE", (w - 250, h - 50),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 255), 1)
+        
+        # Add this near your "Press [S] to Skip" text
+        preview_status = "ON" if self.preview_enabled else "OFF"
+        color = (0, 255, 0) if self.preview_enabled else (0, 0, 255)
+        cv2.putText(canvas, f"PREVIEW [P]: {preview_status}", (w - 250, h - 80),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+        
         return canvas
     
     def _annotate_session_complete(self, frame: np.ndarray) -> np.ndarray:
@@ -1121,6 +1149,8 @@ def main():
     parser.add_argument("--no-adaptive", action='store_true', help="Disable adaptive features")
     parser.add_argument("--speed", default="fast", choices=['fast', 'normal', 'strict'],
                        help="Speed mode: fast (15%% hold), normal (25%%), strict (40%%)")
+    # preview added or removed 
+    parser.add_argument("--no-preview", action='store_true', help="Disable the white-screen preview between poses")
     
     args = parser.parse_args()
     
@@ -1141,7 +1171,8 @@ def main():
             pose_model=args.model,
             max_reps=args.max_reps,
             enable_adaptive=not args.no_adaptive,
-            speed_mode=args.speed
+            speed_mode=args.speed,
+            show_preview=not args.no_preview  # Pass the choice here
         )
     except Exception as e:
         print(f"✗ Error creating monitor: {e}")
@@ -1188,42 +1219,6 @@ def main():
     fullscreen = False
     
     try:
-        # while True:
-
-        #     # Inside your while loop in main()
-        #     key = cv2.waitKey(1) & 0xFF
-
-        #     if key == ord("q"):
-        #         break
-        #     elif key == ord("s"):
-        #         print("\nℹ️  User requested skip")
-        #         monitor._transition_to_next_state(skipped=True)
-
-
-        #     ret, frame = cap.read()
-        #     if not ret:
-        #         print("✗ Failed to read frame")
-        #         break
-            
-        #     annotated, status = monitor.process_frame(frame)
-        #     cv2.imshow(window_name, annotated)
-            
-        #     if status.get("session_complete", False):
-        #         cv2.waitKey(2000)
-        #         break
-            
-        #     key = cv2.waitKey(1) & 0xFF
-            
-        #     if key == ord("q"):
-        #         print("\nℹ️  Stopped by user")
-        #         break
-        #     elif key == ord("f"):
-        #         fullscreen = not fullscreen
-        #         if fullscreen:
-        #             cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-        #         else:
-        #             cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
-
         
         while True:
             ret, frame = cap.read()
@@ -1257,6 +1252,10 @@ def main():
                     cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
                 else:
                     cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
+            elif key == ord("p"):
+                monitor.preview_enabled = not monitor.preview_enabled
+                status_str = "ENABLED" if monitor.preview_enabled else "DISABLED"
+                print(f"\nℹ️  Next Pose Preview: {status_str}")
     
     except KeyboardInterrupt:
         print("\nℹ️  Interrupted")
