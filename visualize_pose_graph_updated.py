@@ -151,6 +151,11 @@ class PoseGraphVisualizer:
         ax.axis('equal')
         ax.axis('off')
         plt.tight_layout()
+
+        # This automatically saves a preview for Streamlit to find
+        preview_path = self.graph_path.replace(".json", "_plot.png")
+        plt.savefig(preview_path, dpi=150, bbox_inches='tight')
+        print(f"Preview saved for Streamlit: {preview_path}")
         
         # Save if requested
         if save_path:
