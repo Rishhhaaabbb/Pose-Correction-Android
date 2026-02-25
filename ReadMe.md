@@ -1,243 +1,215 @@
-# Real-Time Pose Correction System
+# Real-Time Pose Correction System (MediaPipe Edition)
 
-A production-ready real-time pose correction platform for yoga and exercise guidance.
-The system automatically generates **pose-state graphs from reference videos** and provides **live accuracy, quality, and biomechanical feedback** during user sessions.
+A production-ready real-time pose correction platform for yoga and exercise guidance using **MediaPipe BlazePose (PoseLandmarker Full)**.
+
+The system automatically generates **pose-state graphs from reference videos** and provides **live accuracy, biomechanical feedback, and repetition tracking** during user sessions.
 
 ---
 
-## Overview
+## 📌 Overview
 
 The system operates in two phases:
 
-1. **Offline Phase**
-   Builds a **model-agnostic pose graph (JSON)** from a reference video.
+### 1️⃣ Offline Phase  
+Builds a **pose graph (JSON)** from a reference video.
 
-2. **Online Phase**
-   Uses the pose graph to guide users through correct pose sequences using live camera input.
+### 2️⃣ Online Phase  
+Uses the pose graph to guide users through correct pose sequences using live camera input.
 
-The same pose graph can be reused across **YOLOv8, MoveNet, and MediaPipe**.
-
----
-
-## Key Features
-
-* Automatic pose graph discovery (no manual labeling)
-* Deterministic state-machine execution
-* Multi-model pose estimation via adapters
-* Two-metric evaluation system:
-
-  * **Accuracy** (binary correctness)
-  * **Quality** (per-state refinement)
-* Intelligent biomechanical feedback
-* Single-inference-per-frame (performance safe)
-* Mobile-aligned architecture (MoveNet ready)
+Both phases use **MediaPipe PoseLandmarker (BlazePose Full model)**.
 
 ---
 
-## Architecture
+## 🚀 Key Features
 
-```
-Reference Video → Pose Graph Generator → pose_graph.json
-                                             ↓
-Camera → Pose Adapter → Feature Extraction → State Machine → Feedback
-                                                   ↓
-                                              Visualization
-```
+- Automatic pose-state discovery (no manual labeling)
+- Deterministic state-machine execution
+- Real-time accuracy tracking
+- Rep counting
+- Biomechanical feedback
+- Adaptive tolerances
+- Smooth state transitions
+- Lightweight CPU execution
+- Android-ready architecture
 
 ---
 
-## Core Components
+## 🏗 Architecture
+
+
+Architecture
+Reference Video → Graph Generator → pose_graph.json
+                                           ↓
+Camera → MediaPipe Pose → Feature Extraction → State Machine → Feedback
+                                                      ↓
+                                                 Visualization
+
+---
+
+## 📂 Core Components
 
 ### Offline
 
-* `offline_graph_generator.py` – generates pose graphs (JSON)
-* `state_discovery.py` – pose state segmentation & clustering
-* `pose_graph.py` – graph data structure & loader
+- `offline_graph_generator.py` — Generates pose graphs (JSON)
+- `state_discovery.py` — Pose segmentation and clustering
+- `pose_graph.py` — Graph data structure
 
 ### Online
 
-* `online_monitor_updated.py` – real-time monitoring engine
-* `pose_adapters.py` – YOLO / MoveNet / MediaPipe adapters
-* `pose_features.py` – biomechanical feature extraction
+- `online_monitor_final.py` — Real-time monitoring engine
+- `pose_adapters.py` — MediaPipe PoseLandmarker adapter
+- `pose_features.py` — Biomechanical feature extraction
 
 ---
 
-## Metrics (Frozen Design)
+## 🧠 Model Used
 
-### Accuracy — Binary Correctness
+### MediaPipe BlazePose — PoseLandmarker Full
 
-* Frame-level GREEN / RED classification
-* Starts after first GREEN
-* Paused during transitions
-* Formula:
+Model file:
 
-  ```
-  Accuracy = (GREEN frames / total evaluated frames) × 100
-  ```
+pose_landmarker_full.task
 
-### Quality — Per-State Refinement
 
-* Computed **only during GREEN**
-* Reset on:
+This model:
 
-  * leaving GREEN
-  * changing pose state
-* Sliding-window smoothing (recoverable)
-* One quality score per completed state
-* Final quality = average of all state qualities
-* **Does not decay during correct holds**
-
-### Feedback — Coaching Layer
-
-* Triggered on:
-
-  * RED poses
-  * sustained low-quality GREEN
-* Biomechanical priority:
-
-  1. Balance / stability
-  2. Torso alignment
-  3. Lower body
-  4. Upper body
-* Rate-limited and paused during transitions
+- Runs fully on CPU
+- Handles occlusion well
+- Provides stable landmark tracking
+- Optimized for mobile devices
 
 ---
 
-## Multi-Model Pose Support
+## 🛠 Installation
 
-All models are normalized to **COCO-17 keypoints in pixel space**, enabling:
+### 1️⃣ Create Virtual Environment
 
-* identical skeleton rendering
-* shared feature extraction
-* reusable pose graphs
-
-| Model            | Best Use                       |
-| ---------------- | ------------------------------ |
-| YOLOv8 Pose      | Desktop / GPU                  |
-| MoveNet (TFLite) | Mobile & cross-platform        |
-| MediaPipe Pose   | Lightweight CPU (separate env) |
-
----
-
-## Project Structure
-
+```bash
+python -m venv pose-env
+pose-env\Scripts\activate
+2️⃣ Install Requirements
 ```
+Create requirements.txt:
+```bash
+mediapipe>=0.10.9
+opencv-python>=4.8.0
+numpy>=1.23.0
+```
+Install:
+```bash
+pip install -r requirements.txt
+Project Structure
 pose-correction-system/
+│
 ├── offline_graph_generator.py
-├── online_monitor_updated.py
+├── online_monitor_final.py
 ├── pose_graph.py
 ├── state_discovery.py
 ├── pose_features.py
 ├── pose_adapters.py
+│
+├── pose_landmarker_full.task
+│
 ├── reference_videos/
+│
 └── pose_graphs/
     └── exercise_graph.json
-```
-
----
-
-## Usage
-
-### 1️⃣ Generate Pose Graph (Offline)
-
+  ```
+Usage
+1️⃣ Generate Pose Graph (Offline)
 ```bash
-python offline_graph_generator.py reference_videos/pushup.mp4 --output pose_graphs/pushup_graph.json
+python offline_graph_generator.py reference_videos/triangle.mp4 --output pose_graphs/triangle.json
 ```
+Notes:
 
-**Notes**
+Output is JSON
 
-* Output is always **JSON**
-* Graph is **model-agnostic**
-* No `--model` flag required
+Graph stores state sequence and tolerances
 
----
+Generated graph is reusable
 
-### 2️⃣ Run Online Monitoring
-
+2️⃣ Run Online Monitoring
 ```bash
-python online_monitor_updated.py --graph pose_graphs/pushup_graph.json --model yolo --camera 0 --max-reps 10
+python online_monitor_final.py --graph pose_graphs/triangle.json --camera 0 --max-reps 6
 ```
+Optional Flags
+| Flag            | Description                        |
+| --------------- | ---------------------------------- |
+| `--max-reps`    | Stop after N repetitions           |
+| `--camera`      | Camera index                       |
+| `--no-adaptive` | Disable adaptive tolerance scaling |
+| `--speed`       | `fast`, `normal`, `strict`         |
+| `--no-preview`  | Disable next-pose preview panel    |
 
-Supported models:
+Controls (During Session)
+| Key | Action            |
+| --- | ----------------- |
+| `q` | Quit              |
+| `s` | Skip current pose |
+| `f` | Toggle fullscreen |
+| `p` | Toggle preview    |
 
+
+Accuracy is computed as:
 ```bash
---model yolo
---model movenet
---model mediapipe
+Accuracy = (Correct Frames / Evaluated Frames) × 100
 ```
+Starts after first correct match
 
----
+Paused during transitions
 
-## Installation (IMPORTANT)
+Reset per state
 
-⚠️ **MediaPipe and TensorFlow (MoveNet) cannot coexist in the same Python environment on Windows** due to protobuf conflicts.
+Aggregated per rep
 
-### Recommended Setup
+State Logic
 
-#### Environment A — YOLO / MoveNet
+Each exercise consists of:
 
+A fixed temporal sequence of states
+
+Minimum hold duration per state
+
+Per-feature tolerances
+
+Transitions occur when:
 ```bash
-pip install -r requirements.txt
+hold_time >= min_hold_duration
 ```
+Rep is counted when:
+sequence_index completes full cycle
+Performance Notes
 
-#### Environment B — MediaPipe (separate)
+Single inference per frame
 
-```bash
-pip install mediapipe==0.10.9 protobuf==3.20.3 opencv-python numpy
-```
+CPU optimized
 
-Pose graphs (`.json`) are reusable across environments.
+Stable at 30 FPS on modern laptops
 
----
+Android deployment ready via MediaPipe Tasks SDK
 
-## MoveNet Model Requirement
+Android Deployment
 
-MoveNet requires a **TFLite file** (not SavedModel).
+For Android:
 
-Download:
+Use:
 
-* [https://tfhub.dev/google/movenet/singlepose/thunder/4?lite-format=tflite](https://tfhub.dev/google/movenet/singlepose/thunder/4?lite-format=tflite)
+MediaPipe Tasks SDK (PoseLandmarker)
 
-Rename to:
+CameraX for capture
 
-```
-movenet_thunder.tflite
-```
+Same pose_graph JSON
 
-Place it in the same directory as `pose_adapters.py`.
+Same state machine logic
 
----
+Python implementation serves as reference prototype.
 
-
-## Mobile Deployment
-
-⚠️ Python code **does not run on mobile OS**.
-
-Mobile implementation:
-
-* Android → MoveNet TFLite / MediaPipe SDK
-* iOS → MoveNet / MediaPipe iOS
-
-Reusable assets:
-
-* pose graph JSON
-* state logic
-* accuracy / quality definitions
-
-Current Python code serves as a **reference implementation**.
-
----
-
-## License
-
+License
 MIT License
 
----
+Status
 
-## Status
-
-**Version**: 1.0.0
-**State**: Frozen & Stable
-**Last Updated**: January 2026
-
-
+Version: 2.0.0
+Model: MediaPipe BlazePose (Full)
+Architecture: Single-model stable release
+Deployment Target: Desktop + Android
