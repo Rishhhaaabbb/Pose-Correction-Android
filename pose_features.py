@@ -326,3 +326,124 @@ class PoseFeatureExtractor:
         # Normalize relative to body scale (arbitrary reference)
         # Lower values = higher in frame, higher values = lower in frame
         return float(hip_center[1] / body_scale)
+    def extract_features_3d(self, keypoints_3d: np.ndarray) -> dict:
+        """
+        Extract joint angle features from (17, 4) [x, y, z, conf].
+        Keys are identical to 2D — state engine unchanged.
+        VP3D convention: X = left/right, Y = up, Z = forward/back.
+        """
+        features = {}
+
+        def _conf(i: int) -> float:
+            return float(keypoints_3d[i, 3])
+
+        def _xyz(i: int) -> np.ndarray:
+            return keypoints_3d[i, :3]
+
+        def _angle_3d(a, b, c):
+            ba, bc = a - b, c - b
+            na, nb = np.linalg.norm(ba), np.linalg.norm(bc)
+            if na < 1e-6 or nb < 1e-6:
+                return None
+            cos_a = np.clip(np.dot(ba, bc) / (na * nb), -1.0, 1.0)
+            return float(np.degrees(np.arccos(cos_a)))
+
+        ct = self.conf_thresh
+
+        # Elbow angles
+        if all(_conf(i) > ct for i in [5, 7, 9]):
+            a = _angle_3d(_xyz(5), _xyz(7), _xyz(9))
+            if a is not None:
+                features['left_elbow_angle'] = a
+
+        if all(_conf(i) > ct for i in [6, 8, 10]):
+            a = _angle_3d(_xyz(6), _xyz(8), _xyz(10))
+            if a is not None:
+                features['right_elbow_angle'] = a
+
+        # Knee angles
+        if all(_conf(i) > ct for i in [11, 13, 15]):
+            a = _angle_3d(_xyz(11), _xyz(13), _xyz(15))
+            if a is not None:
+                features['left_knee_angle'] = a
+
+        if all(_conf(i) > ct for i in [12, 14, 16]):
+            a = _angle_3d(_xyz(12), _xyz(14), _xyz(16))
+            if a is not None:
+                features['right_knee_angle'] = a
+
+        # Hip angles
+        if all(_conf(i) > ct for i in [5, 11, 13]):
+            a = _angle_3d(_xyz(5), _xyz(11), _xyz(13))
+            if a is not None:
+                features['left_hip_angle'] = a
+
+        if all(_conf(i) > ct for i in [6, 12, 14]):
+            a = _angle_3d(_xyz(6), _xyz(12), _xyz(14))
+            if a is not None:
+                features['right_hip_angle'] = a
+
+        # Shoulder angles
+        if all(_conf(i) > ct for i in [7, 5, 11]):
+            a = _angle_3d(_xyz(7), _xyz(5), _xyz(11))
+            if a is not None:
+                features['left_shoulder_angle'] = a
+
+        if all(_conf(i) > ct for i in [8, 6, 12]):
+            a = _angle_3d(_xyz(8), _xyz(6), _xyz(12))
+            if a is not None:
+                features['right_shoulder_angle'] = a
+
+        # Arm elevation
+        for side, sh, el in [('left', 5, 7), ('right', 6, 8)]:
+            if all(_conf(i) > ct for i in [sh, el]):
+                arm = _xyz(el) - _xyz(sh)
+                n   = np.linalg.norm(arm)
+                if n > 1e-6:
+                    cos_a = np.clip(
+                        np.dot(arm / n, np.array([0.0, 1.0, 0.0])), -1.0, 1.0
+                    )
+                    features[f'{side}_arm_elevation'] = float(
+                        np.degrees(np.arccos(cos_a))
+                    )
+
+        # Torso angle — signed, sagittal Z-Y plane (VP3D convention)
+        # X = left/right, Y = up, Z = forward/back
+        # 0° = upright, +ve = forward lean, -ve = backward lean
+        # Range ≈ [-90°, 90°]. No gravity calibration required.
+        if all(_conf(i) > ct for i in [5, 6, 11, 12]):
+            mid_shoulder = (_xyz(5)  + _xyz(6))  / 2.0
+            mid_hip      = (_xyz(11) + _xyz(12)) / 2.0
+            spine        = mid_shoulder - mid_hip
+
+            spine_forward  = spine[2]   # Z = forward/back
+            spine_vertical = spine[1]   # Y = up
+
+            if abs(spine_forward) > 1e-6 or abs(spine_vertical) > 1e-6:
+                features['torso_angle'] = float(
+                    np.degrees(np.arctan2(spine_forward, spine_vertical))
+                )
+
+        return features
+
+    def extract_features_with_fallback(
+        self,
+        keypoints_2d: np.ndarray,
+        keypoints_3d=None,
+    ) -> dict:
+        """
+        Use 3D features when available, fall back to 2D silently.
+        Drop-in replacement for extract_features() at all call sites.
+        """
+        features_2d = self.extract_features(keypoints_2d)
+
+        if keypoints_3d is None:
+            return features_2d
+
+        features_3d = self.extract_features_3d(keypoints_3d)
+        if not features_3d:
+            return features_2d
+
+        merged = features_2d.copy()
+        merged.update(features_3d)   # 3D overrides 2D for matching keys
+        return merged
