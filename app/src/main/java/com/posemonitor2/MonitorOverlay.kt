@@ -22,6 +22,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -73,6 +74,7 @@ fun MonitorOverlay(
     targetState: PoseState?,
     guidancePreviewState: PoseState?,
     deviations: Map<FeatureKey, Double>,
+    cameraFrameSize: androidx.compose.ui.geometry.Size = androidx.compose.ui.geometry.Size.Zero,
     modifier: Modifier = Modifier,
 ) {
     if (frameStatus == null) return
@@ -87,7 +89,12 @@ fun MonitorOverlay(
             GuidanceOverlay(previewState = guidancePreviewState, feedback = frameStatus.feedback)
         } else {
             skeleton?.let {
-                LiveSkeletonOverlay(skeleton = it, deviations = deviations, targetState = targetState)
+                LiveSkeletonOverlay(
+                    skeleton = it,
+                    deviations = deviations,
+                    targetState = targetState,
+                    cameraFrameSize = cameraFrameSize,
+                )
             }
         }
 
@@ -161,20 +168,74 @@ private fun LiveSkeletonOverlay(
     skeleton: Skeleton2d,
     deviations: Map<FeatureKey, Double>,
     targetState: PoseState?,
+    cameraFrameSize: androidx.compose.ui.geometry.Size,
 ) {
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val w = size.width
-        val h = size.height
+        val screenW = size.width
+        val screenH = size.height
 
-        // ── Performance: no intermediate pts list ─────────────────────────────
-        // Original code did:
-        //   val pts = skeleton.keypoints.map { kpt -> Offset(...) }
-        // which allocated a new List<Offset> (+ 17 Offset objects) every frame.
+        // ── FILL_CENTER crop rect computation ─────────────────────────────────
+        // PreviewView uses FILL_CENTER: the camera frame is scaled UP uniformly
+        // until it fills the screen in both dimensions, then the excess is cropped.
         //
-        // Fix: compute each Offset inline at the draw call site.
-        // Skeleton2d.keypoints is a List backed by an Array — random access is O(1).
-        // The two extra property reads per endpoint (vs list lookup) are negligible
-        // compared to the GC pressure removed by eliminating the allocation.
+        // MediaPipe keypoints are in [0,1] relative to the FULL camera frame.
+        // We need to remap them into the VISIBLE portion of the camera frame
+        // (the crop rect) mapped to screen pixels.
+        //
+        // Math:
+        //   scale = max(screenW / camW, screenH / camH)   — fill scale factor
+        //   scaledW = camW * scale,  scaledH = camH * scale
+        //   cropX = (scaledW - screenW) / 2  — pixels cropped from each side
+        //   cropY = (scaledH - screenH) / 2  — pixels cropped from top/bottom
+        //
+        //   visible portion in [0,1] camera space:
+        //     visX0 = cropX / scaledW,  visX1 = (scaledW - cropX) / scaledW
+        //     visY0 = cropY / scaledH,  visY1 = (scaledH - cropY) / scaledH
+        //
+        //   remap keypoint (kx, ky) → screen pixel:
+        //     px = (kx - visX0) / (visX1 - visX0) * screenW
+        //     py = (ky - visY0) / (visY1 - visY0) * screenH
+        //
+        // When cameraFrameSize is unknown (Zero), fall back to direct mapping.
+
+        val camW = cameraFrameSize.width
+        val camH = cameraFrameSize.height
+        val hasCamSize = camW > 0f && camH > 0f
+
+        // Visible range in [0,1] camera coords
+        val visX0: Float
+        val visX1: Float
+        val visY0: Float
+        val visY1: Float
+
+        if (hasCamSize) {
+            val scale = maxOf(screenW / camW, screenH / camH)
+            val scaledW = camW * scale
+            val scaledH = camH * scale
+            val cropX = (scaledW - screenW) / 2f
+            val cropY = (scaledH - screenH) / 2f
+            visX0 = cropX / scaledW
+            visX1 = (scaledW - cropX) / scaledW
+            visY0 = cropY / scaledH
+            visY1 = (scaledH - cropY) / scaledH
+        } else {
+            // Fallback: no crop (full frame = screen)
+            visX0 = 0f; visX1 = 1f; visY0 = 0f; visY1 = 1f
+        }
+
+        val visRangeX = visX1 - visX0
+        val visRangeY = visY1 - visY0
+
+        // Map a keypoint from [0,1] camera space → screen pixel, accounting for
+        // FILL_CENTER crop and front camera X mirror.
+        fun kptToScreen(kx: Float, ky: Float): Offset {
+            // Mirror X for front camera (already done in PoseDetector, but
+            // we mirror again here because visX0/visX1 are in un-mirrored space)
+            val mx = 1f - kx
+            val px = (mx - visX0) / visRangeX * screenW
+            val py = (ky - visY0) / visRangeY * screenH
+            return Offset(px, py)
+        }
 
         // Draw bones
         for (i in 0 until SkeletonConnections.boneCount) {
@@ -186,8 +247,8 @@ private fun LiveSkeletonOverlay(
             if (bKpt.confidence < 0.2f) continue
             drawLine(
                 color       = COLOR_BONE_OK,
-                start       = Offset((1f - aKpt.x.toFloat()) * w, aKpt.y.toFloat() * h),
-                end         = Offset((1f - bKpt.x.toFloat()) * w, bKpt.y.toFloat() * h),
+                start       = kptToScreen(aKpt.x.toFloat(), aKpt.y.toFloat()),
+                end         = kptToScreen(bKpt.x.toFloat(), bKpt.y.toFloat()),
                 strokeWidth = 5f,
                 cap         = StrokeCap.Round,
             )
@@ -196,7 +257,7 @@ private fun LiveSkeletonOverlay(
         // Draw joints
         skeleton.keypoints.forEachIndexed { idx, kpt ->
             if (kpt.confidence < 0.2f) return@forEachIndexed
-            val center     = Offset((1f - kpt.x.toFloat()) * w, kpt.y.toFloat() * h)
+            val center     = kptToScreen(kpt.x.toFloat(), kpt.y.toFloat())
             val featureKey = JOINT_FEATURE_MAP[idx]
             val tolerance  = featureKey?.let { targetState?.featureTolerances?.get(it) }
             val deviation  = featureKey?.let { deviations[it] }
@@ -292,7 +353,12 @@ private fun ReferencePosePanel(
                     val cx         = size.width / 2f
                     val cy         = size.height * if (isExpanded) 0.52f else 0.56f
                     val nodeRadius = min(size.width, size.height) * if (isExpanded) 0.52f else 0.42f
-                    drawAnatomicalFigure(normalized, Offset(cx, cy), nodeRadius)
+                    // Mirror horizontally so the target figure matches what the user
+                    // sees in the camera (front camera is already mirrored).
+                    // scale(-1, 1) around the center X flips the canvas horizontally.
+                    scale(scaleX = -1f, scaleY = 1f, pivot = Offset(cx, cy)) {
+                        drawAnatomicalFigure(normalized, Offset(cx, cy), nodeRadius)
+                    }
                 }
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -318,7 +384,10 @@ private fun GuidanceOverlay(previewState: PoseState, feedback: String) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val center     = Offset(size.width / 2f, size.height * 0.50f)
                 val nodeRadius = min(size.width, size.height) * 0.56f
-                drawAnatomicalFigure(normalized, center, nodeRadius)
+                // Mirror horizontally — same reason as target panel.
+                scale(scaleX = -1f, scaleY = 1f, pivot = center) {
+                    drawAnatomicalFigure(normalized, center, nodeRadius)
+                }
             }
         }
 

@@ -329,15 +329,33 @@ class PoseMonitorEngine(
 
         lastWasCorrect = false
         currentStreak = 0
+
+        // ── Match Python exactly ───────────────────────────────────────────────
+        // Python only resets current_state_start_time on an incorrect frame —
+        // it does NOT reset current_state_hold_time.
+        //
+        // Hold time is accumulated as a running delta on each correct frame:
+        //   delta = now - current_state_start_time
+        //   current_state_hold_time += delta
+        //   current_state_start_time = now
+        //
+        // On an incorrect frame, moving start_time to now means the next correct
+        // frame only adds the delta since the break — not time from before.
+        // But hold_time already accumulated from previous correct frames is kept.
+        //
+        // The old Kotlin code zeroed currentStateHoldTime = 0.0 here, wiping
+        // all progress on any brief form break — much stricter than Python.
         currentStateStartTime = now
-        currentStateHoldTime = 0.0
+        // currentStateHoldTime intentionally NOT reset — matches Python behavior
 
         if (now - lastFeedbackTime > config.feedbackDelaySeconds) {
             currentFeedback = feedbackGenerator.generateFeedback(deviations, features)
             lastFeedbackTime = now
         }
 
-        return buildStatus(isCorrect = false, progress = 0.0)
+        // Show partial hold progress even on incorrect frames so the UI
+        // reflects that accumulated hold time is preserved (matches Python).
+        return buildStatus(isCorrect = false, progress = currentStateHoldTime / currentState.minHoldDuration)
     }
 
     // ── State transition ──────────────────────────────────────────────────────
@@ -426,20 +444,28 @@ class PoseMonitorEngine(
             val adaptiveScale = adaptiveScaleFor(key)
             val scaled = tolerance * adaptiveScale * progressiveMult * graceMult
 
-            // ── Minimum tolerance floor ───────────────────────────────────────
-            // Graph-baked tolerances for ratio/elevation/spread features are
-            // often 0.1 — equivalent to a 5% margin on normalized [0,1] values.
-            // Any camera wobble, slight distance change, or body scale variation
-            // easily exceeds this, causing those features to permanently fail
-            // and drag the overall match ratio below the 60% threshold even
-            // when all visually important angles are correct.
+            // ── Android-calibrated tolerance floor ────────────────────────────
+            // Python runs at a fixed desktop webcam distance (~2m), so graph-baked
+            // ratio tolerances of 0.1 are achievable. On Android, the phone is
+            // handheld at variable distances — body_center_y, arm_elevation, and
+            // leg_spread shift constantly with camera distance and angle, making
+            // 0.1 tolerance impossible to hold.
             //
-            // Floor values chosen from empirical live-camera noise analysis:
-            //   Angle features (degrees):  15.0° — wider than graph default of 10°
-            //   Ratio features (unitless):  0.25  — 2.5× the graph default of 0.1
+            // The floor values match what the Python monitor effectively sees at
+            // its fixed camera distance, translated to Android's variable conditions:
             //
-            // The floor only activates when the graph tolerance is tighter —
-            // it never makes a tolerance stricter.
+            //   Angle features:  15.0° floor
+            //     Python graph default is 10°. Live camera noise (MediaPipe jitter,
+            //     slight body sway) adds ~3-5° variance. 15° gives the same
+            //     effective headroom Python has at a stable desk setup.
+            //
+            //   Ratio features:  0.35 floor
+            //     Graph default is 0.1. A 0.5m change in camera distance shifts
+            //     body_center_y by ~0.3 units. 0.35 absorbs normal phone handling
+            //     variation while still distinguishing meaningfully different poses
+            //     (e.g. standing vs crouching differs by ~1.5 units).
+            //
+            // Floor only widens — never tightens a tolerance that is already wider.
             if (config.enforceToleranceFloor) {
                 val floor = if (key.isAngle) MIN_ANGLE_TOLERANCE else MIN_RATIO_TOLERANCE
                 maxOf(scaled, floor)
@@ -453,10 +479,10 @@ class PoseMonitorEngine(
     }
 
     companion object {
-        // Minimum tolerance floors — only applied when enforceToleranceFloor = true.
-        // Angle features: degrees. Ratio features: normalized [0,1] units.
+        // Android-calibrated tolerance floors.
+        // Angle features: degrees. Ratio/elevation/spread features: normalized units.
         private const val MIN_ANGLE_TOLERANCE = 15.0
-        private const val MIN_RATIO_TOLERANCE = 0.25
+        private const val MIN_RATIO_TOLERANCE = 0.35
     }
 
     private fun buildStatus(

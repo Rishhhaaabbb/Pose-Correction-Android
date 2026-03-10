@@ -5,6 +5,7 @@ package com.posemonitor2
 import android.app.Application
 import android.content.Context
 import android.util.Log
+import android.util.Size
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.core.poseengine.PoseGraph
@@ -26,6 +27,7 @@ class DebugViewModel(application: Application) : AndroidViewModel(application) {
     // ── Public StateFlows ─────────────────────────────────────────────────────
 
     val currentSkeleton      = MutableStateFlow<Skeleton2d?>(null)
+    val cameraFrameSize      = MutableStateFlow<Size?>(null)
     val frameStatus          = MutableStateFlow<FrameStatus?>(null)
     val targetState          = MutableStateFlow<PoseState?>(null)
     val guidancePreviewState = MutableStateFlow<PoseState?>(null)
@@ -65,6 +67,9 @@ class DebugViewModel(application: Application) : AndroidViewModel(application) {
                 progressiveTolerance = true,
             ),
         )
+
+        // Wire frame size callback — reported once on first frame after rotation.
+        detector.onFrameSize = { size -> cameraFrameSize.value = size }
 
         viewModelScope.launch {
             useCase!!.process(detector.frameFlow(lifecycleOwner))

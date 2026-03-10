@@ -18,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -43,7 +44,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Request permission upfront so it's ready before graph selection
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             != PackageManager.PERMISSION_GRANTED
         ) {
@@ -74,15 +74,12 @@ private fun MainNavigation(viewModel: DebugViewModel, activity: MainActivity) {
                 context = context,
                 onGraphSelected = { entry ->
                     selectedGraph = entry
-                    // Check permission before starting camera
                     if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA)
                         == PackageManager.PERMISSION_GRANTED
                     ) {
                         screen = Screen.MONITOR
                     } else {
-                        // Show error — user hasn't granted camera permission
-                        // The launcher already requested it in onCreate
-                        screen = Screen.MONITOR  // will show initError from ViewModel
+                        screen = Screen.MONITOR
                     }
                 },
             )
@@ -91,15 +88,12 @@ private fun MainNavigation(viewModel: DebugViewModel, activity: MainActivity) {
         Screen.MONITOR -> {
             val graph = selectedGraph
             if (graph != null) {
-                // Start pipeline once when screen first appears
                 LaunchedEffect(graph) {
                     viewModel.startPipeline(activity, graph)
                 }
                 MonitorScreen(
                     viewModel = viewModel,
-                    onBack = {
-                        screen = Screen.GRAPH_SELECT
-                    },
+                    onBack = { screen = Screen.GRAPH_SELECT },
                 )
             }
         }
@@ -110,20 +104,46 @@ private fun MainNavigation(viewModel: DebugViewModel, activity: MainActivity) {
 
 @Composable
 fun MonitorScreen(viewModel: DebugViewModel, onBack: () -> Unit) {
-    val skeleton         by viewModel.currentSkeleton.collectAsStateWithLifecycle()
-    val frameStatus      by viewModel.frameStatus.collectAsStateWithLifecycle()
-    val targetState      by viewModel.targetState.collectAsStateWithLifecycle()
-    val guidancePreview  by viewModel.guidancePreviewState.collectAsStateWithLifecycle()
-    val deviations       by viewModel.lastDeviations.collectAsStateWithLifecycle()
-    val initError        by viewModel.initError.collectAsStateWithLifecycle()
+    val skeleton        by viewModel.currentSkeleton.collectAsStateWithLifecycle()
+    val frameStatus     by viewModel.frameStatus.collectAsStateWithLifecycle()
+    val targetState     by viewModel.targetState.collectAsStateWithLifecycle()
+    val guidancePreview by viewModel.guidancePreviewState.collectAsStateWithLifecycle()
+    val deviations      by viewModel.lastDeviations.collectAsStateWithLifecycle()
+    val initError       by viewModel.initError.collectAsStateWithLifecycle()
+    val rawFrameSize    by viewModel.cameraFrameSize.collectAsStateWithLifecycle()
+
+    // Convert android.util.Size → compose Size for the overlay crop rect math.
+    // Defaults to Size.Zero until the first frame arrives — overlay falls back
+    // to direct mapping in that case.
+    val cameraFrameSize = rawFrameSize?.let {
+        Size(it.width.toFloat(), it.height.toFloat())
+    } ?: Size.Zero
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
         // ── Camera preview ────────────────────────────────────────────────────
+        // FIT_CENTER: the full camera frame is scaled to fit the screen with
+        // letterboxing (black bars) rather than cropping.
+        //
+        // WHY THIS MATTERS FOR SKELETON ALIGNMENT:
+        // MediaPipe returns keypoints in [0,1] relative to the camera frame.
+        // The overlay Canvas maps those coords to screen pixels assuming the
+        // camera frame fills the entire screen. When PreviewView uses FILL_CENTER
+        // (the default), it crops the camera frame to fill the screen — so the
+        // rendered image and the keypoint coordinate space are different rectangles.
+        // This causes the skeleton to appear shifted/scaled relative to the body.
+        //
+        // FIT_CENTER makes them the same rectangle: the camera frame is scaled
+        // uniformly to fit inside the screen, and the overlay Canvas covers the
+        // same area. Keypoint [0,1] → screen pixel mapping is now 1:1 correct.
         AndroidView(
             factory = { ctx ->
-                PreviewView(ctx).also {
-                    viewModel.detector.setSurfaceProvider(it.surfaceProvider)
+                PreviewView(ctx).also { previewView ->
+                    // FILL_CENTER: camera fills screen edge-to-edge, no black bars.
+                    // The overlay compensates for the crop using cameraFrameSize
+                    // to remap keypoints into the visible camera rect precisely.
+                    previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
+                    viewModel.detector.setSurfaceProvider(previewView.surfaceProvider)
                 }
             },
             modifier = Modifier.fillMaxSize(),
@@ -136,6 +156,7 @@ fun MonitorScreen(viewModel: DebugViewModel, onBack: () -> Unit) {
             targetState = targetState,
             guidancePreviewState = guidancePreview,
             deviations = deviations,
+            cameraFrameSize = cameraFrameSize,
             modifier = Modifier.fillMaxSize(),
         )
 

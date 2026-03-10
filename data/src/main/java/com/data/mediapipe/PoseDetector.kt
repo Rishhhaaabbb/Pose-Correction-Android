@@ -18,6 +18,7 @@ import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker.PoseLandmarkerOptions
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult
+import android.util.Size
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -65,6 +66,11 @@ class PoseDetector(private val context: Context) {
 
     // Callback wired by frameFlow to receive LIVE_STREAM results.
     private var onResult: ((PoseDetectorResult) -> Unit)? = null
+
+    // Reports the camera frame size (post-rotation) once on the first frame.
+    // Used by the overlay to compute the FILL_CENTER crop rect for skeleton alignment.
+    var onFrameSize: ((Size) -> Unit)? = null
+    private var frameSizeReported = false
 
     // ── Cached rotation state ─────────────────────────────────────────────────
     // Reuse a single Matrix instance across frames.
@@ -175,6 +181,13 @@ class PoseDetector(private val context: Context) {
                 lastRotationDegrees = rotation
             }
             Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, rotationMatrix, true)
+        }
+
+        // Report frame size once — after rotation so dimensions reflect portrait orientation.
+        // The overlay uses this to compute the FILL_CENTER crop rect.
+        if (!frameSizeReported) {
+            onFrameSize?.invoke(Size(bitmap.width, bitmap.height))
+            frameSizeReported = true
         }
 
         val mpImage = BitmapImageBuilder(bitmap).build()
