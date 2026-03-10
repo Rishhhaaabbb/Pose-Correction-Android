@@ -1,0 +1,237 @@
+// app/src/main/java/com/posemonitor2/GraphSelectorScreen.kt
+
+package com.posemonitor2
+
+import android.content.Context
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import java.io.File
+
+data class GraphEntry(
+    val fileName: String,       // e.g. "side-touch.json"
+    val filePath: String,       // absolute path or "assets:side-touch.json"
+    val isAsset: Boolean = false,
+)
+
+/**
+ * Screen shown before camera starts — user picks which graph to monitor.
+ * Lists all saved graphs from internal storage + the bundled asset graph.
+ */
+@Composable
+fun GraphSelectorScreen(
+    context: Context,
+    onGraphSelected: (GraphEntry) -> Unit,
+) {
+    val graphs = remember { loadAvailableGraphs(context) }
+    var selected by remember { mutableStateOf<GraphEntry?>(null) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0F0F0F)),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Spacer(Modifier.height(32.dp))
+
+            Text(
+                "Select Exercise",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+            )
+            Text(
+                "Choose a pose graph to monitor",
+                fontSize = 14.sp,
+                color = Color(0xFF9E9E9E),
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            if (graphs.isEmpty()) {
+                // No graphs at all
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text("📂", fontSize = 48.sp)
+                        Text(
+                            "No graphs found",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                        )
+                        Text(
+                            "Generate a graph first using\nthe Graph Generation screen.",
+                            fontSize = 14.sp,
+                            color = Color(0xFF9E9E9E),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 20.sp,
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(graphs) { entry ->
+                        GraphEntryCard(
+                            entry = entry,
+                            isSelected = selected == entry,
+                            onClick = { selected = entry },
+                        )
+                    }
+                }
+            }
+
+            // Start button
+            Button(
+                onClick = { selected?.let { onGraphSelected(it) } },
+                enabled = selected != null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF2196F3),
+                    disabledContainerColor = Color(0xFF2A2A2A),
+                    disabledContentColor = Color(0xFF555555),
+                ),
+            ) {
+                Text(
+                    text = if (selected != null) "Start Monitoring" else "Select a graph above",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun GraphEntryCard(
+    entry: GraphEntry,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+) {
+    val borderColor = if (isSelected) Color(0xFF2196F3) else Color(0xFF2A2A2A)
+    val bgColor     = if (isSelected) Color(0xFF0D2A3E) else Color(0xFF1A1A1A)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(bgColor, RoundedCornerShape(10.dp))
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(10.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        // Icon
+        Text(
+            text = if (entry.isAsset) "📦" else "📄",
+            fontSize = 24.sp,
+        )
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = entry.fileName.removeSuffix(".json"),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+            )
+            Text(
+                text = if (entry.isAsset) "Bundled" else "Generated",
+                fontSize = 12.sp,
+                color = Color(0xFF757575),
+            )
+        }
+
+        // Selection indicator
+        if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .background(Color(0xFF2196F3), RoundedCornerShape(11.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("✓", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .border(1.5.dp, Color(0xFF555555), RoundedCornerShape(11.dp)),
+            )
+        }
+    }
+}
+
+// ── Load available graphs ─────────────────────────────────────────────────────
+
+fun loadAvailableGraphs(context: Context): List<GraphEntry> {
+    val result = mutableListOf<GraphEntry>()
+
+    // 1. Saved graphs from internal storage
+    val graphsDir = File(context.filesDir, "graphs")
+    if (graphsDir.exists()) {
+        graphsDir.listFiles { f -> f.extension == "json" }
+            ?.sortedByDescending { it.lastModified() }
+            ?.forEach { file ->
+                result.add(GraphEntry(
+                    fileName = file.name,
+                    filePath = file.absolutePath,
+                    isAsset = false,
+                ))
+            }
+    }
+
+    // 2. Bundled asset graphs
+    try {
+        context.assets.list("")
+            ?.filter { it.endsWith(".json") }
+            ?.forEach { name ->
+                // Only add if not already present from internal storage
+                if (result.none { it.fileName == name }) {
+                    result.add(GraphEntry(
+                        fileName = name,
+                        filePath = "assets:$name",
+                        isAsset = true,
+                    ))
+                }
+            }
+    } catch (_: Exception) {}
+
+    return result
+}
