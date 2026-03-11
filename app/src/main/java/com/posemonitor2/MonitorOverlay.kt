@@ -229,11 +229,14 @@ private fun LiveSkeletonOverlay(
         // Map a keypoint from [0,1] camera space → screen pixel, accounting for
         // FILL_CENTER crop and front camera X mirror.
         fun kptToScreen(kx: Float, ky: Float): Offset {
-            // Mirror X for front camera (already done in PoseDetector, but
-            // we mirror again here because visX0/visX1 are in un-mirrored space)
+            // Mirror X for front camera.
             val mx = 1f - kx
+            // Flip Y back to camera convention (Y=0 at top).
+            // Skeleton2d stores Y flipped (Y=0 at bottom) to match Python/OpenCV
+            // for feature extraction. The overlay needs raw camera Y for drawing.
+            val my = 1f - ky
             val px = (mx - visX0) / visRangeX * screenW
-            val py = (ky - visY0) / visRangeY * screenH
+            val py = (my - visY0) / visRangeY * screenH
             return Offset(px, py)
         }
 

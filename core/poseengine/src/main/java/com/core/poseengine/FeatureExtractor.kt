@@ -416,7 +416,7 @@ class FeatureExtractor(
         val lHip = skeleton[KeypointIndex.LEFT_HIP]
         val rHip = skeleton[KeypointIndex.RIGHT_HIP]
         val hipCy = (lHip.y + rHip.y) / 2.0
-        return (1.0-hipCy) / bodyScale
+        return hipCy / bodyScale
     }
 
     // ── 3D computation helpers ────────────────────────────────────────────────

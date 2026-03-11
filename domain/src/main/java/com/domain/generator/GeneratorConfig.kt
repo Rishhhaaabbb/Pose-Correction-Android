@@ -10,6 +10,17 @@ package com.domain.generator
  *   be used in feature extraction. Default 0.6 matches Python default.
  * @param stabilityThreshold   Max normalized feature distance for a frame to
  *   remain in the same stable segment. Default 0.12 matches Python default.
+ * @param mergeThreshold       Max normalized feature distance for two segments
+ *   to be merged into the same canonical state.
+ *
+ *   MUST DEFAULT TO stabilityThreshold — matches Python exactly:
+ *     Python._find_matching_state: distance <= self.stability_threshold
+ *   Python uses the SAME threshold for both detection and merging.
+ *
+ *   Previous Kotlin default was stabilityThreshold × 0.5 — this caused
+ *   states that Python merges (distance ≤ 0.12) to remain separate in Kotlin
+ *   (distance > 0.06), requiring artificially inflated hyperparameters to
+ *   compensate and producing different graphs from the same video.
  * @param minHoldFrames        A segment shorter than this (after skip_frames)
  *   is discarded. Default 18 matches Python default.
  * @param smoothingWindow      Rolling average window for temporal smoothing.
@@ -31,6 +42,18 @@ data class GeneratorConfig(
     val skipFrames: Int = 1,
     val maxFrames: Int? = null,
 ) {
+    /**
+     * Merge threshold — always equals stabilityThreshold to match Python.
+     *
+     * Defined as a val (not a constructor param) so it cannot be accidentally
+     * set to a different value, preserving the Python invariant that detection
+     * and merging use the same threshold.
+     *
+     * If you ever need asymmetric thresholds, promote this to a constructor
+     * param with default = stabilityThreshold.
+     */
+    val mergeThreshold: Double get() = stabilityThreshold
+
     init {
         require(skipFrames >= 1) { "skipFrames must be ≥ 1" }
         require(minHoldFrames >= 1) { "minHoldFrames must be ≥ 1" }
@@ -46,6 +69,6 @@ data class GeneratorConfig(
 
     companion object {
         /** Matches all Python defaults. */
-        val DEFAULT = `GeneratorConfig`()
+        val DEFAULT = GeneratorConfig()
     }
 }

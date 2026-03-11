@@ -40,7 +40,26 @@ class OfflineGraphGeneratorImpl @Inject constructor(
     private val poseProvider: MediaPipePoseProvider,
     private val featureExtractor: FeatureExtractor,
 ) : OfflineGraphGenerator {
-
+    private fun resolveDisplayName(context: Context, videoUri: String): String {
+        // For content:// URIs (gallery picks), query the MediaStore display name.
+        // Uri.lastPathSegment returns the media ID (e.g. "1000178312"), not the filename.
+        return try {
+            val uri = Uri.parse(videoUri)
+            if (uri.scheme == "content") {
+                context.contentResolver.query(
+                    uri,
+                    arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                    null, null, null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        cursor.getString(0)  // e.g. "side-touch.mp4"
+                    } else null
+                }
+            } else null
+        } catch (e: Exception) { null }
+            ?: Uri.parse(videoUri).lastPathSegment  // fallback for file:// URIs
+            ?: videoUri
+    }
     override fun generate(
         videoUri: String,
         config: GeneratorConfig,
@@ -191,7 +210,7 @@ class OfflineGraphGeneratorImpl @Inject constructor(
         // Matches Python:
         //   graph = PoseGraph()
         //   graph.build_from_temporal_sequence(states, temporal_sequence)
-        val videoFilename = Uri.parse(videoUri).lastPathSegment ?: videoUri
+        val videoFilename = resolveDisplayName(context, videoUri)
         val now = Clock.System.now().toString()  // ISO-8601, matches Python datetime.now().isoformat()
 
         val metadata = GraphMetadata(

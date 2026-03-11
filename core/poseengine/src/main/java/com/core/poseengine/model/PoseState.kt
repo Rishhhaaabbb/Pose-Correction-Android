@@ -122,7 +122,7 @@ data class PoseState(
 
     companion object {
 
-        private const val MATCH_RATIO_THRESHOLD = 0.6
+        private const val MATCH_RATIO_THRESHOLD = 0.7
 
         fun fromSerializable(dto: PoseStateDto): PoseState = PoseState(
             stateId = dto.stateId,

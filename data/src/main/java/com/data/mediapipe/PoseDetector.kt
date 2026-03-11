@@ -226,7 +226,13 @@ class PoseDetector(private val context: Context) {
 
             keypoints[cocoIdx] = Keypoint2d(
                 x = lmk.x().toDouble().coerceIn(0.0, 1.0),
-                y = lmk.y().toDouble().coerceIn(0.0, 1.0),
+                // CameraX delivers landmarks in a coordinate system where Y=0 is
+                // at the BOTTOM of the frame — opposite to OpenCV (Y=0 at top).
+                // Python's offline generator uses OpenCV, so we flip Y once here
+                // at ingestion so ALL downstream code (FeatureExtractor, StateDiscovery,
+                // MonitorEngine) operates on the same coordinate system as Python.
+                // This is the single source of truth for the Y flip — nowhere else.
+                y = (1.0 - lmk.y().toDouble()).coerceIn(0.0, 1.0),
                 confidence = conf,
             )
             if (conf > 0.5) validCount++

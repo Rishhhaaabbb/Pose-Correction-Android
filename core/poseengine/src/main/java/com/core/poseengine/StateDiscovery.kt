@@ -50,7 +50,7 @@ class StateDiscovery(
     mergeThreshold: Double? = null,
     val asymmetryVetoMinMagnitude: Double = 5.0,
 ) {
-    val mergeThreshold: Double = mergeThreshold ?: (stabilityThreshold * 0.5)
+    val mergeThreshold: Double = mergeThreshold ?: stabilityThreshold
 
     // ── Primary entry point ───────────────────────────────────────────────────
 
