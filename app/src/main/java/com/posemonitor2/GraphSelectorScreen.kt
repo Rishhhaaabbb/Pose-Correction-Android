@@ -6,6 +6,7 @@ import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,17 +28,38 @@ data class GraphEntry(
     val isAsset: Boolean = false,
 )
 
-/**
- * Screen shown before camera starts — user picks which graph to monitor.
- * Lists all saved graphs from internal storage + the bundled asset graph.
- */
 @Composable
 fun GraphSelectorScreen(
     context: Context,
     onGraphSelected: (GraphEntry) -> Unit,
 ) {
-    val graphs = remember { loadAvailableGraphs(context) }
+    var graphs by remember { mutableStateOf(loadAvailableGraphs(context)) }
     var selected by remember { mutableStateOf<GraphEntry?>(null) }
+    var renameTarget by remember { mutableStateOf<GraphEntry?>(null) }
+
+    // Rename dialog
+    renameTarget?.let { target ->
+        RenameDialog(
+            currentName = target.fileName.removeSuffix(".json"),
+            onConfirm = { newName ->
+                val trimmed = newName.trim()
+                if (trimmed.isNotEmpty() && !target.isAsset) {
+                    val oldFile = File(target.filePath)
+                    val newFile = File(oldFile.parent, "$trimmed.json")
+                    if (oldFile.renameTo(newFile)) {
+                        val updatedEntry = target.copy(
+                            fileName = newFile.name,
+                            filePath = newFile.absolutePath,
+                        )
+                        graphs = graphs.map { if (it == target) updatedEntry else it }
+                        if (selected == target) selected = updatedEntry
+                    }
+                }
+                renameTarget = null
+            },
+            onDismiss = { renameTarget = null },
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -67,7 +89,6 @@ fun GraphSelectorScreen(
             Spacer(Modifier.height(8.dp))
 
             if (graphs.isEmpty()) {
-                // No graphs at all
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -104,12 +125,14 @@ fun GraphSelectorScreen(
                             entry = entry,
                             isSelected = selected == entry,
                             onClick = { selected = entry },
+                            onLongClick = if (!entry.isAsset) {
+                                { renameTarget = entry }
+                            } else null,
                         )
                     }
                 }
             }
 
-            // Start button
             Button(
                 onClick = { selected?.let { onGraphSelected(it) } },
                 enabled = selected != null,
@@ -135,11 +158,62 @@ fun GraphSelectorScreen(
     }
 }
 
+// ── Rename dialog ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun RenameDialog(
+    currentName: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by remember { mutableStateOf(currentName) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1E1E1E),
+        titleContentColor = Color.White,
+        textContentColor = Color(0xFFCCCCCC),
+        title = { Text("Rename Graph", fontWeight = FontWeight.SemiBold) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                singleLine = true,
+                placeholder = { Text("Graph name", color = Color(0xFF666666)) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFF2196F3),
+                    unfocusedBorderColor = Color(0xFF444444),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    cursorColor = Color(0xFF2196F3),
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(text) },
+                enabled = text.trim().isNotEmpty(),
+            ) {
+                Text("Rename", color = Color(0xFF2196F3), fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = Color(0xFF9E9E9E))
+            }
+        },
+    )
+}
+
+// ── Graph entry card ──────────────────────────────────────────────────────────
+
 @Composable
 private fun GraphEntryCard(
     entry: GraphEntry,
     isSelected: Boolean,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
 ) {
     val borderColor = if (isSelected) Color(0xFF2196F3) else Color(0xFF2A2A2A)
     val bgColor     = if (isSelected) Color(0xFF0D2A3E) else Color(0xFF1A1A1A)
@@ -153,12 +227,14 @@ private fun GraphEntryCard(
                 color = borderColor,
                 shape = RoundedCornerShape(10.dp),
             )
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        // Icon
         Text(
             text = if (entry.isAsset) "📦" else "📄",
             fontSize = 24.sp,
@@ -172,13 +248,15 @@ private fun GraphEntryCard(
                 color = Color.White,
             )
             Text(
-                text = if (entry.isAsset) "Bundled" else "Generated",
+                text = when {
+                    entry.isAsset -> "Bundled"
+                    else -> "Generated · hold to rename"
+                },
                 fontSize = 12.sp,
                 color = Color(0xFF757575),
             )
         }
 
-        // Selection indicator
         if (isSelected) {
             Box(
                 modifier = Modifier
@@ -203,7 +281,6 @@ private fun GraphEntryCard(
 fun loadAvailableGraphs(context: Context): List<GraphEntry> {
     val result = mutableListOf<GraphEntry>()
 
-    // 1. Saved graphs from internal storage
     val graphsDir = File(context.filesDir, "graphs")
     if (graphsDir.exists()) {
         graphsDir.listFiles { f -> f.extension == "json" }
@@ -217,12 +294,10 @@ fun loadAvailableGraphs(context: Context): List<GraphEntry> {
             }
     }
 
-    // 2. Bundled asset graphs
     try {
         context.assets.list("")
             ?.filter { it.endsWith(".json") }
             ?.forEach { name ->
-                // Only add if not already present from internal storage
                 if (result.none { it.fileName == name }) {
                     result.add(GraphEntry(
                         fileName = name,

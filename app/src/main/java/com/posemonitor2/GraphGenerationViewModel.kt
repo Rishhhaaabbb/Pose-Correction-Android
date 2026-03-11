@@ -30,12 +30,19 @@ class GraphGenerationViewModel(application: Application) : AndroidViewModel(appl
         )
     }
 
-    fun startGeneration(videoUri: String, config: GeneratorConfig) {
+    /**
+     * @param graphName User-provided name for the graph (no extension).
+     *   If blank, falls back to the video filename.
+     */
+    fun startGeneration(videoUri: String, config: GeneratorConfig, graphName: String = "") {
         viewModelScope.launch {
             val outputDir = File(getApplication<Application>().filesDir, "graphs")
             outputDir.mkdirs()
 
-            val fileName = resolveVideoFileName(videoUri)
+            val fileName = graphName.trim()
+                .takeIf { it.isNotEmpty() }
+                ?.plus(".json")
+                ?: resolveVideoFileName(videoUri)
 
             val outputPath = File(outputDir, fileName).absolutePath
 
@@ -113,18 +120,6 @@ class GraphGenerationViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    /**
-     * Resolves the human-readable filename from a content:// URI.
-     *
-     * Android's file picker returns content URIs like:
-     *   content://com.android.providers.media.documents/document/video:1000000123
-     * whose lastPathSegment is just the media ID ("video:1000000123"), not the filename.
-     *
-     * We query OpenableColumns.DISPLAY_NAME via ContentResolver to get the real name,
-     * strip its extension, and append .json.
-     *
-     * Falls back to timestamp if the resolver returns nothing.
-     */
     private fun resolveVideoFileName(videoUri: String): String {
         val uri = Uri.parse(videoUri)
         var displayName: String? = null
@@ -143,7 +138,7 @@ class GraphGenerationViewModel(application: Application) : AndroidViewModel(appl
         }
 
         return displayName
-            ?.substringBeforeLast(".")   // strip video extension (.mp4 etc.)
+            ?.substringBeforeLast(".")
             ?.plus(".json")
             ?: "graph_${System.currentTimeMillis()}.json"
     }

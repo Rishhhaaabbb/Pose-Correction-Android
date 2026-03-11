@@ -92,8 +92,12 @@ fun GraphGenerationScreen(viewModel: GraphGenerationViewModel) {
                 Box(modifier = Modifier.padding(24.dp)) {
                     SettingsContent(
                         videoUri = pendingVideoUri!!,
-                        onConfirm = { config ->
-                            viewModel.startGeneration(videoUri = pendingVideoUri!!, config = config)
+                        onConfirm = { config, graphName ->
+                            viewModel.startGeneration(
+                                videoUri  = pendingVideoUri!!,
+                                config    = config,
+                                graphName = graphName,
+                            )
                         },
                         onBack = { pendingVideoUri = null },
                     )
@@ -139,10 +143,11 @@ private fun IdleContent(onPickVideo: () -> Unit) {
 @Composable
 private fun SettingsContent(
     videoUri: String,
-    onConfirm: (GeneratorConfig) -> Unit,
+    onConfirm: (GeneratorConfig, String) -> Unit,
     onBack: () -> Unit,
 ) {
     val defaults = GeneratorConfig.DEFAULT
+    var graphName           by remember { mutableStateOf("") }
     var stabilityThreshold  by remember { mutableStateOf(defaults.stabilityThreshold.toString()) }
     var minHoldFrames       by remember { mutableStateOf(defaults.minHoldFrames.toString()) }
     var skipFrames          by remember { mutableStateOf(defaults.skipFrames.toString()) }
@@ -161,8 +166,36 @@ private fun SettingsContent(
             "Video: ${Uri.parse(videoUri).lastPathSegment ?: videoUri}",
             fontSize = 13.sp, color = Color(0xFF9E9E9E),
         )
+
         Spacer(Modifier.height(4.dp))
 
+        // ── Graph name ────────────────────────────────────────────────────────
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Graph Name", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White)
+            Text(
+                "What to call this graph (leave blank to use the video filename)",
+                fontSize = 12.sp, color = Color(0xFF757575),
+            )
+            OutlinedTextField(
+                value = graphName,
+                onValueChange = { graphName = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("e.g. side-touch", color = Color(0xFF555555)) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFF2196F3),
+                    unfocusedBorderColor = Color(0xFF424242),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    cursorColor = Color(0xFF2196F3),
+                ),
+                shape = RoundedCornerShape(8.dp),
+            )
+        }
+
+        HorizontalDivider(color = Color(0xFF2A2A2A))
+
+        // ── Advanced parameters ───────────────────────────────────────────────
         ParamField("Stability Threshold", "Max feature distance to stay in same segment (default: 0.12)",
             stabilityThreshold, { stabilityThreshold = it }, KeyboardType.Decimal)
         ParamField("Min Hold Frames", "Minimum frames a pose must be held (default: 18)",
@@ -202,7 +235,7 @@ private fun SettingsContent(
                         validationError = "Please check all fields — values must be valid numbers within range."
                     } else {
                         validationError = null
-                        onConfirm(config)
+                        onConfirm(config, graphName.trim())
                     }
                 },
                 modifier = Modifier.weight(2f).height(52.dp),
@@ -249,20 +282,16 @@ private fun SuccessContent(
     state: GenerationUiState.Success,
     onGenerateAnother: () -> Unit,
 ) {
-    // Load the graph from the saved JSON path for visualization
     val graph = remember(state.outputPath) {
         runCatching {
             PoseGraph.fromJson(File(state.outputPath).readText(Charsets.UTF_8))
         }.getOrNull()
     }
 
-    // Track whether visualization is expanded
     var showVisualization by remember { mutableStateOf(false) }
 
     if (showVisualization && graph != null) {
-        // Full-screen visualization — back button returns to summary
         Column(modifier = Modifier.fillMaxSize()) {
-            // Top bar with back button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -281,11 +310,9 @@ private fun SuccessContent(
                     color = Color.White,
                 )
             }
-            // The existing visualization screen
             PoseGraphVisualizationScreen(graph = graph)
         }
     } else {
-        // Summary screen
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -314,7 +341,6 @@ private fun SuccessContent(
 
             Spacer(Modifier.height(4.dp))
 
-            // View Graph button — only shown if graph loaded successfully
             if (graph != null) {
                 Button(
                     onClick = { showVisualization = true },
