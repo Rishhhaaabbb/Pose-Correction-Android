@@ -4,13 +4,17 @@ package com.posemonitor2
 
 import android.content.Context
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,9 +36,9 @@ data class GraphEntry(
 fun GraphSelectorScreen(
     context: Context,
     onGraphSelected: (GraphEntry) -> Unit,
+    onBack: (() -> Unit)? = null,
 ) {
     var graphs by remember { mutableStateOf(loadAvailableGraphs(context)) }
-    var selected by remember { mutableStateOf<GraphEntry?>(null) }
     var renameTarget by remember { mutableStateOf<GraphEntry?>(null) }
 
     // Rename dialog
@@ -52,7 +56,6 @@ fun GraphSelectorScreen(
                             filePath = newFile.absolutePath,
                         )
                         graphs = graphs.map { if (it == target) updatedEntry else it }
-                        if (selected == target) selected = updatedEntry
                     }
                 }
                 renameTarget = null
@@ -64,35 +67,70 @@ fun GraphSelectorScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0F0F)),
+            .background(Color(0xFFEFF1F2)),
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .fillMaxSize(),
         ) {
-            Spacer(Modifier.height(32.dp))
+            Surface(
+                color = Color(0xFFF7F8F9),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 20.dp),
+                ) {
+                    Surface(
+                        onClick = { onBack?.invoke() },
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color(0xFFF2F4F5),
+                        modifier = Modifier
+                            .size(44.dp)
+                            .align(Alignment.TopStart),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color(0xFF075246),
+                            )
+                        }
+                    }
 
-            Text(
-                "Select Exercise",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-            )
-            Text(
-                "Choose a pose graph to monitor",
-                fontSize = 14.sp,
-                color = Color(0xFF9E9E9E),
-            )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 52.dp, bottom = 10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            "Pose Graphs",
+                            fontSize = 27.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF064E43),
+                        )
+                        Text(
+                            "Select a pose graph to monitor",
+                            fontSize = 14.sp,
+                            color = Color(0xFF5F6368),
+                        )
+                    }
+                }
+            }
 
-            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(
+                color = Color(0xFFE5E7EB),
+                thickness = 1.dp,
+            )
 
             if (graphs.isEmpty()) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                        .fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
                     Column(
@@ -101,15 +139,15 @@ fun GraphSelectorScreen(
                     ) {
                         Text("📂", fontSize = 48.sp)
                         Text(
-                            "No graphs found",
+                            "No exercises available",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White,
+                            color = Color(0xFF0D3E40),
                         )
                         Text(
                             "Generate a graph first using\nthe Graph Generation screen.",
                             fontSize = 14.sp,
-                            color = Color(0xFF9E9E9E),
+                            color = Color(0xFF8B959E),
                             textAlign = TextAlign.Center,
                             lineHeight = 20.sp,
                         )
@@ -117,43 +155,26 @@ fun GraphSelectorScreen(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 20.dp, vertical = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
                     items(graphs) { entry ->
                         GraphEntryCard(
                             entry = entry,
-                            isSelected = selected == entry,
-                            onClick = { selected = entry },
+                            onClick = { onGraphSelected(entry) },
                             onLongClick = if (!entry.isAsset) {
                                 { renameTarget = entry }
                             } else null,
                         )
                     }
+                    item {
+                        Spacer(Modifier.height(20.dp))
+                    }
                 }
             }
-
-            Button(
-                onClick = { selected?.let { onGraphSelected(it) } },
-                enabled = selected != null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF2196F3),
-                    disabledContainerColor = Color(0xFF2A2A2A),
-                    disabledContentColor = Color(0xFF555555),
-                ),
-            ) {
-                Text(
-                    text = if (selected != null) "Start Monitoring" else "Select a graph above",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-
-            Spacer(Modifier.height(8.dp))
         }
     }
 }
@@ -170,22 +191,22 @@ private fun RenameDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF1E1E1E),
-        titleContentColor = Color.White,
-        textContentColor = Color(0xFFCCCCCC),
-        title = { Text("Rename Graph", fontWeight = FontWeight.SemiBold) },
+        containerColor = Color.White,
+        titleContentColor = Color(0xFF0D3E40),
+        textContentColor = Color(0xFF8B959E),
+        title = { Text("Rename Exercise", fontWeight = FontWeight.SemiBold) },
         text = {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
                 singleLine = true,
-                placeholder = { Text("Graph name", color = Color(0xFF666666)) },
+                placeholder = { Text("Exercise name", color = Color(0xFFC0C0C0)) },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF2196F3),
-                    unfocusedBorderColor = Color(0xFF444444),
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    cursorColor = Color(0xFF2196F3),
+                    focusedBorderColor = Color(0xFF1E6B6C),
+                    unfocusedBorderColor = Color(0xFFE0E0E0),
+                    focusedTextColor = Color(0xFF0D3E40),
+                    unfocusedTextColor = Color(0xFF0D3E40),
+                    cursorColor = Color(0xFF1E6B6C),
                 ),
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -195,12 +216,12 @@ private fun RenameDialog(
                 onClick = { onConfirm(text) },
                 enabled = text.trim().isNotEmpty(),
             ) {
-                Text("Rename", color = Color(0xFF2196F3), fontWeight = FontWeight.SemiBold)
+                Text("Rename", color = Color(0xFF1E6B6C), fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = Color(0xFF9E9E9E))
+                Text("Cancel", color = Color(0xFF8B959E))
             }
         },
     )
@@ -211,66 +232,79 @@ private fun RenameDialog(
 @Composable
 private fun GraphEntryCard(
     entry: GraphEntry,
-    isSelected: Boolean,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
 ) {
-    val borderColor = if (isSelected) Color(0xFF2196F3) else Color(0xFF2A2A2A)
-    val bgColor     = if (isSelected) Color(0xFF0D2A3E) else Color(0xFF1A1A1A)
+    val normalizedName = entry.fileName.removeSuffix(".json").replace('_', '-').lowercase()
+    val (iconBgColor, iconTintColor, icon) = when (normalizedName) {
+        "side-touch", "arm-extension" -> Triple(
+            Color(0xFFFFE8D6),
+            Color(0xFFFF5B26),
+            Icons.Outlined.Inventory2,
+        )
+        "squat-analysis", "core-balance", "bicep-curl" -> Triple(
+            Color(0xFFFFF4CC),
+            Color(0xFFF5B400),
+            Icons.Outlined.BarChart,
+        )
+        "lunge-tracker", "deep-squat" -> Triple(
+            Color(0xFFDDF0EE),
+            Color(0xFF0E6A5F),
+            Icons.Outlined.Bolt,
+        )
+        else -> Triple(
+            Color(0xFFDDF0EE),
+            Color(0xFF0E6A5F),
+            Icons.Outlined.Bolt,
+        )
+    }
 
-    Row(
+    Surface(
+        shape = RoundedCornerShape(30.dp),
+        color = Color.White,
+        shadowElevation = 2.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .background(bgColor, RoundedCornerShape(10.dp))
-            .border(
-                width = if (isSelected) 2.dp else 1.dp,
-                color = borderColor,
-                shape = RoundedCornerShape(10.dp),
-            )
+            .height(94.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(
-            text = if (entry.isAsset) "📦" else "📄",
-            fontSize = 24.sp,
-        )
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = entry.fileName.removeSuffix(".json"),
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-            )
-            Text(
-                text = when {
-                    entry.isAsset -> "Bundled"
-                    else -> "Generated · hold to rename"
-                },
-                fontSize = 12.sp,
-                color = Color(0xFF757575),
-            )
-        }
-
-        if (isSelected) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
             Box(
                 modifier = Modifier
-                    .size(22.dp)
-                    .background(Color(0xFF2196F3), RoundedCornerShape(11.dp)),
+                    .size(56.dp)
+                    .background(iconBgColor, RoundedCornerShape(19.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("✓", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTintColor,
+                    modifier = Modifier.size(30.dp),
+                )
             }
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .border(1.5.dp, Color(0xFF555555), RoundedCornerShape(11.dp)),
+
+            Text(
+                text = normalizedName,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFF064E43),
+                modifier = Modifier.weight(1f),
+            )
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = Color(0xFFD0D5DD),
+                modifier = Modifier.size(30.dp),
             )
         }
     }

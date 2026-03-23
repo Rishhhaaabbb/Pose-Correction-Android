@@ -82,6 +82,7 @@ private fun MainNavigation(viewModel: DebugViewModel, activity: MainActivity) {
                         screen = Screen.MONITOR
                     }
                 },
+                onBack = { activity.finish() },
             )
         }
 
