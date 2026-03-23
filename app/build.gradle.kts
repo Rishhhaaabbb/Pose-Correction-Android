@@ -7,7 +7,6 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
-    id("com.google.gms.google-services")
 }
 
 android {
@@ -103,9 +102,5 @@ dependencies {
     testImplementation(project(":core:poseengine"))
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
-    implementation(platform(libs.compose.bom))
-    implementation(libs.androidx.navigation.compose)
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation("com.google.firebase:firebase-auth:22.3.0")
-    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    implementation("androidx.compose.foundation:foundation:1.6.x")
 }

@@ -7,30 +7,17 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.Bolt
-import androidx.compose.material.icons.outlined.CameraAlt
-import androidx.compose.material.icons.outlined.CloudUpload
-import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -43,7 +30,7 @@ class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme(colorScheme = lightColorScheme()) {
+            MaterialTheme(colorScheme = darkColorScheme()) {
                 HomeNav()
             }
         }
@@ -82,46 +69,39 @@ private fun HomeNav() {
 @Composable
 private fun HomeScreen(onViewGraphs: () -> Unit) {
     val context = LocalContext.current
-    val scrollState = rememberScrollState()
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF0F2F3))
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        contentAlignment = Alignment.TopCenter,
+            .background(Color(0xFF0F0F0F))
+            .padding(24.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
                 text = "PoseMonitor",
-                fontSize = 40.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF0D3E40),
-                fontFamily = FontFamily.Serif,
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
             )
             Text(
                 text = "Real-time exercise pose analysis",
                 fontSize = 15.sp,
-                color = Color(0xFF667085),
+                color = Color(0xFF9E9E9E),
                 textAlign = TextAlign.Center,
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             HomeCard(
                 title = "Generate Graph",
-                description = "Upload an exercise video to create a\ndetailed page graph for form analysis.",
+                description = "Upload an exercise video to create a pose graph",
                 buttonLabel = "Choose Video",
-                buttonIcon = Icons.Outlined.CloudUpload,
-                buttonColor = Color(0xFFFFC107),
-                buttonTextColor = Color(0xFF075246),
-                borderColor = Color(0xFFFFC107),
+                buttonColor = Color(0xFF2196F3),
                 onClick = {
                     context.startActivity(
                         Intent(context, GraphGenerationActivity::class.java)
@@ -131,12 +111,9 @@ private fun HomeScreen(onViewGraphs: () -> Unit) {
 
             HomeCard(
                 title = "Start Monitoring",
-                description = "Use your camera to monitor your exercise\nform in real time with AI guidance.",
+                description = "Use the camera to monitor your exercise form in real time",
                 buttonLabel = "Open Camera",
-                buttonIcon = Icons.Outlined.CameraAlt,
-                buttonColor = Color(0xFF025B50),
-                buttonTextColor = Color.White,
-                borderColor = Color(0xFF00695C),
+                buttonColor = Color(0xFF4CAF50),
                 onClick = {
                     context.startActivity(
                         Intent(context, MainActivity::class.java)
@@ -146,16 +123,11 @@ private fun HomeScreen(onViewGraphs: () -> Unit) {
 
             HomeCard(
                 title = "View Graphs",
-                description = "Browse and inspect your previously\ngenerated pose graphs and progress.",
+                description = "Browse and inspect your generated pose graphs",
                 buttonLabel = "View Graphs",
-                buttonIcon = Icons.Outlined.BarChart,
-                buttonColor = Color(0xFFFE4E1A),
-                buttonTextColor = Color.White,
-                borderColor = Color(0xFFFE4E1A),
+                buttonColor = Color(0xFF9C27B0),
                 onClick = onViewGraphs,
             )
-
-            Spacer(modifier = Modifier.height(12.dp))
         }
     }
 }
@@ -173,55 +145,26 @@ private fun GraphListScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFEFF1F2)),
+            .background(Color(0xFF0F0F0F))
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 20.dp),
+        Spacer(Modifier.height(16.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Surface(
-                onClick = onBack,
-                shape = RoundedCornerShape(14.dp),
-                color = Color(0xFFF2F4F5),
-                modifier = Modifier
-                    .size(42.dp)
-                    .align(Alignment.TopStart),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color(0xFF075246),
-                    )
-                }
+            TextButton(onClick = onBack) {
+                Text("← Back", color = Color(0xFF9E9E9E), fontSize = 14.sp)
             }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 50.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    "Pose Graphs",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF064E43),
-                )
-                Text(
-                    "Select a pose graph to monitor",
-                    fontSize = 14.sp,
-                    color = Color(0xFF5F6368),
-                )
-            }
+            Text(
+                "Pose Graphs",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+            )
         }
-
-        HorizontalDivider(
-            color = Color(0xFFE5E7EB),
-            thickness = 1.dp,
-        )
 
         if (graphs.isEmpty()) {
             Box(
@@ -232,33 +175,26 @@ private fun GraphListScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    Text("📂", fontSize = 48.sp)
                     Text(
                         "No graphs yet",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF0D3E40),
+                        color = Color.White,
                     )
                     Text(
                         "Generate a graph first from\nthe home screen.",
                         fontSize = 14.sp,
-                        color = Color(0xFF8B959E),
+                        color = Color(0xFF9E9E9E),
                         textAlign = TextAlign.Center,
                         lineHeight = 20.sp,
                     )
                 }
             }
         } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 22.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
-            ) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(graphs) { entry ->
                     GraphBrowseCard(entry = entry, onClick = { onViewGraph(entry) })
-                }
-                item {
-                    Spacer(Modifier.height(20.dp))
                 }
             }
         }
@@ -267,75 +203,33 @@ private fun GraphListScreen(
 
 @Composable
 private fun GraphBrowseCard(entry: GraphEntry, onClick: () -> Unit) {
-    val normalizedName = entry.fileName.removeSuffix(".json").lowercase()
-    val (iconBgColor, iconTintColor, icon) = when (normalizedName) {
-        "side-touch", "side_touch", "arm-extension", "arm_extension" -> Triple(
-            Color(0xFFFFE8D6),
-            Color(0xFFFF5B26),
-            Icons.Outlined.Inventory2,
-        )
-        "squat-analysis", "squat_analysis", "core-balance", "core_balance" -> Triple(
-            Color(0xFFFFF4CC),
-            Color(0xFFF5B400),
-            Icons.Outlined.BarChart,
-        )
-        "lunge-tracker", "lunge_tracker" -> Triple(
-            Color(0xFFDDF0EE),
-            Color(0xFF0E6A5F),
-            Icons.Outlined.Bolt,
-        )
-        else -> Triple(
-            Color(0xFFDDF0EE),
-            Color(0xFF0E6A5F),
-            Icons.Outlined.Bolt,
-        )
-    }
-
-    Surface(
-        shape = RoundedCornerShape(30.dp),
-        color = Color.White,
-        shadowElevation = 2.dp,
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(92.dp)
-            .clickable(onClick = onClick),
+            .background(Color(0xFF1A1A1A), RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .background(iconBgColor, RoundedCornerShape(18.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconTintColor,
-                    modifier = Modifier.size(30.dp),
-                )
-            }
-
+        Text(
+            text = if (entry.isAsset) "📦" else "📊",
+            fontSize = 24.sp,
+        )
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = normalizedName.replace('_', '-'),
-                fontSize = 17.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF064E43),
-                modifier = Modifier.weight(1f),
+                text = entry.fileName.removeSuffix(".json"),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
             )
-
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = Color(0xFFD0D5DD),
-                modifier = Modifier.size(30.dp),
+            Text(
+                text = if (entry.isAsset) "Bundled" else "Generated",
+                fontSize = 12.sp,
+                color = Color(0xFF757575),
             )
         }
+        Text("›", fontSize = 20.sp, color = Color(0xFF555555))
     }
 }
 
@@ -356,24 +250,24 @@ private fun GraphViewScreen(entry: GraphEntry, onBack: () -> Unit) {
         }.getOrNull()
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF2F1EE))) {
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF5F5F5))) {
         // Top bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White)
+                .background(Color(0xFF1A1A1A))
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             TextButton(onClick = onBack) {
-                Text("← Back", color = Color(0xFF1E6B6C), fontSize = 15.sp)
+                Text("← Back", color = Color(0xFF2196F3), fontSize = 15.sp)
             }
             Text(
                 text = entry.fileName.removeSuffix(".json"),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF0D3E40),
+                color = Color.White,
             )
         }
 
@@ -389,13 +283,13 @@ private fun GraphViewScreen(entry: GraphEntry, onBack: () -> Unit) {
                     Text(
                         "Failed to load graph",
                         fontSize = 16.sp,
-                        color = Color(0xFFE74C3C),
+                        color = Color(0xFFEF5350),
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
                         entry.filePath,
                         fontSize = 12.sp,
-                        color = Color(0xFF8B959E),
+                        color = Color(0xFF757575),
                         textAlign = TextAlign.Center,
                     )
                 }
@@ -411,65 +305,39 @@ private fun HomeCard(
     title: String,
     description: String,
     buttonLabel: String,
-    buttonIcon: ImageVector,
     buttonColor: Color,
-    buttonTextColor: Color,
-    borderColor: Color,
     onClick: () -> Unit,
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(color = borderColor, shape = RoundedCornerShape(30.dp)),
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFF1A1A1A),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Surface(
-            shape = RoundedCornerShape(30.dp),
-            color = Color(0xFFF6F7F8),
-            shadowElevation = 0.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 5.dp),
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(
+            Text(
+                text = title,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+            )
+            Text(
+                text = description,
+                fontSize = 13.sp,
+                color = Color(0xFF9E9E9E),
+                lineHeight = 20.sp,
+            )
+            Button(
+                onClick = onClick,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 22.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .height(48.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
             ) {
-                Text(
-                    text = title,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF075246),
-                )
-                Text(
-                    text = description,
-                    fontSize = 15.sp,
-                    color = Color(0xFF616B7D),
-                    lineHeight = 24.sp,
-                )
-                Button(
-                    onClick = onClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(68.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
-                ) {
-                    Icon(
-                        imageVector = buttonIcon,
-                        contentDescription = null,
-                        tint = buttonTextColor,
-                        modifier = Modifier.size(26.dp),
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = buttonLabel,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = buttonTextColor,
-                    )
-                }
+                Text(text = buttonLabel, fontSize = 15.sp, fontWeight = FontWeight.Medium)
             }
         }
     }

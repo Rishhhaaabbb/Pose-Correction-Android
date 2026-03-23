@@ -10,21 +10,16 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -43,7 +38,7 @@ class GraphGenerationActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme(colorScheme = lightColorScheme()) {
+            MaterialTheme(colorScheme = darkColorScheme()) {
                 GraphGenerationScreen(viewModel = viewModel)
             }
         }
@@ -64,7 +59,7 @@ fun GraphGenerationScreen(viewModel: GraphGenerationViewModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFEFF1F2)),
+            .background(Color(0xFF0F0F0F)),
         contentAlignment = Alignment.Center,
     ) {
         when {
@@ -94,12 +89,7 @@ fun GraphGenerationScreen(viewModel: GraphGenerationViewModel) {
             }
 
             pendingVideoUri != null -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 18.dp),
-                    contentAlignment = Alignment.TopCenter,
-                ) {
+                Box(modifier = Modifier.padding(24.dp)) {
                     SettingsContent(
                         videoUri = pendingVideoUri!!,
                         onConfirm = { config, graphName ->
@@ -131,19 +121,19 @@ private fun IdleContent(onPickVideo: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        Text("Generate Pose Graph", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF0D3E40))
+        Text("Generate Pose Graph", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
         Text(
             "Select a video of the exercise to generate\na pose graph for real-time monitoring.",
-            fontSize = 15.sp, color = Color(0xFF8B959E), textAlign = TextAlign.Center, lineHeight = 22.sp,
+            fontSize = 15.sp, color = Color(0xFF9E9E9E), textAlign = TextAlign.Center, lineHeight = 22.sp,
         )
         Spacer(Modifier.height(8.dp))
         Button(
             onClick = onPickVideo,
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(28.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E6B6C)),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
         ) {
-            Text("Choose Video", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text("Choose Video", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -168,71 +158,72 @@ private fun SettingsContent(
     var validationError     by remember { mutableStateOf<String?>(null) }
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // Header with back button
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Surface(
-                onClick = onBack,
-                shape = RoundedCornerShape(14.dp),
-                color = Color(0xFFF2F4F5),
-                shadowElevation = 0.dp,
-                tonalElevation = 0.dp,
-                modifier = Modifier.size(48.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color(0xFF075246),
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
+        Text("Generation Settings", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(
+            "Video: ${Uri.parse(videoUri).lastPathSegment ?: videoUri}",
+            fontSize = 13.sp, color = Color(0xFF9E9E9E),
+        )
+
+        Spacer(Modifier.height(4.dp))
+
+        // ── Graph name ────────────────────────────────────────────────────────
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Graph Name", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White)
             Text(
-                "Generation Settings",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF064E43),
+                "What to call this graph (leave blank to use the video filename)",
+                fontSize = 12.sp, color = Color(0xFF757575),
+            )
+            OutlinedTextField(
+                value = graphName,
+                onValueChange = { graphName = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("e.g. side-touch", color = Color(0xFF555555)) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFF2196F3),
+                    unfocusedBorderColor = Color(0xFF424242),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    cursorColor = Color(0xFF2196F3),
+                ),
+                shape = RoundedCornerShape(8.dp),
             )
         }
 
-        // Scrollable content
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 10.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            SettingCardField("Video ID", Uri.parse(videoUri).lastPathSegment ?: videoUri, enabled = false)
+        HorizontalDivider(color = Color(0xFF2A2A2A))
 
-            ParamField("Stability Threshold", "Max feature distance to stay in same segment\n(default: 0.12)",
-                stabilityThreshold, { stabilityThreshold = it }, KeyboardType.Decimal)
-            ParamField("Min Hold Frames", "Minimum frames a pose must be held (default: 18)",
-                minHoldFrames, { minHoldFrames = it }, KeyboardType.Number)
-            ParamField("Skip Frames", "Process every Nth frame - 1 = all frames (default: 1)",
-                skipFrames, { skipFrames = it }, KeyboardType.Number)
-            ParamField("Smoothing Window", "Rolling average window size (default: 7)",
-                smoothingWindow, { smoothingWindow = it }, KeyboardType.Number)
-            ParamField("Transition Buffer", "Frames skipped at segment boundaries (default: 3)",
-                transitionBuffer, { transitionBuffer = it }, KeyboardType.Number)
-            ParamField("Tolerance Multiplier", "Feature tolerance = std x this value (default: 2.0)",
-                toleranceMultiplier, { toleranceMultiplier = it }, KeyboardType.Decimal)
-            ParamField("Confidence Threshold", "Min keypoint confidence 0.0-1.0 (default: 0.6)",
-                confidenceThreshold, { confidenceThreshold = it }, KeyboardType.Decimal)
+        // ── Advanced parameters ───────────────────────────────────────────────
+        ParamField("Stability Threshold", "Max feature distance to stay in same segment (default: 0.12)",
+            stabilityThreshold, { stabilityThreshold = it }, KeyboardType.Decimal)
+        ParamField("Min Hold Frames", "Minimum frames a pose must be held (default: 18)",
+            minHoldFrames, { minHoldFrames = it }, KeyboardType.Number)
+        ParamField("Skip Frames", "Process every Nth frame — 1 = all frames (default: 1)",
+            skipFrames, { skipFrames = it }, KeyboardType.Number)
+        ParamField("Smoothing Window", "Rolling average window size (default: 7)",
+            smoothingWindow, { smoothingWindow = it }, KeyboardType.Number)
+        ParamField("Transition Buffer", "Frames skipped at segment boundaries (default: 3)",
+            transitionBuffer, { transitionBuffer = it }, KeyboardType.Number)
+        ParamField("Tolerance Multiplier", "Feature tolerance = std × this value (default: 2.0)",
+            toleranceMultiplier, { toleranceMultiplier = it }, KeyboardType.Decimal)
+        ParamField("Confidence Threshold", "Min keypoint confidence 0.0–1.0 (default: 0.6)",
+            confidenceThreshold, { confidenceThreshold = it }, KeyboardType.Decimal)
 
-            if (validationError != null) {
-                Text(validationError!!, fontSize = 13.sp, color = Color(0xFFE74C3C))
-            }
+        if (validationError != null) {
+            Text(validationError!!, fontSize = 13.sp, color = Color(0xFFEF5350))
+        }
 
-            Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedButton(
+                onClick = onBack,
+                modifier = Modifier.weight(1f).height(52.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF9E9E9E)),
+            ) { Text("Back", fontSize = 15.sp) }
 
             Button(
                 onClick = {
@@ -247,18 +238,13 @@ private fun SettingsContent(
                         onConfirm(config, graphName.trim())
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(76.dp),
-                shape = RoundedCornerShape(38.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF006A67)),
-            ) {
-                Text("Start Generation", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            }
-
-            Spacer(Modifier.height(28.dp))
+                modifier = Modifier.weight(2f).height(52.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+            ) { Text("Start Generation", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
         }
+
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -266,116 +252,26 @@ private fun SettingsContent(
 
 @Composable
 private fun ProcessingContent(state: GenerationUiState.Processing) {
-    val progress = state.progressFraction.coerceIn(0f, 1f)
-    val progressVisual = progress.coerceAtLeast(0.02f)
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFEFF1F2)),
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(Modifier.height(136.dp))
-
-            Surface(
-                shape = RoundedCornerShape(30.dp),
-                color = Color(0xFFF8F9FA),
-                shadowElevation = 2.dp,
-                modifier = Modifier.fillMaxWidth(0.9f),
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
-                    modifier = Modifier.padding(horizontal = 26.dp, vertical = 30.dp),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(120.dp)
-                            .background(Color(0xFFF3F4F6), RoundedCornerShape(58.dp))
-                            .border(7.dp, Color(0xFFE5E9EF), RoundedCornerShape(58.dp)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Person,
-                            contentDescription = null,
-                            tint = Color(0xFFFF7A4A),
-                            modifier = Modifier.size(42.dp),
-                        )
-                    }
-
-                    Text(
-                        state.message,
-                        fontSize = 23.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF111A3A),
-                        textAlign = TextAlign.Center,
-                    )
-
-                    Text(
-                        state.detail,
-                        fontSize = 14.sp,
-                        color = Color(0xFF8FA0B7),
-                        textAlign = TextAlign.Center,
-                    )
-
-                    Spacer(Modifier.height(12.dp))
-
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                "OVERALL PROGRESS",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF8FA0B7),
-                                letterSpacing = 1.sp,
-                            )
-                            Text(
-                                "${"%.0f".format(progress * 100)}%",
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color(0xFFE84E1B),
-                            )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(12.dp)
-                                .background(Color(0xFFE3E8EF), RoundedCornerShape(999.dp)),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth(progressVisual)
-                                    .background(Color(0xFFFF5B26), RoundedCornerShape(999.dp)),
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(40.dp))
-
-            Text(
-                "Please keep the app open while we\nanalyze your movement.",
-                fontSize = 14.sp,
-                color = Color(0xFF8FA0B7),
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp,
-            )
-        }
+        CircularProgressIndicator(
+            progress = { state.progressFraction },
+            modifier = Modifier.size(80.dp),
+            color = Color(0xFF2196F3),
+            strokeWidth = 6.dp,
+        )
+        Text(state.message, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+        Text(state.detail, fontSize = 13.sp, color = Color(0xFF9E9E9E), textAlign = TextAlign.Center)
+        LinearProgressIndicator(
+            progress = { state.progressFraction },
+            modifier = Modifier.fillMaxWidth().height(6.dp),
+            color = Color(0xFF2196F3),
+            trackColor = Color(0xFF2A2A2A),
+        )
+        Text("${"%.0f".format(state.progressFraction * 100)}%", fontSize = 13.sp, color = Color(0xFF9E9E9E))
     }
 }
 
@@ -399,19 +295,19 @@ private fun SuccessContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White)
+                    .background(Color(0xFF1A1A1A))
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 TextButton(onClick = { showVisualization = false }) {
-                    Text("← Back", color = Color(0xFF1E6B6C), fontSize = 15.sp)
+                    Text("← Back", color = Color(0xFF2196F3), fontSize = 15.sp)
                 }
                 Text(
                     text = "Graph Visualization",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF0D3E40),
+                    color = Color.White,
                 )
             }
             PoseGraphVisualizationScreen(graph = graph)
@@ -426,11 +322,11 @@ private fun SuccessContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text("✅", fontSize = 56.sp)
-            Text("Graph Generated!", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0D3E40))
+            Text("Graph Generated!", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White)
 
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = Color.White,
+                color = Color(0xFF1A1A1A),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
@@ -450,9 +346,9 @@ private fun SuccessContent(
                     onClick = { showVisualization = true },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B959E)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF37474F)),
                 ) {
-                    Text("View Graph", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color.White)
+                    Text("View Graph", fontSize = 15.sp, fontWeight = FontWeight.Medium)
                 }
             }
 
@@ -460,9 +356,9 @@ private fun SuccessContent(
                 onClick = onGenerateAnother,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E6B6C)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
             ) {
-                Text("Generate Another", fontSize = 15.sp, color = Color.White)
+                Text("Generate Another", fontSize = 15.sp)
             }
         }
     }
@@ -478,22 +374,20 @@ private fun ErrorContent(state: GenerationUiState.Error, onRetry: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Text("❌", fontSize = 56.sp)
-        Text("Generation Failed", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0D3E40))
-        Surface(shape = RoundedCornerShape(12.dp), color = Color.White, modifier = Modifier.fillMaxWidth()) {
+        Text("Generation Failed", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFF1A1A1A), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(state.reason.replace("_", " "), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFE74C3C))
+                Text(state.reason.replace("_", " "), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFEF5350))
                 Spacer(Modifier.height(8.dp))
-                Text(state.detail, fontSize = 13.sp, color = Color(0xFF8B959E), lineHeight = 20.sp)
+                Text(state.detail, fontSize = 13.sp, color = Color(0xFF9E9E9E), lineHeight = 20.sp)
             }
         }
         Button(
             onClick = onRetry,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E6B6C)),
-        ) {
-            Text("Try Again", fontSize = 15.sp, color = Color.White)
-        }
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF424242)),
+        ) { Text("Try Again", fontSize = 15.sp) }
     }
 }
 
@@ -507,72 +401,32 @@ private fun ParamField(
     onValueChange: (String) -> Unit,
     keyboardType: KeyboardType,
 ) {
-    Surface(
-        shape = RoundedCornerShape(34.dp),
-        color = Color(0xFFF7F8F9),
-        shadowElevation = 0.dp,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(label, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF053F35))
-            Text(description, fontSize = 12.sp, color = Color(0xFF8A95A5), lineHeight = 19.sp)
-            TextField(
-                value = value,
-                onValueChange = onValueChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFF1F3F4), RoundedCornerShape(18.dp)),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-                textStyle = LocalTextStyle.current.copy(
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF053F35),
-                ),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFF1F3F4),
-                    unfocusedContainerColor = Color(0xFFF1F3F4),
-                    focusedTextColor = Color(0xFF053F35),
-                    unfocusedTextColor = Color(0xFF053F35),
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    cursorColor = Color(0xFF006A67),
-                ),
-            )
-        }
-    }
-}
-
-@Composable
-private fun SettingCardField(
-    label: String,
-    value: String,
-    enabled: Boolean = true,
-) {
-    Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = Color(0xFFF7F8F9),
-        shadowElevation = 0.dp,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 22.dp, vertical = 18.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF677485))
-            Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF053F35), fontFamily = FontFamily.Monospace)
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White)
+        Text(description, fontSize = 12.sp, color = Color(0xFF757575))
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFF2196F3),
+                unfocusedBorderColor = Color(0xFF424242),
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                cursorColor = Color(0xFF2196F3),
+            ),
+            shape = RoundedCornerShape(8.dp),
+        )
     }
 }
 
 @Composable
 private fun StatRow(label: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, fontSize = 13.sp, color = Color(0xFF8B959E))
-        Text(value, fontSize = 13.sp, color = Color(0xFF0D3E40), fontWeight = FontWeight.Medium)
+        Text(label, fontSize = 13.sp, color = Color(0xFF9E9E9E))
+        Text(value, fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Medium)
     }
 }
 
