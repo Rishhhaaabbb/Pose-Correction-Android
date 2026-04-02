@@ -481,7 +481,7 @@ class PoseMonitorEngine(
     companion object {
         // Android-calibrated tolerance floors.
         // Angle features: degrees. Ratio/elevation/spread features: normalized units.
-        private const val MIN_ANGLE_TOLERANCE = 15.0
+        private const val MIN_ANGLE_TOLERANCE = 5.0
         private const val MIN_RATIO_TOLERANCE = 0.35
     }
 

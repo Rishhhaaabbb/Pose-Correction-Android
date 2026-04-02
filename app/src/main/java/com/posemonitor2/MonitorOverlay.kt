@@ -4,6 +4,7 @@ package com.posemonitor2
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -83,6 +84,45 @@ fun MonitorOverlay(
     val displayState = if (isGuidance) guidancePreviewState else targetState
     var panelExpanded by remember { mutableStateOf(false) }
 
+    // ── Accuracy meter: retain last value on incorrect frames ─────────────────
+    // Prevents the meter from snapping to 0 on brief form breaks.
+    // The displayed value only advances forward (on correct frames) or holds
+    // steady (on incorrect frames). It resets to 0 only when a new state begins.
+    var displayedAccuracy by remember { mutableStateOf(0) }
+    val newAccuracy = if (frameStatus.isCorrect)
+        (frameStatus.holdProgress * 100).toInt().coerceIn(0, 100)
+    else
+        displayedAccuracy
+    // Reset when state changes
+    val currentStateId = frameStatus.stateId
+    var lastStateId by remember { mutableStateOf(currentStateId) }
+    if (currentStateId != lastStateId) {
+        displayedAccuracy = 0
+        lastStateId = currentStateId
+    } else {
+        displayedAccuracy = newAccuracy
+    }
+    val animatedAccuracy by animateIntAsState(
+        targetValue    = displayedAccuracy,
+        animationSpec  = tween(200),
+        label          = "accuracy",
+    )
+
+    // ── Grace period pulse: flash status bar on rep completion ────────────────
+    var pulseActive by remember { mutableStateOf(false) }
+    var lastReps by remember { mutableStateOf(frameStatus.repsCompleted) }
+    if (frameStatus.repsCompleted != lastReps) {
+        pulseActive = true
+        lastReps = frameStatus.repsCompleted
+    }
+    // Auto-dismiss pulse after 600ms
+    LaunchedEffect(pulseActive) {
+        if (pulseActive) {
+            kotlinx.coroutines.delay(600)
+            pulseActive = false
+        }
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
 
         if (isGuidance && guidancePreviewState != null) {
@@ -90,9 +130,9 @@ fun MonitorOverlay(
         } else {
             skeleton?.let {
                 LiveSkeletonOverlay(
-                    skeleton = it,
-                    deviations = deviations,
-                    targetState = targetState,
+                    skeleton        = it,
+                    deviations      = deviations,
+                    targetState     = targetState,
                     cameraFrameSize = cameraFrameSize,
                 )
             }
@@ -100,15 +140,10 @@ fun MonitorOverlay(
 
         AnimatedVisibility(
             visible = panelExpanded,
-            enter = fadeIn(tween(200)),
-            exit = fadeOut(tween(200)),
+            enter   = fadeIn(tween(200)),
+            exit    = fadeOut(tween(200)),
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xAA000000))
-                    .clickable { panelExpanded = false },
-            )
+            Box(modifier = Modifier.fillMaxSize().background(Color(0xAA000000)).clickable { panelExpanded = false })
         }
 
         if (displayState != null) {
@@ -121,8 +156,9 @@ fun MonitorOverlay(
         }
 
         StatusBar(
-            frameStatus = frameStatus,
-            modifier    = Modifier
+            frameStatus  = frameStatus,
+            pulseActive  = pulseActive,
+            modifier     = Modifier
                 .align(Alignment.TopStart)
                 .fillMaxWidth()
                 .padding(end = if (panelExpanded) 0.dp else 132.dp),
@@ -130,7 +166,7 @@ fun MonitorOverlay(
 
         if (!panelExpanded) {
             AccuracyMeter(
-                accuracy = computeDisplayAccuracy(frameStatus),
+                accuracy = animatedAccuracy,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(start = 12.dp, top = 56.dp)
@@ -138,14 +174,8 @@ fun MonitorOverlay(
             )
         }
 
-        RepCounter(
-            reps     = frameStatus.repsCompleted,
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
-        )
-        StreakCounter(
-            streak   = frameStatus.streak,
-            modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 72.dp),
-        )
+        RepCounter(reps = frameStatus.repsCompleted, modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
+        StreakCounter(streak = frameStatus.streak, modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 72.dp))
 
         if (frameStatus.feedback.isNotEmpty()) {
             FeedbackBar(
@@ -174,73 +204,37 @@ private fun LiveSkeletonOverlay(
         val screenW = size.width
         val screenH = size.height
 
-        // ── FILL_CENTER crop rect computation ─────────────────────────────────
-        // PreviewView uses FILL_CENTER: the camera frame is scaled UP uniformly
-        // until it fills the screen in both dimensions, then the excess is cropped.
-        //
-        // MediaPipe keypoints are in [0,1] relative to the FULL camera frame.
-        // We need to remap them into the VISIBLE portion of the camera frame
-        // (the crop rect) mapped to screen pixels.
-        //
-        // Math:
-        //   scale = max(screenW / camW, screenH / camH)   — fill scale factor
-        //   scaledW = camW * scale,  scaledH = camH * scale
-        //   cropX = (scaledW - screenW) / 2  — pixels cropped from each side
-        //   cropY = (scaledH - screenH) / 2  — pixels cropped from top/bottom
-        //
-        //   visible portion in [0,1] camera space:
-        //     visX0 = cropX / scaledW,  visX1 = (scaledW - cropX) / scaledW
-        //     visY0 = cropY / scaledH,  visY1 = (scaledH - cropY) / scaledH
-        //
-        //   remap keypoint (kx, ky) → screen pixel:
-        //     px = (kx - visX0) / (visX1 - visX0) * screenW
-        //     py = (ky - visY0) / (visY1 - visY0) * screenH
-        //
-        // When cameraFrameSize is unknown (Zero), fall back to direct mapping.
-
         val camW = cameraFrameSize.width
         val camH = cameraFrameSize.height
         val hasCamSize = camW > 0f && camH > 0f
 
-        // Visible range in [0,1] camera coords
-        val visX0: Float
-        val visX1: Float
-        val visY0: Float
-        val visY1: Float
+        val visX0: Float; val visX1: Float
+        val visY0: Float; val visY1: Float
 
         if (hasCamSize) {
-            val scale = maxOf(screenW / camW, screenH / camH)
+            val scale   = maxOf(screenW / camW, screenH / camH)
             val scaledW = camW * scale
             val scaledH = camH * scale
-            val cropX = (scaledW - screenW) / 2f
-            val cropY = (scaledH - screenH) / 2f
-            visX0 = cropX / scaledW
-            visX1 = (scaledW - cropX) / scaledW
-            visY0 = cropY / scaledH
-            visY1 = (scaledH - cropY) / scaledH
+            val cropX   = (scaledW - screenW) / 2f
+            val cropY   = (scaledH - screenH) / 2f
+            visX0 = cropX / scaledW;        visX1 = (scaledW - cropX) / scaledW
+            visY0 = cropY / scaledH;        visY1 = (scaledH - cropY) / scaledH
         } else {
-            // Fallback: no crop (full frame = screen)
             visX0 = 0f; visX1 = 1f; visY0 = 0f; visY1 = 1f
         }
 
         val visRangeX = visX1 - visX0
         val visRangeY = visY1 - visY0
 
-        // Map a keypoint from [0,1] camera space → screen pixel, accounting for
-        // FILL_CENTER crop and front camera X mirror.
         fun kptToScreen(kx: Float, ky: Float): Offset {
-            // Mirror X for front camera.
             val mx = 1f - kx
-            // Flip Y back to camera convention (Y=0 at top).
-            // Skeleton2d stores Y flipped (Y=0 at bottom) to match Python/OpenCV
-            // for feature extraction. The overlay needs raw camera Y for drawing.
             val my = 1f - ky
-            val px = (mx - visX0) / visRangeX * screenW
-            val py = (my - visY0) / visRangeY * screenH
-            return Offset(px, py)
+            return Offset(
+                (mx - visX0) / visRangeX * screenW,
+                (my - visY0) / visRangeY * screenH,
+            )
         }
 
-        // Draw bones
         for (i in 0 until SkeletonConnections.boneCount) {
             val aIdx = SkeletonConnections.boneIndices[i * 2]
             val bIdx = SkeletonConnections.boneIndices[i * 2 + 1]
@@ -257,7 +251,6 @@ private fun LiveSkeletonOverlay(
             )
         }
 
-        // Draw joints
         skeleton.keypoints.forEachIndexed { idx, kpt ->
             if (kpt.confidence < 0.2f) return@forEachIndexed
             val center     = kptToScreen(kpt.x.toFloat(), kpt.y.toFloat())
@@ -291,29 +284,12 @@ private fun ReferencePosePanel(
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // ── Performance: single animation float, four values lerped from it ───────
-    // Original used four separate animateDpAsState calls:
-    //   val panelWidth  by animateDpAsState(...)
-    //   val panelHeight by animateDpAsState(...)
-    //   val topPad      by animateDpAsState(...)
-    //   val endPad      by animateDpAsState(...)
-    //
-    // Each animateDpAsState runs its own Choreographer callback and triggers a
-    // recomposition tick independently. Four of them running simultaneously
-    // during expand/collapse caused Compose to recompose ReferencePosePanel
-    // on every animation frame — typically 4 recompositions per vsync.
-    //
-    // Fix: one animateFloatAsState drives a single [0,1] progress value.
-    // All four layout dimensions are lerped from that single float.
-    // Result: one recomposition per vsync during animation instead of four.
-
     val progress by animateFloatAsState(
-        targetValue = if (expanded) 1f else 0f,
+        targetValue   = if (expanded) 1f else 0f,
         animationSpec = tween(250),
-        label = "panelProgress",
+        label         = "panelProgress",
     )
 
-    // Lerp all four dimensions from the single progress float.
     val panelWidth  : Dp = lerp(120f, 260f, progress).dp
     val panelHeight : Dp = lerp(160f, 380f, progress).dp
     val topPad      : Dp = lerp(56f,  80f,  progress).dp
@@ -331,23 +307,11 @@ private fun ReferencePosePanel(
             .clickable(onClick = onToggle),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(if (expanded) 12.dp else 4.dp),
+            modifier = Modifier.fillMaxSize().padding(if (expanded) 12.dp else 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                "TARGET",
-                fontSize     = if (expanded) 13.sp else 9.sp,
-                fontWeight   = FontWeight.Bold,
-                color        = COLOR_PANEL_TEXT,
-                letterSpacing = 1.sp,
-            )
-            Text(
-                "State ${state.stateId + 1}",
-                fontSize = if (expanded) 11.sp else 8.sp,
-                color    = Color(0xFF666666),
-            )
+            Text("TARGET", fontSize = if (expanded) 13.sp else 9.sp, fontWeight = FontWeight.Bold, color = COLOR_PANEL_TEXT, letterSpacing = 1.sp)
+            Text("State ${state.stateId + 1}", fontSize = if (expanded) 11.sp else 8.sp, color = Color(0xFF666666))
             if (expanded) Text("Tap to close", fontSize = 9.sp, color = Color(0xFF999999))
 
             if (normalized != null) {
@@ -356,9 +320,6 @@ private fun ReferencePosePanel(
                     val cx         = size.width / 2f
                     val cy         = size.height * if (isExpanded) 0.52f else 0.56f
                     val nodeRadius = min(size.width, size.height) * if (isExpanded) 0.52f else 0.42f
-                    // Mirror horizontally so the target figure matches what the user
-                    // sees in the camera (front camera is already mirrored).
-                    // scale(-1, 1) around the center X flips the canvas horizontally.
                     scale(scaleX = -1f, scaleY = 1f, pivot = Offset(cx, cy)) {
                         drawAnatomicalFigure(normalized, Offset(cx, cy), nodeRadius)
                     }
@@ -387,7 +348,6 @@ private fun GuidanceOverlay(previewState: PoseState, feedback: String) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val center     = Offset(size.width / 2f, size.height * 0.50f)
                 val nodeRadius = min(size.width, size.height) * 0.56f
-                // Mirror horizontally — same reason as target panel.
                 scale(scaleX = -1f, scaleY = 1f, pivot = center) {
                     drawAnatomicalFigure(normalized, center, nodeRadius)
                 }
@@ -420,25 +380,37 @@ private fun GuidanceOverlay(previewState: PoseState, feedback: String) {
 // ── Status bar ────────────────────────────────────────────────────────────────
 
 @Composable
-private fun StatusBar(frameStatus: FrameStatus, modifier: Modifier = Modifier) {
+private fun StatusBar(
+    frameStatus: FrameStatus,
+    pulseActive: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val (text, color, icon) = when {
-        frameStatus.inGrace -> Triple("TRANSITIONING...", COLOR_GRACE, ">>")
+        frameStatus.inGrace                                -> Triple("TRANSITIONING...", COLOR_GRACE,   ">>")
         frameStatus.phase == MonitorPhase.SESSION_COMPLETE -> Triple("SESSION COMPLETE!", COLOR_CORRECT, "✓")
-        frameStatus.isCorrect -> Triple("CORRECT FORM", COLOR_CORRECT, "✓")
-        else -> Triple("ADJUST FORM", COLOR_WRONG, "!!")
+        frameStatus.isCorrect                              -> Triple("CORRECT FORM",      COLOR_CORRECT, "✓")
+        else                                               -> Triple("ADJUST FORM",       COLOR_WRONG,   "!!")
     }
+
+    // Pulse background flashes green briefly on rep completion
+    val pulseBg = if (pulseActive) Color(0xCC1A4A1A) else Color(0xCC1A1A1A)
+    val animatedBg by animateFloatAsState(
+        targetValue   = if (pulseActive) 1f else 0f,
+        animationSpec = tween(150),
+        label         = "pulse",
+    )
+    val bgColor = androidx.compose.ui.graphics.lerp(Color(0xCC1A1A1A), Color(0xCC1A4A1A), animatedBg)
+
     Row(
         modifier = modifier
             .padding(8.dp)
-            .background(Color(0xCC1A1A1A), RoundedCornerShape(8.dp))
+            .background(bgColor, RoundedCornerShape(8.dp))
             .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment    = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(
-            modifier = Modifier
-                .size(36.dp)
-                .background(Color(0x33FFFFFF), RoundedCornerShape(4.dp)),
+            modifier = Modifier.size(36.dp).background(Color(0x33FFFFFF), RoundedCornerShape(4.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Text(icon, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color)
@@ -486,11 +458,7 @@ private fun AccuracyMeter(accuracy: Int, modifier: Modifier = Modifier) {
 
 @Composable
 private fun RepCounter(reps: Int, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .background(Color(0xCC282828), RoundedCornerShape(8.dp))
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-    ) {
+    Box(modifier = modifier.background(Color(0xCC282828), RoundedCornerShape(8.dp)).padding(horizontal = 14.dp, vertical = 6.dp)) {
         Text("REPS  $reps", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White, letterSpacing = 1.sp)
     }
 }
@@ -502,51 +470,22 @@ private fun StreakCounter(streak: Int, modifier: Modifier = Modifier) {
         streak >= 5  -> "✨ STREAK" to COLOR_CORRECT
         else         -> "STREAK"    to Color(0xFFBBBBBB)
     }
-    Box(
-        modifier = modifier
-            .background(Color(0xCC282828), RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-    ) {
+    Box(modifier = modifier.background(Color(0xCC282828), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp)) {
         Text("$label  $streak", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = color)
     }
 }
 
 @Composable
-private fun FeedbackBar(
-    feedback: String,
-    isCorrect: Boolean,
-    inGrace: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val borderColor = when {
-        inGrace   -> COLOR_GRACE
-        isCorrect -> COLOR_CORRECT
-        else      -> Color(0xFF00D7FF)
-    }
-    Box(
-        modifier = modifier.background(Color(0xEE1A1A1A), RoundedCornerShape(10.dp)),
-        contentAlignment = Alignment.Center,
-    ) {
+private fun FeedbackBar(feedback: String, isCorrect: Boolean, inGrace: Boolean, modifier: Modifier = Modifier) {
+    val borderColor = when { inGrace -> COLOR_GRACE; isCorrect -> COLOR_CORRECT; else -> Color(0xFF00D7FF) }
+    Box(modifier = modifier.background(Color(0xEE1A1A1A), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.matchParentSize()) {
-            drawRoundRect(
-                color        = borderColor,
-                size         = size,
-                cornerRadius = CornerRadius(10.dp.toPx()),
-                style        = Stroke(3f),
-            )
+            drawRoundRect(color = borderColor, size = size, cornerRadius = CornerRadius(10.dp.toPx()), style = Stroke(3f))
         }
-        Text(
-            feedback,
-            fontSize   = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            color      = Color.White,
-            textAlign  = TextAlign.Center,
-            modifier   = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
-        )
+        Text(feedback, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White, textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
     }
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 private fun computeDisplayAccuracy(status: FrameStatus): Int =
     if (status.isCorrect) (status.holdProgress * 100).toInt().coerceIn(0, 100) else 0

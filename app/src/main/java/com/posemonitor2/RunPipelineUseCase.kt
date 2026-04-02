@@ -42,7 +42,7 @@ class RunPipelineUseCase(
     graph: PoseGraph,
     config: MonitorConfig = MonitorConfig.DEFAULT,
 ) {
-    private val extractor = FeatureExtractor(confidenceThreshold = 0.5)
+    private val extractor = FeatureExtractor(confidenceThreshold = 0.2)
     val engine = PoseMonitorEngine(
         graph = graph,
         config = config,

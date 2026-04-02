@@ -24,8 +24,6 @@ class DebugViewModel(application: Application) : AndroidViewModel(application) {
 
     val detector = PoseDetector(application)
 
-    // ── Public StateFlows ─────────────────────────────────────────────────────
-
     val currentSkeleton      = MutableStateFlow<Skeleton2d?>(null)
     val cameraFrameSize      = MutableStateFlow<Size?>(null)
     val frameStatus          = MutableStateFlow<FrameStatus?>(null)
@@ -33,8 +31,6 @@ class DebugViewModel(application: Application) : AndroidViewModel(application) {
     val guidancePreviewState = MutableStateFlow<PoseState?>(null)
     val lastDeviations       = MutableStateFlow<Map<FeatureKey, Double>>(emptyMap())
     val initError            = MutableStateFlow<String?>(null)
-
-    // ── Internal pipeline ─────────────────────────────────────────────────────
 
     private var useCase: RunPipelineUseCase? = null
 
@@ -62,13 +58,12 @@ class DebugViewModel(application: Application) : AndroidViewModel(application) {
         useCase = RunPipelineUseCase(
             graph = graph,
             config = MonitorConfig(
-                guidanceDurationSeconds = 2.0,
-                enableAdaptive = true,
-                progressiveTolerance = true,
+                guidanceDurationSeconds = if (graphEntry.enableGuidance) 2.0 else 0.0,
+                enableAdaptive          = true,
+                progressiveTolerance    = true,
             ),
         )
 
-        // Wire frame size callback — reported once on first frame after rotation.
         detector.onFrameSize = { size -> cameraFrameSize.value = size }
 
         viewModelScope.launch {
@@ -84,12 +79,6 @@ class DebugViewModel(application: Application) : AndroidViewModel(application) {
                     targetState.value          = useCase!!.engine.targetState
                     guidancePreviewState.value = useCase!!.engine.guidancePreviewState
 
-                    // ── Performance: per-frame log gated behind DEBUG_LOG ──────
-                    // Original: buildLayerLog() ran unconditionally every frame.
-                    // It iterated all features with padEnd + format per key,
-                    // then called Log.d — allocations + I/O at 30fps.
-                    // Now: entire buildLayerLog call is skipped in production.
-                    // Flip RunPipelineUseCase.DEBUG_LOG to re-enable.
                     if (RunPipelineUseCase.DEBUG_LOG) {
                         Log.d(TAG, buildLayerLog(result))
                     }
@@ -101,8 +90,6 @@ class DebugViewModel(application: Application) : AndroidViewModel(application) {
         useCase?.engine?.skipCurrentState()
     }
 
-    // ── Graph loading ─────────────────────────────────────────────────────────
-
     private fun loadGraph(context: Context, entry: GraphEntry): PoseGraph {
         return if (entry.isAsset) {
             val json = context.assets.open(entry.fileName).bufferedReader().readText()
@@ -112,8 +99,6 @@ class DebugViewModel(application: Application) : AndroidViewModel(application) {
             PoseGraph.fromJson(json)
         }
     }
-
-    // ── Layer logging (only called when DEBUG_LOG = true) ─────────────────────
 
     private fun buildLayerLog(result: PipelineResult): String {
         val status = result.frameStatus

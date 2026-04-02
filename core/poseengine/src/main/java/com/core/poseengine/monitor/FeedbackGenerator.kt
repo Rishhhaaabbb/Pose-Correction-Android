@@ -5,79 +5,38 @@ import com.core.poseengine.model.RawFeatureMap
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-/**
- * Generates human-readable corrective feedback from pose deviations.
- *
- * Matches Python: EnhancedFeedbackGenerator
- *
- * ── Instability detection ─────────────────────────────────────────────────────
- * Python uses np.std(torso_vals) > 8.0 with ddof=0.
- * We use [populationStd] (same ddof=0) to match exactly.
- *
- * ── Feature prioritization ───────────────────────────────────────────────────
- * Core features (hip, knee, elbow, torso) are prioritized over peripheral
- * features. Within the same priority tier, the feature with the largest
- * deviation is selected. The last-used feature is rotated away to avoid
- * repeating the same instruction every frame.
- *
- * ── Thread safety ─────────────────────────────────────────────────────────────
- * [FeedbackGenerator] is stateful (feature history, last-feedback rotation).
- * It must be owned by a single engine instance and called from one thread.
- *
- * @param historyLength  Number of frames to retain for stability analysis.
- *   Default 15 matches Python default.
- */
 class FeedbackGenerator(
     private val historyLength: Int = 15,
 ) {
-    // Rolling feature history for instability detection
-    // Matches Python: self.feature_history deque with pop(0) eviction
     private val featureHistory = ArrayDeque<RawFeatureMap>(historyLength)
-
-    // Last three features used for feedback — rotated to avoid repetition
-    // Matches Python: self.last_feedback_features (maxlen=3)
     private val lastFeedbackKeys = ArrayDeque<FeatureKey>(3)
 
-    /**
-     * Add current frame features to the rolling history.
-     *
-     * Matches Python: update_history()
-     */
     fun updateHistory(features: RawFeatureMap) {
         if (featureHistory.size >= historyLength) featureHistory.removeFirst()
         featureHistory.addLast(features)
     }
 
-    /**
-     * Generate a corrective feedback string for the current frame.
-     *
-     * Matches Python: generate_feedback()
-     *
-     * @param deviations      Per-feature absolute deviation from state mean.
-     * @param currentFeatures Current frame's extracted features (unused in
-     *   feedback string generation but kept for API symmetry with Python).
-     */
     fun generateFeedback(
         deviations: Map<FeatureKey, Double>,
         currentFeatures: RawFeatureMap,
     ): String {
-        // Instability check — matches Python: if self._is_unstable()
         if (isUnstable()) return "Hold steady - minimize movement"
-
         if (deviations.isEmpty()) return "Adjust to match target pose"
 
-        // Priority 1: core joints — matches Python: core_features = ['hip','knee','elbow','torso']
-        val coreDevs = deviations.filter { (key, _) -> key.isCoreJoint }
+        // Priority 1: angle/core joints
+        // Priority 2: positional features (elevation, spread, body center, torso)
+        val coreDevs       = deviations.filter { (key, _) -> key.isCoreJoint }
+        val positionalDevs = deviations.filter { (key, _) -> key.isPositional }
 
-        // Select worst deviation in priority tier
-        // Matches Python: worst_feature, worst_dev = max(core_devs.items(), key=lambda x: abs(x[1]))
-        val candidatePool = if (coreDevs.isNotEmpty()) coreDevs else deviations
+        val candidatePool = when {
+            coreDevs.isNotEmpty()       -> coreDevs
+            positionalDevs.isNotEmpty() -> positionalDevs
+            else                        -> deviations
+        }
 
         var worstKey = candidatePool.maxByOrNull { (_, v) -> abs(v) }?.key
             ?: return "Adjust position to match target"
 
-        // Rotate away from recently used feedback key
-        // Matches Python: if worst_feature in self.last_feedback_features: try other
         if (worstKey in lastFeedbackKeys) {
             val others = candidatePool.filter { (k, _) -> k != worstKey }
             if (others.isNotEmpty()) {
@@ -85,7 +44,6 @@ class FeedbackGenerator(
             }
         }
 
-        // Record for rotation — matches Python: last_feedback_features.append(); pop(0) at 3
         if (lastFeedbackKeys.size >= 3) lastFeedbackKeys.removeFirst()
         lastFeedbackKeys.addLast(worstKey)
 
@@ -93,15 +51,9 @@ class FeedbackGenerator(
         return generateSpecificFeedback(worstKey, deviation)
     }
 
-    /**
-     * Generate the specific instruction string for a feature+deviation pair.
-     *
-     * Matches Python: _generate_specific_feedback()
-     *
-     * Uses [FeatureKey] enum instead of string 'in' checks — compile-safe.
-     */
     private fun generateSpecificFeedback(key: FeatureKey, deviation: Double): String {
         return when (key) {
+            // ── Angle features ─────────────────────────────────────────────────
             FeatureKey.LEFT_ELBOW_ANGLE ->
                 if (deviation > 0) "Straighten left arm more" else "Bend left elbow deeper"
             FeatureKey.RIGHT_ELBOW_ANGLE ->
@@ -112,53 +64,43 @@ class FeedbackGenerator(
             FeatureKey.RIGHT_KNEE_ANGLE ->
                 if (deviation > 0) "Straighten right leg" else "Bend right knee more"
 
-            FeatureKey.LEFT_HIP_ANGLE, FeatureKey.RIGHT_HIP_ANGLE -> {
-                // Matches Python: if abs(deviation) > 10
+            FeatureKey.LEFT_HIP_ANGLE, FeatureKey.RIGHT_HIP_ANGLE ->
                 if (abs(deviation) > 10.0) {
-                    if (deviation > 0) "Hinge forward at hips more"
-                    else "Straighten hips, stand taller"
+                    if (deviation > 0) "Hinge forward at hips more" else "Straighten hips, stand taller"
                 } else "Adjust hip position"
-            }
 
             FeatureKey.LEFT_SHOULDER_ANGLE -> "Adjust left shoulder position"
             FeatureKey.RIGHT_SHOULDER_ANGLE -> "Adjust right shoulder position"
 
-            FeatureKey.TORSO_ANGLE -> {
-                // Matches Python: if abs(deviation) > 5
+            FeatureKey.TORSO_ANGLE ->
                 if (abs(deviation) > 5.0) {
-                    if (deviation > 0) "Lean torso forward slightly"
-                    else "Bring torso more upright"
+                    if (deviation > 0) "Lean torso forward slightly" else "Bring torso more upright"
                 } else "Adjust torso angle"
-            }
 
+            // ── Positional features ────────────────────────────────────────────
             FeatureKey.LEFT_ARM_ELEVATION ->
                 if (deviation > 0) "Raise left arm higher" else "Lower left arm"
             FeatureKey.RIGHT_ARM_ELEVATION ->
                 if (deviation > 0) "Raise right arm higher" else "Lower right arm"
 
+            FeatureKey.LEFT_LEG_SPREAD ->
+                if (deviation > 0) "Spread left leg wider" else "Bring left leg closer in"
+            FeatureKey.RIGHT_LEG_SPREAD ->
+                if (deviation > 0) "Spread right leg wider" else "Bring right leg closer in"
+
+            FeatureKey.BODY_CENTER_Y ->
+                if (deviation > 0) "Step back from camera" else "Step closer to camera"
+
             else -> "Adjust position to match target"
         }
     }
 
-    /**
-     * Returns true if the torso is oscillating rapidly — indicates subject
-     * is not yet settled into the pose.
-     *
-     * Matches Python: _is_unstable()
-     *   - Requires >= 5 frames in history
-     *   - Requires >= 3 torso_angle values
-     *   - Returns True if population std > 8.0
-     */
     private fun isUnstable(): Boolean {
         if (featureHistory.size < 5) return false
-
         val torsoVals = featureHistory.mapNotNull { it[FeatureKey.TORSO_ANGLE] }
         if (torsoVals.size < 3) return false
-
-        // Population std — matches Python np.std() with ddof=0
         val mean = torsoVals.average()
-        val std = populationStd(torsoVals, mean)
-        return std > INSTABILITY_THRESHOLD
+        return populationStd(torsoVals, mean) > INSTABILITY_THRESHOLD
     }
 
     fun reset() {
@@ -169,10 +111,6 @@ class FeedbackGenerator(
     companion object {
         private const val INSTABILITY_THRESHOLD = 8.0
 
-        /**
-         * Population std (ddof=0). Matches np.std().
-         * Replicates the same function from StateDiscovery to avoid cross-module dependency.
-         */
         private fun populationStd(values: List<Double>, mean: Double): Double {
             if (values.size <= 1) return 0.0
             var sumSq = 0.0
@@ -182,18 +120,15 @@ class FeedbackGenerator(
     }
 }
 
-// ── FeatureKey extensions used by FeedbackGenerator ──────────────────────────
+// ── FeatureKey extensions ─────────────────────────────────────────────────────
 
-/**
- * True for features corresponding to core joints that get priority in feedback.
- *
- * Matches Python: core_features = ['hip', 'knee', 'elbow', 'torso']
- */
-val FeatureKey.isCoreJoint: Boolean
-    get() = this == FeatureKey.LEFT_HIP_ANGLE ||
-            this == FeatureKey.RIGHT_HIP_ANGLE ||
-            this == FeatureKey.LEFT_KNEE_ANGLE ||
-            this == FeatureKey.RIGHT_KNEE_ANGLE ||
-            this == FeatureKey.LEFT_ELBOW_ANGLE ||
-            this == FeatureKey.RIGHT_ELBOW_ANGLE ||
-            this == FeatureKey.TORSO_ANGLE
+// isCoreJoint is defined as a member property on FeatureKey
+
+val FeatureKey.isPositional: Boolean
+    get() = this == FeatureKey.LEFT_ARM_ELEVATION  ||
+            this == FeatureKey.RIGHT_ARM_ELEVATION ||
+            this == FeatureKey.LEFT_LEG_SPREAD     ||
+            this == FeatureKey.RIGHT_LEG_SPREAD    ||
+            this == FeatureKey.BODY_CENTER_Y
+
+// isAngle is defined as a member property on FeatureKey
