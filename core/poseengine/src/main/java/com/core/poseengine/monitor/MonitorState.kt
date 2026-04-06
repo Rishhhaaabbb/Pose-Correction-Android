@@ -58,20 +58,12 @@ data class ExerciseComplexity(
 
 enum class ComplexityLevel { SIMPLE, MODERATE, COMPLEX }
 
-enum class CoachingProfile {
-    YOGA_GENTLE,
-    WORKOUT_STRICT,
-}
-
-enum class CoachingMode {
-    BALANCED,
-    FULL,
-}
-
 // ── Monitor configuration ─────────────────────────────────────────────────────
 
 data class MonitorConfig(
     val confidenceThreshold: Double = 0.7,
+    /** Minimum seconds between corrective feedback updates. Correct-frame
+     *  feedback (hold countdown) always updates immediately regardless. */
     /** Minimum seconds between corrective feedback updates. Correct-frame
      *  feedback (hold countdown) always updates immediately regardless. */
     val feedbackDelaySeconds: Double = 1.0,
@@ -82,8 +74,6 @@ data class MonitorConfig(
     val transitionGraceSeconds: Double = 0.2,
     val progressiveTolerance: Boolean = true,
     val enforceToleranceFloor: Boolean = true,
-    val coachingProfile: CoachingProfile = CoachingProfile.YOGA_GENTLE,
-    val coachingMode: CoachingMode = CoachingMode.BALANCED,
 ) {
     companion object {
         val DEFAULT = MonitorConfig()
