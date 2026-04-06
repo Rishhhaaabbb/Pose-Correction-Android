@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.core.poseengine.monitor.CoachingMode
+import com.core.poseengine.monitor.CoachingProfile
 import java.io.File
 
 data class GraphEntry(
@@ -31,6 +33,8 @@ data class GraphEntry(
     val enableGuidance: Boolean = true,
     val speechLanguage: SpeechLanguageOption = SpeechLanguageOption.ENGLISH,
     val speechSpeedMode: SpeechSpeedMode = SpeechSpeedMode.NORMAL,
+    val coachingProfile: CoachingProfile = CoachingProfile.YOGA_GENTLE,
+    val coachingMode: CoachingMode = CoachingMode.BALANCED,
 )
 
 @Composable
@@ -44,6 +48,8 @@ fun GraphSelectorScreen(
     var enableGuidance by remember { mutableStateOf(true) }
     var speechLanguage by remember { mutableStateOf(SpeechLanguageOption.ENGLISH) }
     var speechSpeedMode by remember { mutableStateOf(SpeechSpeedMode.NORMAL) }
+    var coachingProfile by remember { mutableStateOf(CoachingProfile.YOGA_GENTLE) }
+    var coachingMode by remember { mutableStateOf(CoachingMode.BALANCED) }
 
     renameTarget?.let { target ->
         RenameDialog(
@@ -185,6 +191,45 @@ fun GraphSelectorScreen(
                 }
             }
 
+            item {
+                SettingsChoiceCard(
+                    title = "Exercise profile",
+                    subtitle = "Gentle yoga guidance or stricter workout guidance",
+                ) {
+                    ChoiceChipRow {
+                        ChoiceChip(
+                            label = "Yoga gentle",
+                            selected = coachingProfile == CoachingProfile.YOGA_GENTLE,
+                            onClick = { coachingProfile = CoachingProfile.YOGA_GENTLE },
+                        )
+                        ChoiceChip(
+                            label = "Workout strict",
+                            selected = coachingProfile == CoachingProfile.WORKOUT_STRICT,
+                            onClick = { coachingProfile = CoachingProfile.WORKOUT_STRICT },
+                        )
+                    }
+                }
+            }
+
+            item {
+                SettingsChoiceCard(
+                    title = "Coaching intensity",
+                    subtitle = "Balanced is calm. Full gives extra body-part corrections.",
+                ) {
+                    ChoiceChipRow {
+                        ChoiceChip(
+                            label = "Balanced",
+                            selected = coachingMode == CoachingMode.BALANCED,
+                            onClick = { coachingMode = CoachingMode.BALANCED },
+                        )
+                        ChoiceChip(
+                            label = "Full coaching",
+                            selected = coachingMode == CoachingMode.FULL,
+                            onClick = { coachingMode = CoachingMode.FULL },
+                        )
+                    }
+                }
+            }
         }
 
         Button(
@@ -195,6 +240,8 @@ fun GraphSelectorScreen(
                             enableGuidance = enableGuidance,
                             speechLanguage = speechLanguage,
                             speechSpeedMode = speechSpeedMode,
+                            coachingProfile = coachingProfile,
+                            coachingMode = coachingMode,
                         )
                     )
                 }

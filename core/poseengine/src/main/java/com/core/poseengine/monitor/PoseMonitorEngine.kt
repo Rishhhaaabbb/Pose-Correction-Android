@@ -80,7 +80,10 @@ class PoseMonitorEngine(
     // ── Navigator / feedback ──────────────────────────────────────────────────
 
     private val navigator = SequenceNavigator(temporalSequence)
-    private val feedbackGenerator = FeedbackGenerator()
+    private val feedbackGenerator = FeedbackGenerator(
+        coachingProfile = config.coachingProfile,
+        coachingMode = config.coachingMode,
+    )
 
     // ── Mutable engine state ──────────────────────────────────────────────────
 

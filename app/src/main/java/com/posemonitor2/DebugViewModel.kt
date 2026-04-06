@@ -6,6 +6,7 @@ import android.app.Application
 import android.content.Context
 import android.util.Log
 import android.util.Size
+import androidx.camera.core.CameraSelector
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.core.poseengine.PoseGraph
@@ -31,11 +32,21 @@ class DebugViewModel(application: Application) : AndroidViewModel(application) {
     val guidancePreviewState = MutableStateFlow<PoseState?>(null)
     val lastDeviations       = MutableStateFlow<Map<FeatureKey, Double>>(emptyMap())
     val initError            = MutableStateFlow<String?>(null)
+    val cameraFacing         = MutableStateFlow(detector.currentLensFacing())
+    val zoomRatio            = MutableStateFlow(detector.currentZoomRatio())
+    val zoomRange            = MutableStateFlow(detector.currentZoomRange())
     val speechPreferences    = MutableStateFlow(MonitorSpeechPreferences())
 
     private var useCase: RunPipelineUseCase? = null
 
     init {
+        detector.onZoomRatioChanged = { ratio ->
+            zoomRatio.value = ratio
+        }
+        detector.onZoomRangeChanged = { minZoom, maxZoom ->
+            zoomRange.value = minZoom..maxZoom
+        }
+
         try {
             detector.initialize(confidenceThreshold = 0.5f)
             Log.d(TAG, "PoseDetector initialised")
@@ -95,6 +106,21 @@ class DebugViewModel(application: Application) : AndroidViewModel(application) {
     fun skipCurrentPose() {
         useCase?.engine?.skipCurrentState()
     }
+
+    fun toggleCameraFacing() {
+        cameraFacing.value = detector.toggleCameraFacing()
+    }
+
+    fun setZoomPreset(presetZoomRatio: Float) {
+        zoomRatio.value = detector.applyPresetZoom(presetZoomRatio)
+    }
+
+    fun onPinchZoom(scaleFactor: Float) {
+        zoomRatio.value = detector.zoomByScale(scaleFactor)
+    }
+
+    fun cameraFacingLabel(): String =
+        if (cameraFacing.value == CameraSelector.LENS_FACING_BACK) "BACK" else "FRONT"
 
     private fun loadGraph(context: Context, entry: GraphEntry): PoseGraph {
         return if (entry.isAsset) {
