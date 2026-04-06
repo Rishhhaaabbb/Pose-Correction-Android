@@ -20,9 +20,9 @@ data class PoseState(
      *
      * Non-strict mode: uses an adaptive threshold based on how many features
      * are actually visible:
-     *   - >= 6 features visible → 60% must match (normal front-facing)
-     *   - 4-5 features visible  → 55% must match (partial occlusion)
-     *   - < 4 features visible  → 50% must match (side-on pose)
+      *   - >= 6 features visible → 70% must match (normal front-facing)
+      *   - 4-5 features visible  → 60% must match (partial occlusion)
+      *   - < 4 features visible  → 55% must match (side-on pose)
      *
      * This prevents side-on exercises from being impossible to complete —
      * when only left-side joints are visible, a 70% threshold would require
@@ -61,9 +61,9 @@ data class PoseState(
             // Adaptive threshold — fewer visible features = more lenient
             // This handles side-on poses where only one body side is visible
             val threshold = when {
-                totalCount >= 6 -> MATCH_RATIO_FULL      // 0.60 — normal
-                totalCount >= 4 -> MATCH_RATIO_PARTIAL   // 0.55 — partial occlusion
-                else            -> MATCH_RATIO_MINIMAL   // 0.50 — side-on / heavy occlusion
+                totalCount >= 6 -> MATCH_RATIO_FULL      // 0.70 — normal
+                totalCount >= 4 -> MATCH_RATIO_PARTIAL   // 0.60 — partial occlusion
+                else            -> MATCH_RATIO_MINIMAL   // 0.55 — side-on / heavy occlusion
             }
             matchesCount.toDouble() / totalCount >= threshold
         }

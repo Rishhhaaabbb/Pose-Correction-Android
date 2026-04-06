@@ -102,5 +102,5 @@ dependencies {
     testImplementation(project(":core:poseengine"))
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
-    implementation("androidx.compose.foundation:foundation:1.6.x")
+    implementation("androidx.compose.foundation:foundation")
 }

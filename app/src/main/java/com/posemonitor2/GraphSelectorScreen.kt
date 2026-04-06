@@ -7,9 +7,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.core.poseengine.monitor.CoachingMode
+import com.core.poseengine.monitor.CoachingProfile
 import java.io.File
 
 data class GraphEntry(
@@ -27,6 +31,10 @@ data class GraphEntry(
     val filePath: String,
     val isAsset: Boolean = false,
     val enableGuidance: Boolean = true,
+    val speechLanguage: SpeechLanguageOption = SpeechLanguageOption.ENGLISH,
+    val speechSpeedMode: SpeechSpeedMode = SpeechSpeedMode.NORMAL,
+    val coachingProfile: CoachingProfile = CoachingProfile.YOGA_GENTLE,
+    val coachingMode: CoachingMode = CoachingMode.BALANCED,
 )
 
 @Composable
@@ -38,6 +46,10 @@ fun GraphSelectorScreen(
     var selected by remember { mutableStateOf<GraphEntry?>(null) }
     var renameTarget by remember { mutableStateOf<GraphEntry?>(null) }
     var enableGuidance by remember { mutableStateOf(true) }
+    var speechLanguage by remember { mutableStateOf(SpeechLanguageOption.ENGLISH) }
+    var speechSpeedMode by remember { mutableStateOf(SpeechSpeedMode.NORMAL) }
+    var coachingProfile by remember { mutableStateOf(CoachingProfile.YOGA_GENTLE) }
+    var coachingMode by remember { mutableStateOf(CoachingMode.BALANCED) }
 
     renameTarget?.let { target ->
         RenameDialog(
@@ -60,85 +72,199 @@ fun GraphSelectorScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0F0F0F))) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp),
+            contentPadding = PaddingValues(top = 32.dp, bottom = 112.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Spacer(Modifier.height(32.dp))
-
-            Text("Select Exercise", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Choose a pose graph to monitor", fontSize = 14.sp, color = Color(0xFF9E9E9E))
-
-            Spacer(Modifier.height(8.dp))
+            item {
+                Text("Select Exercise", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Choose a pose graph to monitor", fontSize = 14.sp, color = Color(0xFF9E9E9E))
+            }
 
             if (graphs.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("📂", fontSize = 48.sp)
-                        Text("No graphs found", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                        Text(
-                            "Generate a graph first using\nthe Graph Generation screen.",
-                            fontSize = 14.sp, color = Color(0xFF9E9E9E),
-                            textAlign = TextAlign.Center, lineHeight = 20.sp,
-                        )
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text("📂", fontSize = 48.sp)
+                            Text("No graphs found", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                            Text(
+                                "Generate a graph first using\nthe Graph Generation screen.",
+                                fontSize = 14.sp,
+                                color = Color(0xFF9E9E9E),
+                                textAlign = TextAlign.Center,
+                                lineHeight = 20.sp,
+                            )
+                        }
                     }
                 }
             } else {
-                LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(graphs) { entry ->
-                        GraphEntryCard(
-                            entry = entry,
-                            isSelected = selected == entry,
-                            onClick = { selected = entry },
-                            onLongClick = if (!entry.isAsset) { { renameTarget = entry } } else null,
+                item {
+                    Text(
+                        "Exercises",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFBDBDBD),
+                    )
+                }
+                items(graphs) { entry ->
+                    GraphEntryCard(
+                        entry = entry,
+                        isSelected = selected == entry,
+                        onClick = { selected = entry },
+                        onLongClick = if (!entry.isAsset) { { renameTarget = entry } } else null,
+                    )
+                }
+            }
+
+            item {
+                // ── Guidance preview toggle ────────────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF1A1A1A), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column {
+                        Text("Show pose preview", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                        Text("Show next pose before each transition", fontSize = 12.sp, color = Color(0xFF757575))
+                    }
+                    Switch(
+                        checked = enableGuidance,
+                        onCheckedChange = { enableGuidance = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor   = Color.White,
+                            checkedTrackColor   = Color(0xFF2196F3),
+                            uncheckedThumbColor = Color(0xFF9E9E9E),
+                            uncheckedTrackColor = Color(0xFF444444),
+                        ),
+                    )
+                }
+            }
+
+            item {
+                SettingsChoiceCard(
+                    title = "Speech speed",
+                    subtitle = "Normal or extra slow for better clarity",
+                ) {
+                    ChoiceChipRow {
+                        ChoiceChip(
+                            label = "Normal",
+                            selected = speechSpeedMode == SpeechSpeedMode.NORMAL,
+                            onClick = { speechSpeedMode = SpeechSpeedMode.NORMAL },
+                        )
+                        ChoiceChip(
+                            label = "Extra slow",
+                            selected = speechSpeedMode == SpeechSpeedMode.EXTRA_SLOW,
+                            onClick = { speechSpeedMode = SpeechSpeedMode.EXTRA_SLOW },
                         )
                     }
                 }
             }
 
-            // ── Guidance preview toggle ────────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF1A1A1A), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column {
-                    Text("Show pose preview", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                    Text("Show next pose before each transition", fontSize = 12.sp, color = Color(0xFF757575))
+            item {
+                SettingsChoiceCard(
+                    title = "Speech language",
+                    subtitle = "Select the coaching voice language",
+                ) {
+                    ChoiceChipRow {
+                        SpeechLanguageOption.entries.forEach { option ->
+                            ChoiceChip(
+                                label = option.displayName,
+                                selected = speechLanguage == option,
+                                onClick = { speechLanguage = option },
+                            )
+                        }
+                    }
                 }
-                Switch(
-                    checked = enableGuidance,
-                    onCheckedChange = { enableGuidance = it },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor   = Color.White,
-                        checkedTrackColor   = Color(0xFF2196F3),
-                        uncheckedThumbColor = Color(0xFF9E9E9E),
-                        uncheckedTrackColor = Color(0xFF444444),
-                    ),
-                )
             }
 
-            Button(
-                onClick = { selected?.let { onGraphSelected(it.copy(enableGuidance = enableGuidance)) } },
-                enabled = selected != null,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF2196F3),
-                    disabledContainerColor = Color(0xFF2A2A2A),
-                    disabledContentColor = Color(0xFF555555),
-                ),
-            ) {
-                Text(
-                    text = if (selected != null) "Start Monitoring" else "Select a graph above",
-                    fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                )
+            item {
+                SettingsChoiceCard(
+                    title = "Exercise profile",
+                    subtitle = "Gentle yoga guidance or stricter workout guidance",
+                ) {
+                    ChoiceChipRow {
+                        ChoiceChip(
+                            label = "Yoga gentle",
+                            selected = coachingProfile == CoachingProfile.YOGA_GENTLE,
+                            onClick = { coachingProfile = CoachingProfile.YOGA_GENTLE },
+                        )
+                        ChoiceChip(
+                            label = "Workout strict",
+                            selected = coachingProfile == CoachingProfile.WORKOUT_STRICT,
+                            onClick = { coachingProfile = CoachingProfile.WORKOUT_STRICT },
+                        )
+                    }
+                }
             }
 
-            Spacer(Modifier.height(8.dp))
+            item {
+                SettingsChoiceCard(
+                    title = "Coaching intensity",
+                    subtitle = "Balanced is calm. Full gives extra body-part corrections.",
+                ) {
+                    ChoiceChipRow {
+                        ChoiceChip(
+                            label = "Balanced",
+                            selected = coachingMode == CoachingMode.BALANCED,
+                            onClick = { coachingMode = CoachingMode.BALANCED },
+                        )
+                        ChoiceChip(
+                            label = "Full coaching",
+                            selected = coachingMode == CoachingMode.FULL,
+                            onClick = { coachingMode = CoachingMode.FULL },
+                        )
+                    }
+                }
+            }
+        }
+
+        Button(
+            onClick = {
+                selected?.let {
+                    onGraphSelected(
+                        it.copy(
+                            enableGuidance = enableGuidance,
+                            speechLanguage = speechLanguage,
+                            speechSpeedMode = speechSpeedMode,
+                            coachingProfile = coachingProfile,
+                            coachingMode = coachingMode,
+                        )
+                    )
+                }
+            },
+            enabled = selected != null,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF2196F3),
+                disabledContainerColor = Color(0xFF2A2A2A),
+                disabledContentColor = Color(0xFF555555),
+            ),
+        ) {
+            Text(
+                text = if (selected != null) "Start Monitoring" else "Select a graph above",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
 }
@@ -232,4 +358,54 @@ fun loadAvailableGraphs(context: Context): List<GraphEntry> {
             }
     } catch (_: Exception) {}
     return result
+}
+
+@Composable
+private fun SettingsChoiceCard(
+    title: String,
+    subtitle: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF1A1A1A), RoundedCornerShape(10.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+        Text(subtitle, fontSize = 12.sp, color = Color(0xFF757575), lineHeight = 16.sp)
+        content()
+    }
+}
+
+@Composable
+private fun ChoiceChipRow(content: @Composable RowScope.() -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content,
+    )
+}
+
+@Composable
+private fun ChoiceChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, fontSize = 12.sp) },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = Color(0xFF2196F3),
+            selectedLabelColor = Color.White,
+            containerColor = Color(0xFF2A2A2A),
+            labelColor = Color(0xFFDDDDDD),
+        ),
+    )
 }

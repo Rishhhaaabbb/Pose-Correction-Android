@@ -9,7 +9,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
 import androidx.activity.viewModels
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -20,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -27,6 +30,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.util.Locale
+import kotlin.math.abs
 
 class MainActivity : ComponentActivity() {
 
@@ -104,6 +109,8 @@ private fun MainNavigation(viewModel: DebugViewModel, activity: MainActivity) {
 
 @Composable
 fun MonitorScreen(viewModel: DebugViewModel, onBack: () -> Unit) {
+    val context = LocalContext.current
+
     val skeleton        by viewModel.currentSkeleton.collectAsStateWithLifecycle()
     val frameStatus     by viewModel.frameStatus.collectAsStateWithLifecycle()
     val targetState     by viewModel.targetState.collectAsStateWithLifecycle()
@@ -111,6 +118,40 @@ fun MonitorScreen(viewModel: DebugViewModel, onBack: () -> Unit) {
     val deviations      by viewModel.lastDeviations.collectAsStateWithLifecycle()
     val initError       by viewModel.initError.collectAsStateWithLifecycle()
     val rawFrameSize    by viewModel.cameraFrameSize.collectAsStateWithLifecycle()
+    val cameraFacing    by viewModel.cameraFacing.collectAsStateWithLifecycle()
+    val zoomRatio       by viewModel.zoomRatio.collectAsStateWithLifecycle()
+    val zoomRange       by viewModel.zoomRange.collectAsStateWithLifecycle()
+    val speechPreferences by viewModel.speechPreferences.collectAsStateWithLifecycle()
+
+    val speechCoach = remember(context) { MonitorSpeechCoach(context) }
+
+    DisposableEffect(speechCoach) {
+        onDispose { speechCoach.shutdown() }
+    }
+
+    LaunchedEffect(Unit) {
+        speechCoach.applyPreferences(speechPreferences)
+        speechCoach.announceSessionStarted(cameraFacing)
+    }
+
+    LaunchedEffect(speechPreferences) {
+        speechCoach.applyPreferences(speechPreferences)
+    }
+
+    LaunchedEffect(cameraFacing) {
+        speechCoach.announceCameraFacing(cameraFacing)
+    }
+
+    LaunchedEffect(
+        frameStatus?.feedback,
+        frameStatus?.phase,
+        frameStatus?.stateId,
+        frameStatus?.repsCompleted,
+        guidancePreview?.stateId,
+    ) {
+        val status = frameStatus ?: return@LaunchedEffect
+        speechCoach.onFrameStatus(status, guidancePreview?.stateId)
+    }
 
     // Convert android.util.Size → compose Size for the overlay crop rect math.
     // Defaults to Size.Zero until the first frame arrives — overlay falls back
@@ -146,7 +187,15 @@ fun MonitorScreen(viewModel: DebugViewModel, onBack: () -> Unit) {
                     viewModel.detector.setSurfaceProvider(previewView.surfaceProvider)
                 }
             },
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(cameraFacing, zoomRange) {
+                    detectTransformGestures { _, _, zoom, _ ->
+                        if (zoom != 1f) {
+                            viewModel.onPinchZoom(zoom)
+                        }
+                    }
+                },
         )
 
         // ── Monitoring overlay ────────────────────────────────────────────────
@@ -157,6 +206,7 @@ fun MonitorScreen(viewModel: DebugViewModel, onBack: () -> Unit) {
             guidancePreviewState = guidancePreview,
             deviations = deviations,
             cameraFrameSize = cameraFrameSize,
+            mirrorHorizontally = cameraFacing == CameraSelector.LENS_FACING_FRONT,
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -172,20 +222,90 @@ fun MonitorScreen(viewModel: DebugViewModel, onBack: () -> Unit) {
             Text("← Back", fontSize = 13.sp, fontWeight = FontWeight.Medium)
         }
 
-        // ── Skip button — bottom right ────────────────────────────────────────
-        Button(
-            onClick = { viewModel.skipCurrentPose() },
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 16.dp)
-                .height(40.dp),
-            shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xCC424242),
-                contentColor = Color(0xFF90CAF9),
-            ),
+                .navigationBarsPadding()
+                .padding(end = 16.dp, bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("SKIP", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            Button(
+                onClick = { viewModel.toggleCameraFacing() },
+                modifier = Modifier.height(40.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xCC1E1E1E),
+                    contentColor = Color(0xFF81D4FA),
+                ),
+            ) {
+                val cameraLabel = if (cameraFacing == CameraSelector.LENS_FACING_BACK) {
+                    "CAM: BACK"
+                } else {
+                    "CAM: FRONT"
+                }
+                Text(cameraLabel, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+
+            // ── Skip button — bottom right ────────────────────────────────────
+            Button(
+                onClick = { viewModel.skipCurrentPose() },
+                modifier = Modifier.height(40.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xCC424242),
+                    contentColor = Color(0xFF90CAF9),
+                ),
+            ) {
+                Text("SKIP", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            }
+        }
+
+        val zoomPresets = remember(zoomRange) {
+            listOf(0.6f, 1.0f, 1.5f)
+                .map { it.coerceIn(zoomRange.start, zoomRange.endInclusive) }
+                .distinctBy { (it * 20f).toInt() }
+        }
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                zoomPresets.forEach { preset ->
+                    val selected = abs(zoomRatio - preset) < 0.08f
+                    FilterChip(
+                        selected = selected,
+                        onClick = { viewModel.setZoomPreset(preset) },
+                        label = {
+                            Text(
+                                text = formatZoomLabel(preset),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xCC2196F3),
+                            selectedLabelColor = Color.White,
+                            containerColor = Color(0xCC212121),
+                            labelColor = Color(0xFFE0E0E0),
+                        ),
+                    )
+                }
+            }
+
+            Text(
+                text = "Zoom ${formatZoomLabel(zoomRatio)}  |  Pinch ${formatZoomLabel(zoomRange.start)}-${formatZoomLabel(zoomRange.endInclusive)}",
+                color = Color(0xCCEEEEEE),
+                fontSize = 10.sp,
+            )
         }
 
         // ── Init error banner ─────────────────────────────────────────────────
@@ -202,5 +322,13 @@ fun MonitorScreen(viewModel: DebugViewModel, onBack: () -> Unit) {
                 Text("⚠️ $error", color = Color(0xFFFF8A80), fontSize = 13.sp)
             }
         }
+    }
+}
+
+private fun formatZoomLabel(ratio: Float): String {
+    return if (abs(ratio - ratio.toInt()) < 0.05f) {
+        "${ratio.toInt()}x"
+    } else {
+        String.format(Locale.US, "%.1fx", ratio)
     }
 }

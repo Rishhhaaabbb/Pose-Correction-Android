@@ -72,6 +72,26 @@ class PoseDetector(private val context: Context) {
     var onFrameSize: ((Size) -> Unit)? = null
     private var frameSizeReported = false
 
+    @Volatile
+    private var currentLensFacing: Int = CameraSelector.LENS_FACING_FRONT
+
+    private var activeCameraProvider: ProcessCameraProvider? = null
+    private var activeLifecycleOwner: LifecycleOwner? = null
+    private var activePreview: Preview? = null
+    private var activeImageAnalysis: ImageAnalysis? = null
+    private var activeCamera: Camera? = null
+
+    private var currentZoomRatioValue: Float = DEFAULT_ZOOM_RATIO
+    private var minAllowedZoomRatio: Float = USER_MIN_ZOOM_RATIO
+    private var maxAllowedZoomRatio: Float = USER_MAX_ZOOM_RATIO
+    private val zoomRatioByLensFacing = mutableMapOf(
+        CameraSelector.LENS_FACING_FRONT to DEFAULT_ZOOM_RATIO,
+        CameraSelector.LENS_FACING_BACK to DEFAULT_ZOOM_RATIO,
+    )
+
+    var onZoomRatioChanged: ((Float) -> Unit)? = null
+    var onZoomRangeChanged: ((Float, Float) -> Unit)? = null
+
     // ── Cached rotation state ─────────────────────────────────────────────────
     // Reuse a single Matrix instance across frames.
     // Only call postRotate() again when the rotation degree changes.
@@ -81,6 +101,40 @@ class PoseDetector(private val context: Context) {
 
     fun setSurfaceProvider(provider: Preview.SurfaceProvider) {
         previewSurfaceProvider = provider
+    }
+
+    fun currentLensFacing(): Int = currentLensFacing
+
+    fun currentZoomRatio(): Float = currentZoomRatioValue
+
+    fun currentZoomRange(): ClosedFloatingPointRange<Float> =
+        minAllowedZoomRatio..maxAllowedZoomRatio
+
+    fun setZoomRatio(requestedZoomRatio: Float): Float =
+        applyZoomRatio(requestedZoomRatio, persistForCurrentLens = true)
+
+    fun applyPresetZoom(presetZoomRatio: Float): Float =
+        setZoomRatio(presetZoomRatio)
+
+    fun zoomByScale(scaleFactor: Float): Float {
+        if (!scaleFactor.isFinite() || scaleFactor <= 0f) return currentZoomRatioValue
+        return setZoomRatio(currentZoomRatioValue * scaleFactor)
+    }
+
+    fun toggleCameraFacing(): Int {
+        val requestedLensFacing = if (currentLensFacing == CameraSelector.LENS_FACING_FRONT) {
+            CameraSelector.LENS_FACING_BACK
+        } else {
+            CameraSelector.LENS_FACING_FRONT
+        }
+        return setCameraFacing(requestedLensFacing)
+    }
+
+    fun setCameraFacing(lensFacing: Int): Int {
+        currentLensFacing = lensFacing
+        frameSizeReported = false
+        rebindCameraIfActive()
+        return currentLensFacing
     }
 
     // ── Initialisation ────────────────────────────────────────────────────────
@@ -131,12 +185,15 @@ class PoseDetector(private val context: Context) {
             }
 
             try {
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_FRONT_CAMERA,
-                    preview,
-                    imageAnalysis,
+                activeCameraProvider = cameraProvider
+                activeLifecycleOwner = lifecycleOwner
+                activePreview = preview
+                activeImageAnalysis = imageAnalysis
+                bindActiveUseCases(
+                    cameraProvider = cameraProvider,
+                    lifecycleOwner = lifecycleOwner,
+                    preview = preview,
+                    imageAnalysis = imageAnalysis,
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "CameraX bind failed: ${e.message}")
@@ -146,10 +203,133 @@ class PoseDetector(private val context: Context) {
 
         awaitClose {
             onResult = null
+            activeCameraProvider = null
+            activeLifecycleOwner = null
+            activePreview = null
+            activeImageAnalysis = null
+            activeCamera = null
             executor.shutdown()
             landmarker?.close()
         }
     }.buffer(Channel.CONFLATED)
+
+    private fun rebindCameraIfActive() {
+        val cameraProvider = activeCameraProvider ?: return
+        val lifecycleOwner = activeLifecycleOwner ?: return
+        val preview = activePreview ?: return
+        val imageAnalysis = activeImageAnalysis ?: return
+
+        runCatching {
+            bindActiveUseCases(
+                cameraProvider = cameraProvider,
+                lifecycleOwner = lifecycleOwner,
+                preview = preview,
+                imageAnalysis = imageAnalysis,
+            )
+        }.onFailure { error ->
+            Log.e(TAG, "Failed to switch camera: ${error.message}")
+        }
+    }
+
+    private fun bindActiveUseCases(
+        cameraProvider: ProcessCameraProvider,
+        lifecycleOwner: LifecycleOwner,
+        preview: Preview,
+        imageAnalysis: ImageAnalysis,
+    ) {
+        val resolvedLensFacing = resolveSupportedLensFacing(cameraProvider, currentLensFacing)
+        currentLensFacing = resolvedLensFacing
+
+        cameraProvider.unbindAll()
+        activeCamera = cameraProvider.bindToLifecycle(
+            lifecycleOwner,
+            selectorForLensFacing(resolvedLensFacing),
+            preview,
+            imageAnalysis,
+        )
+
+        refreshZoomBoundsFromCamera()
+        val rememberedZoom = zoomRatioByLensFacing[resolvedLensFacing] ?: DEFAULT_ZOOM_RATIO
+        applyZoomRatio(rememberedZoom, persistForCurrentLens = true)
+    }
+
+    private fun refreshZoomBoundsFromCamera() {
+        val zoomState = activeCamera?.cameraInfo?.zoomState?.value
+        if (zoomState != null) {
+            val supportedMin = zoomState.minZoomRatio
+            val supportedMax = zoomState.maxZoomRatio
+
+            val boundedMin = maxOf(USER_MIN_ZOOM_RATIO, supportedMin)
+            val boundedMax = minOf(USER_MAX_ZOOM_RATIO, supportedMax)
+
+            if (boundedMax >= boundedMin) {
+                minAllowedZoomRatio = boundedMin
+                maxAllowedZoomRatio = boundedMax
+            } else {
+                minAllowedZoomRatio = supportedMin
+                maxAllowedZoomRatio = supportedMax
+            }
+        } else {
+            minAllowedZoomRatio = USER_MIN_ZOOM_RATIO
+            maxAllowedZoomRatio = USER_MAX_ZOOM_RATIO
+        }
+
+        onZoomRangeChanged?.invoke(minAllowedZoomRatio, maxAllowedZoomRatio)
+    }
+
+    private fun applyZoomRatio(
+        requestedZoomRatio: Float,
+        persistForCurrentLens: Boolean,
+    ): Float {
+        val clamped = clampZoomRatio(requestedZoomRatio)
+        currentZoomRatioValue = clamped
+
+        if (persistForCurrentLens) {
+            zoomRatioByLensFacing[currentLensFacing] = clamped
+        }
+
+        activeCamera?.cameraControl?.setZoomRatio(clamped)
+        onZoomRatioChanged?.invoke(clamped)
+        return clamped
+    }
+
+    private fun clampZoomRatio(requestedZoomRatio: Float): Float {
+        val safeRequested = if (requestedZoomRatio.isFinite() && requestedZoomRatio > 0f) {
+            requestedZoomRatio
+        } else {
+            DEFAULT_ZOOM_RATIO
+        }
+        return safeRequested.coerceIn(minAllowedZoomRatio, maxAllowedZoomRatio)
+    }
+
+    private fun resolveSupportedLensFacing(
+        cameraProvider: ProcessCameraProvider,
+        requestedLensFacing: Int,
+    ): Int {
+        if (cameraProvider.hasCameraSafely(selectorForLensFacing(requestedLensFacing))) {
+            return requestedLensFacing
+        }
+
+        val fallback = if (requestedLensFacing == CameraSelector.LENS_FACING_FRONT) {
+            CameraSelector.LENS_FACING_BACK
+        } else {
+            CameraSelector.LENS_FACING_FRONT
+        }
+
+        if (cameraProvider.hasCameraSafely(selectorForLensFacing(fallback))) {
+            Log.w(TAG, "Requested camera not available, falling back to lensFacing=$fallback")
+            return fallback
+        }
+
+        Log.w(TAG, "No preferred camera available, keeping lensFacing=$requestedLensFacing")
+        return requestedLensFacing
+    }
+
+    private fun selectorForLensFacing(lensFacing: Int): CameraSelector =
+        CameraSelector.Builder().requireLensFacing(lensFacing).build()
+
+    private fun ProcessCameraProvider.hasCameraSafely(selector: CameraSelector): Boolean =
+        runCatching { hasCamera(selector) }.getOrDefault(false)
 
     // ── Frame processing ──────────────────────────────────────────────────────
 
@@ -247,6 +427,9 @@ class PoseDetector(private val context: Context) {
     companion object {
         private const val TAG = "PoseDetector"
         private const val MODEL_FILE = "pose_landmarker_full.task"
+        private const val USER_MIN_ZOOM_RATIO = 0.6f
+        private const val USER_MAX_ZOOM_RATIO = 2.0f
+        private const val DEFAULT_ZOOM_RATIO = 1.0f
     }
 }
 

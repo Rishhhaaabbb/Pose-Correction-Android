@@ -76,6 +76,7 @@ fun MonitorOverlay(
     guidancePreviewState: PoseState?,
     deviations: Map<FeatureKey, Double>,
     cameraFrameSize: androidx.compose.ui.geometry.Size = androidx.compose.ui.geometry.Size.Zero,
+    mirrorHorizontally: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     if (frameStatus == null) return
@@ -134,6 +135,7 @@ fun MonitorOverlay(
                     deviations      = deviations,
                     targetState     = targetState,
                     cameraFrameSize = cameraFrameSize,
+                    mirrorHorizontally = mirrorHorizontally,
                 )
             }
         }
@@ -161,6 +163,7 @@ fun MonitorOverlay(
             modifier     = Modifier
                 .align(Alignment.TopStart)
                 .fillMaxWidth()
+                .statusBarsPadding()
                 .padding(end = if (panelExpanded) 0.dp else 132.dp),
         )
 
@@ -169,13 +172,26 @@ fun MonitorOverlay(
                 accuracy = animatedAccuracy,
                 modifier = Modifier
                     .align(Alignment.TopStart)
+                    .statusBarsPadding()
                     .padding(start = 12.dp, top = 56.dp)
                     .size(80.dp),
             )
         }
 
-        RepCounter(reps = frameStatus.repsCompleted, modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
-        StreakCounter(streak = frameStatus.streak, modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 72.dp))
+        RepCounter(
+            reps = frameStatus.repsCompleted,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 56.dp),
+        )
+        StreakCounter(
+            streak = frameStatus.streak,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .navigationBarsPadding()
+                .padding(start = 12.dp, bottom = 88.dp),
+        )
 
         if (frameStatus.feedback.isNotEmpty()) {
             FeedbackBar(
@@ -184,7 +200,8 @@ fun MonitorOverlay(
                 inGrace   = frameStatus.inGrace,
                 modifier  = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 16.dp)
+                    .navigationBarsPadding()
+                    .padding(bottom = 88.dp)
                     .padding(horizontal = 24.dp),
             )
         }
@@ -199,6 +216,7 @@ private fun LiveSkeletonOverlay(
     deviations: Map<FeatureKey, Double>,
     targetState: PoseState?,
     cameraFrameSize: androidx.compose.ui.geometry.Size,
+    mirrorHorizontally: Boolean,
 ) {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val screenW = size.width
@@ -227,7 +245,7 @@ private fun LiveSkeletonOverlay(
         val visRangeY = visY1 - visY0
 
         fun kptToScreen(kx: Float, ky: Float): Offset {
-            val mx = 1f - kx
+            val mx = if (mirrorHorizontally) 1f - kx else kx
             val my = 1f - ky
             return Offset(
                 (mx - visX0) / visRangeX * screenW,
@@ -370,7 +388,8 @@ private fun GuidanceOverlay(previewState: PoseState, feedback: String) {
             color      = Color(0xFF222222),
             modifier   = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 56.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 108.dp)
                 .background(Color(0x22000000), RoundedCornerShape(8.dp))
                 .padding(horizontal = 20.dp, vertical = 10.dp),
         )

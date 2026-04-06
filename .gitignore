@@ -13,3 +13,13 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Local diagnostic artifacts
+/.kotlin/errors/
+/core/poseengine/bin/
+/domain/bin/
+
+# Temporary build/debug files
+*.log
+*.status
+*.exit
