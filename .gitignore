@@ -1,0 +1,38 @@
+# Built artifacts
+build/
+bin/
+gen/
+out/
+.externalNativeBuild
+.cxx
+**/build/
+**/bin/
+
+# Gradle
+.gradle/
+local.properties
+.navigation/
+
+# IDE
+*.iml
+.idea/
+!.idea/codeStyles/
+!.idea/vcs.xml
+!.idea/gradle.xml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Android Studio - Captures and backups
+/captures/
+*.bak
+*.swp

@@ -1,0 +1,87 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "gradle assembleDebug",
+			"type": "shell",
+			"command": "gradlew.bat",
+			"args": [
+				"assembleDebug"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "gradle assembleDebug (local)",
+			"type": "shell",
+			"command": ".\\gradlew.bat",
+			"args": [
+				"assembleDebug"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "gradle assembleDebug (stacktrace)",
+			"type": "shell",
+			"command": ".\\gradlew.bat",
+			"args": [
+				"assembleDebug",
+				"--stacktrace"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "gradle assembleDebug (local)",
+			"type": "shell",
+			"command": ".\\gradlew.bat",
+			"args": [
+				"assembleDebug"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "gradle assembleDebug (plain)",
+			"type": "shell",
+			"command": ".\\gradlew.bat",
+			"args": [
+				"assembleDebug",
+				"--console=plain"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "gradle installDebug",
+			"type": "shell",
+			"command": ".\\gradlew.bat",
+			"args": [
+				"installDebug"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "gradle installDebug",
+			"type": "shell",
+			"command": ".\\gradlew.bat",
+			"args": [
+				"installDebug"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "gradle installDebug",
+			"type": "shell",
+			"command": ".\\gradlew.bat",
+			"args": [
+				"installDebug"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}
