@@ -24,7 +24,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.posemonitor2.trial2"
+        applicationId = "com.posemonitor2"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

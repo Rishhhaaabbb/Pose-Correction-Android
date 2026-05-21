@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:651796601115:android:d975c5194f612fd9ccdbbe",
         "android_client_info": {
-          "package_name": "com.posemonitor2.trial2"
+          "package_name": "com.posemonitor2"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "651796601115-0uubscs3ptm88fesremijiiptarlhvd4.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.posemonitor2.trial2",
+            "package_name": "com.posemonitor2",
             "certificate_hash": "9a7605ac4ce25e31162c153c763e2c088dcbb4c7"
           }
         },
@@ -46,7 +46,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:651796601115:android:44fe0525df535f66ccdbbe",
         "android_client_info": {
-          "package_name": "com.posemonitor2.trial2.debug"
+          "package_name": "com.posemonitor2.debug"
         }
       },
       "oauth_client": [
@@ -54,7 +54,7 @@
           "client_id": "651796601115-ee1h9eq6b4md1gukb7tmnhj342nr8sjj.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.posemonitor2.trial2.debug",
+            "package_name": "com.posemonitor2.debug",
             "certificate_hash": "9a7605ac4ce25e31162c153c763e2c088dcbb4c7"
           }
         },
