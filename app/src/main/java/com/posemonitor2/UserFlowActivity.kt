@@ -110,8 +110,8 @@ fun UserFlowNavigation() {
         } ?: false
     }
 
-    LaunchedEffect(authState.isAuthenticated) {
-        if (!authState.isAuthenticated) {
+    LaunchedEffect(authState.isAuthenticated, authState.isLoading) {
+        if (!authState.isLoading && !authState.isAuthenticated && activity?.isFinishing == false && activity?.isDestroyed == false) {
             val intent = Intent(context, LoginActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             }
@@ -123,9 +123,9 @@ fun UserFlowNavigation() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     
-    // If on Home and press back, logout
+    // If on Home and press back, exit the app completely
     BackHandler(enabled = currentRoute == UserRoute.Home.route) {
-        authViewModel.signOut()
+        activity?.finishAffinity()
     }
 
     LaunchedEffect(Unit) {

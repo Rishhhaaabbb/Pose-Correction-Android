@@ -52,6 +52,21 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    fun restoreSession() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, errorMessage = null) }
+            val restored = restoreSessionUseCase().getOrNull()
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    isAuthenticated = restored != null,
+                    userId = restored?.id,
+                    userEmail = restored?.email,
+                )
+            }
+        }
+    }
+
     fun signInWithGoogle(idToken: String, fallbackName: String?, fallbackEmail: String?) {
         if (idToken.isBlank()) {
             _state.update { it.copy(errorMessage = "Missing Google ID token") }

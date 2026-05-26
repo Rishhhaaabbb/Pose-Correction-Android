@@ -80,8 +80,13 @@ class LoginActivity : ComponentActivity() {
                 AuthNavigation(
                     authViewModel = authViewModel,
                     onAuthenticated = { email ->
-                        val target = UserFlowActivity::class.java
-                        startActivity(Intent(this, target))
+                        val intent = Intent(this, UserFlowActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        }
+                        startActivity(intent)
+                        finish()
+                    }
+                        startActivity(intent)
                         finish()
                     }
                 )
