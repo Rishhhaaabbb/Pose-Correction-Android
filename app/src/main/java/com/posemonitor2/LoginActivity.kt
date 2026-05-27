@@ -86,9 +86,7 @@ class LoginActivity : ComponentActivity() {
                         startActivity(intent)
                         finish()
                     }
-                        startActivity(intent)
-                        finish()
-                    }
+
                 )
             }
         }
