@@ -59,6 +59,14 @@
           }
         },
         {
+          "client_id": "651796601115-om8dp9e9oe8e4i4p2o86os6pfj4bodvq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.posemonitor2.debug",
+            "certificate_hash": "83a081c3e92b0a936f5a3f3c0276974a77ccf8ad"
+          }
+        },
+        {
           "client_id": "651796601115-jhp3fmm29htfgioif62d0mrp117sbakv.apps.googleusercontent.com",
           "client_type": 3
         }
