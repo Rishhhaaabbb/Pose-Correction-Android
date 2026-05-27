@@ -158,7 +158,11 @@ fun UserFlowNavigation() {
             startDestination = UserRoute.Home.route,
             modifier         = Modifier.padding(innerPadding),
         ) {
-            composable(UserRoute.Home.route) {
+            composable(
+                UserRoute.Home.route,
+                enterTransition = { fadeIn(animationSpec = tween(250)) },
+                exitTransition = { fadeOut(animationSpec = tween(250)) },
+            ) {
                 UserHomeScreen(
                     navController = navController,
                     onOpenHelp = {
@@ -168,28 +172,56 @@ fun UserFlowNavigation() {
                     },
                 )
             }
-            composable(UserRoute.Exercises.route) {
+            composable(
+                UserRoute.Exercises.route,
+                enterTransition = { fadeIn(animationSpec = tween(300)) },
+                exitTransition = { fadeOut(animationSpec = tween(300)) },
+            ) {
                 ExercisesScreen(navController = navController)
             }
-            composable(UserRoute.CustomWorkout.route) {
+            composable(
+                UserRoute.CustomWorkout.route,
+                enterTransition = { fadeIn(animationSpec = tween(300)) },
+                exitTransition = { fadeOut(animationSpec = tween(300)) },
+            ) {
                 CustomWorkoutScreen(navController = navController)
             }
             composable(CUSTOM_WORKOUT_EDITOR_ROUTE_PATTERN) {
                 CustomWorkoutEditorScreen(navController = navController)
             }
-            composable(UserRoute.Progress.route) {
+            composable(
+                UserRoute.Progress.route,
+                enterTransition = { fadeIn(animationSpec = tween(300)) },
+                exitTransition = { fadeOut(animationSpec = tween(300)) },
+            ) {
                 ProgressScreen(navController = navController)
             }
-            composable(UserRoute.Library.route) {
+            composable(
+                UserRoute.Library.route,
+                enterTransition = { fadeIn(animationSpec = tween(300)) },
+                exitTransition = { fadeOut(animationSpec = tween(300)) },
+            ) {
                 LibraryScreen(navController = navController)
             }
-            composable(UserRoute.Graphs.route) {
+            composable(
+                UserRoute.Graphs.route,
+                enterTransition = { fadeIn(animationSpec = tween(300)) },
+                exitTransition = { fadeOut(animationSpec = tween(300)) },
+            ) {
                 GraphsScreen(navController = navController)
             }
-            composable(UserRoute.AdminStats.route) {
+            composable(
+                UserRoute.AdminStats.route,
+                enterTransition = { fadeIn(animationSpec = tween(300)) },
+                exitTransition = { fadeOut(animationSpec = tween(300)) },
+            ) {
                 AdminStatsScreen(navController = navController)
             }
-            composable(UserRoute.Profile.route) {
+            composable(
+                UserRoute.Profile.route,
+                enterTransition = { fadeIn(animationSpec = tween(300)) },
+                exitTransition = { fadeOut(animationSpec = tween(300)) },
+            ) {
                 ProfileScreen(navController = navController)
             }
             // ... remainder same
