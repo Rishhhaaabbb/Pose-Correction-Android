@@ -486,12 +486,8 @@ fun MonitorScreen(
 
     // ── Sync UI Slider with Hardware (Pinch Support) ──────────────────────
     LaunchedEffect(zoomState) {
-        zoomState?.linearZoom?.let { hardwareLinear ->
-            // Update the slider state if it differs from hardware (e.g. after a pinch)
-            if (kotlin.math.abs(hardwareLinear - zoomLevel) > 0.01f) {
-                viewModel.zoomLevel.value = hardwareLinear
-            }
-        }
+        viewModel.applyDefaultZoomIfNeeded(zoomState)
+        viewModel.applyPendingZoomIfNeeded(zoomState)
     }
 
     // Convert android.util.Size → compose Size for the overlay crop rect math.
@@ -627,6 +623,7 @@ fun MonitorScreen(
             currentZoomRatio = currentZoomRatio,
             minZoomRatio = minZoomRatio,
             maxZoomRatio = maxZoomRatio,
+            onZoomRatioChange = { viewModel.setZoomRatio(it) },
             targetReps = targetReps,
             targetHoldDurationSeconds = sessionHoldDurationSeconds,
             exerciseName = viewModel.getCurrentExerciseName(),

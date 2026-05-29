@@ -6,6 +6,8 @@ import android.app.Application
 import android.content.Context
 import android.util.Log
 import android.util.Size
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.core.poseengine.PoseGraph
@@ -30,9 +32,13 @@ import com.domain.usecase.SavePoseGraphUseCase
 import com.domain.usecase.SaveSessionMetricUseCase
 import com.domain.usecase.SaveWorkoutSessionUseCase
 import androidx.camera.core.ZoomState
+import androidx.camera.core.CameraInfo
+import androidx.camera.core.CameraSelector
+import androidx.camera.camera2.interop.Camera2CameraInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
@@ -72,18 +78,30 @@ class DebugViewModel @Inject constructor(
     
     // ── Camera Zoom State (Hardware) ──────────────────────────────────────────
     val zoomLevel = MutableStateFlow(0f) // User input [0.0 - 1.0]
+    private var defaultZoomApplied = false
+    private val backLens = MutableStateFlow(BackLens.DEFAULT)
+    private var pendingZoomRatio: Float? = null
+    private var pipelineJob: Job? = null
+    private var pipelineOwner: androidx.lifecycle.LifecycleOwner? = null
+    private var cameraInventoryLogged = false
     
     // Live hardware ratios (from detector)
     val zoomState: StateFlow<ZoomState?> = detector.zoomStateFlow
     
-    val currentZoomRatio = zoomState.map { it?.zoomRatio ?: 1.0f }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1.0f)
+    val currentZoomRatio = combine(zoomState, backLens) { state, lens ->
+        val ratio = state?.zoomRatio ?: 1.0f
+        if (lens == BackLens.ULTRAWIDE && !isFrontCamera.value) ratio * ULTRAWIDE_EFFECTIVE_RATIO else ratio
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1.0f)
         
-    val minZoomRatio = zoomState.map { it?.minZoomRatio ?: 1.0f }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1.0f)
+    val minZoomRatio = combine(zoomState, backLens) { state, lens ->
+        val ratio = state?.minZoomRatio ?: 1.0f
+        if (lens == BackLens.ULTRAWIDE && !isFrontCamera.value) ratio * ULTRAWIDE_EFFECTIVE_RATIO else ratio
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1.0f)
         
-    val maxZoomRatio = zoomState.map { it?.maxZoomRatio ?: 1.0f }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1.0f)
+    val maxZoomRatio = combine(zoomState, backLens) { state, lens ->
+        val ratio = state?.maxZoomRatio ?: 1.0f
+        if (lens == BackLens.ULTRAWIDE && !isFrontCamera.value) ratio * ULTRAWIDE_EFFECTIVE_RATIO else ratio
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1.0f)
 
     // Tracks the historical accuracy of each completed rep [0.0 - 1.0]
     val completedRepAccuracies = MutableStateFlow<List<Double>>(emptyList())
@@ -133,6 +151,26 @@ class DebugViewModel @Inject constructor(
                 frameRotationDegrees.value = rotation
             }
         }
+
+        logCameraInventoryOnce()
+    }
+
+    private fun logCameraInventoryOnce() {
+        if (cameraInventoryLogged) return
+        cameraInventoryLogged = true
+        val app = getApplication<Application>()
+        val manager = app.getSystemService(Context.CAMERA_SERVICE) as? CameraManager ?: return
+        runCatching {
+            for (cameraId in manager.cameraIdList) {
+                val chars = manager.getCameraCharacteristics(cameraId)
+                val facing = chars.get(CameraCharacteristics.LENS_FACING)
+                val focal = chars.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                val caps = chars.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
+                Log.d(TAG, "CameraId=$cameraId facing=$facing focal=${focal?.joinToString()} caps=${caps?.joinToString()}")
+            }
+        }.onFailure { e ->
+            Log.e(TAG, "Camera inventory log failed: ${e.message}")
+        }
     }
 
     fun setTargetReps(reps: Int) {
@@ -154,12 +192,16 @@ class DebugViewModel @Inject constructor(
 
     fun stopPipeline() {
         useCase = null
+        pipelineJob?.cancel()
+        pipelineJob = null
     }
 
     fun startPipeline(
         lifecycleOwner: androidx.lifecycle.LifecycleOwner,
         graphEntry: GraphEntry,
     ) {
+        defaultZoomApplied = false
+        pipelineOwner = lifecycleOwner
         currentGraphEntry = graphEntry
         sessionStartEpochMs = System.currentTimeMillis()
         completionPersisted = false
@@ -189,15 +231,19 @@ class DebugViewModel @Inject constructor(
         // Wire frame size callback — reported once on first frame after rotation.
         detector.onFrameSize = { size -> cameraFrameSize.value = size }
 
-        val cameraSelector = if (isFrontCamera.value) 
-            androidx.camera.core.CameraSelector.DEFAULT_FRONT_CAMERA 
-        else 
-            androidx.camera.core.CameraSelector.DEFAULT_BACK_CAMERA
         // Ensure MediaPipe/landmarker is ready before binding the CameraX pipeline.
         ensureDetectorInitialized()
 
-        viewModelScope.launch {
-            useCase!!.process(detector.frameFlow(lifecycleOwner, cameraSelector))
+        bindCameraFlow()
+    }
+
+    private fun bindCameraFlow() {
+        val owner = pipelineOwner ?: return
+        val activeUseCase = useCase ?: return
+        val cameraSelector = buildCameraSelector()
+        pipelineJob?.cancel()
+        pipelineJob = viewModelScope.launch {
+            activeUseCase.process(detector.frameFlow(owner, cameraSelector))
                 .catch { e ->
                     Log.e(TAG, "Pipeline error: ${e.message}")
                     initError.value = e.message
@@ -209,8 +255,8 @@ class DebugViewModel @Inject constructor(
                     currentSkeleton.value      = result.skeleton
                     frameStatus.value          = result.frameStatus
                     lastDeviations.value       = result.frameStatus.deviations
-                    targetState.value          = useCase!!.engine.targetState
-                    guidancePreviewState.value = useCase!!.engine.guidancePreviewState
+                    targetState.value          = activeUseCase.engine.targetState
+                    guidancePreviewState.value = activeUseCase.engine.guidancePreviewState
 
                     // ── Track Rep History & Diagnostic Logs ───────────────────
                     updateRepHistory(result.frameStatus)
@@ -254,7 +300,7 @@ class DebugViewModel @Inject constructor(
     private fun ensureDetectorInitialized() {
         try {
             if (!detector.isInitialized()) {
-                detector.initialize(confidenceThreshold = 0.5f)
+                detector.initialize(confidenceThreshold = 0.35f)
                 Log.d(TAG, "PoseDetector initialised (lazy)")
             }
         } catch (e: Exception) {
@@ -270,6 +316,9 @@ class DebugViewModel @Inject constructor(
 
     fun toggleCamera() {
         isFrontCamera.value = !isFrontCamera.value
+        defaultZoomApplied = false
+        backLens.value = BackLens.DEFAULT
+        rebindCameraIfRunning()
     }
 
     fun toggleMute() {
@@ -280,6 +329,100 @@ class DebugViewModel @Inject constructor(
         val coerced = value.coerceIn(0f, 1f)
         zoomLevel.value = coerced
         detector.setLinearZoom(coerced)
+    }
+
+    fun setZoomRatio(value: Float) {
+        if (isFrontCamera.value) {
+            applyZoomRatio(value, BackLens.DEFAULT)
+            return
+        }
+
+        val targetLens = if (value <= ULTRAWIDE_SWITCH_THRESHOLD) BackLens.ULTRAWIDE else BackLens.DEFAULT
+        if (backLens.value != targetLens) {
+            backLens.value = targetLens
+            pendingZoomRatio = value
+            rebindCameraIfRunning()
+            return
+        }
+        applyZoomRatio(value, backLens.value)
+    }
+
+    fun applyDefaultZoomIfNeeded(state: ZoomState?) {
+        if (defaultZoomApplied || state == null) return
+        if (state.minZoomRatio <= 0.5f) {
+            detector.setZoomRatio(1.0f.coerceIn(state.minZoomRatio, state.maxZoomRatio))
+            defaultZoomApplied = true
+        }
+    }
+
+    fun applyPendingZoomIfNeeded(state: ZoomState?) {
+        val pending = pendingZoomRatio ?: return
+        if (state == null) return
+        applyZoomRatio(pending, backLens.value)
+        pendingZoomRatio = null
+    }
+
+    private fun applyZoomRatio(value: Float, lens: BackLens) {
+        val state = zoomState.value
+        val actual = if (lens == BackLens.ULTRAWIDE && !isFrontCamera.value) {
+            value / ULTRAWIDE_EFFECTIVE_RATIO
+        } else {
+            value
+        }
+        val coerced = if (state != null) {
+            actual.coerceIn(state.minZoomRatio, state.maxZoomRatio)
+        } else {
+            actual
+        }
+        detector.setZoomRatio(coerced)
+    }
+
+    private fun rebindCameraIfRunning() {
+        if (pipelineOwner == null || useCase == null) return
+        bindCameraFlow()
+    }
+
+    private fun buildCameraSelector(): CameraSelector {
+        if (isFrontCamera.value) return CameraSelector.DEFAULT_FRONT_CAMERA
+        return if (backLens.value == BackLens.ULTRAWIDE) {
+            Log.d(TAG, "Switching to ultrawide back lens")
+            CameraSelector.Builder()
+                .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+                .addCameraFilter { cameraInfos -> selectUltraWideCamera(cameraInfos) }
+                .build()
+        } else {
+            Log.d(TAG, "Switching to default back lens")
+            CameraSelector.DEFAULT_BACK_CAMERA
+        }
+    }
+
+    private fun selectUltraWideCamera(cameraInfos: List<CameraInfo>): List<CameraInfo> {
+        if (cameraInfos.isEmpty()) return cameraInfos
+        var bestInfo: CameraInfo? = null
+        var bestFocal = Float.MAX_VALUE
+        for (info in cameraInfos) {
+            val camera2Info = Camera2CameraInfo.from(info)
+            val focalLengths = camera2Info.getCameraCharacteristic(
+                CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS
+            )
+            val minFocal = focalLengths?.minOrNull() ?: continue
+            if (minFocal < bestFocal) {
+                bestFocal = minFocal
+                bestInfo = info
+            }
+        }
+        if (bestInfo != null) {
+            val cameraId = Camera2CameraInfo.from(bestInfo).cameraId
+            Log.d(TAG, "Selected ultrawide cameraId=$cameraId focal=$bestFocal")
+        } else {
+            Log.w(TAG, "No ultrawide camera found; falling back to default")
+        }
+        return if (bestInfo != null) listOf(bestInfo) else cameraInfos
+    }
+
+    private enum class BackLens {
+        DEFAULT,
+        ULTRAWIDE,
     }
 
     private var lastRepsCompleted = 0
@@ -557,6 +700,8 @@ class DebugViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "DebugViewModel"
+        private const val ULTRAWIDE_EFFECTIVE_RATIO = 0.5f
+        private const val ULTRAWIDE_SWITCH_THRESHOLD = 0.55f
         private const val DEFAULT_USER_ID = "default-local-user"
     }
 }
