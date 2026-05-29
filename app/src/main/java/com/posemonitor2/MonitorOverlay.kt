@@ -155,6 +155,7 @@ fun MonitorOverlay(
     currentZoomRatio: Float = 1.0f,
     minZoomRatio: Float = 1.0f,
     maxZoomRatio: Float = 5.0f,
+    onZoomRatioChange: (Float) -> Unit = {},
     targetReps: Int = 10,
     targetHoldDurationSeconds: Double? = null,
     exerciseName: String? = null,
@@ -181,6 +182,17 @@ fun MonitorOverlay(
 
     val holdTarget = targetHoldDurationSeconds ?: targetState?.minHoldDuration
     val holdElapsed = holdTarget?.times(frameStatus.holdProgress.coerceIn(0.0, 1.0))
+    val minDisplayZoomRatio = 0.5f
+    var requestedZoomRatio by rememberSaveable { mutableFloatStateOf(currentZoomRatio.coerceIn(minDisplayZoomRatio, maxZoomRatio)) }
+    var isZoomDragging by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentZoomRatio, minZoomRatio, maxZoomRatio, minDisplayZoomRatio, isZoomDragging) {
+        if (isZoomDragging) return@LaunchedEffect
+        val coercedCurrent = currentZoomRatio.coerceIn(minDisplayZoomRatio, maxZoomRatio)
+        if (requestedZoomRatio >= minZoomRatio || kotlin.math.abs(requestedZoomRatio - coercedCurrent) < 0.01f) {
+            requestedZoomRatio = coercedCurrent
+        }
+    }
 
     fun appendDebugEvent(message: String) {
         val stamped = "${SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())}  $message"
@@ -639,6 +651,7 @@ fun MonitorOverlay(
             )
         }
 
+
         // ── Performance Accuracy Bar (Right Side) ──────────────────────────────
         PerformanceAccuracyBar(
             isCorrect = frameStatus.isCorrect,
@@ -664,6 +677,11 @@ fun MonitorOverlay(
                     .height(260.dp),
                 contentAlignment = Alignment.Center
             ) {
+                val ratioRange = (maxZoomRatio - minDisplayZoomRatio).takeIf { it > 0f } ?: 1f
+                val requestedNormalized = ((requestedZoomRatio - minDisplayZoomRatio) / ratioRange).coerceIn(0f, 1f)
+                val actualNormalized = ((currentZoomRatio - minDisplayZoomRatio) / ratioRange).coerceIn(0f, 1f)
+                val sliderValue = requestedZoomRatio.coerceIn(minDisplayZoomRatio, maxZoomRatio)
+
                 // Track Area height is 200dp
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -696,7 +714,7 @@ fun MonitorOverlay(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .fillMaxHeight(zoomLevel.coerceIn(0.01f, 1f))
+                                    .fillMaxHeight(requestedNormalized.coerceIn(0.01f, 1f))
                                     .align(Alignment.BottomCenter)
                                     .background(Color(0xFFE8622E), RoundedCornerShape(3.dp))
                             )
@@ -705,7 +723,7 @@ fun MonitorOverlay(
                         // 2. Floating "Flowing" Indicator
                         Box(
                             modifier = Modifier.fillMaxSize(),
-                            contentAlignment = BiasAlignment(0f, 1f - 2f * zoomLevel.coerceIn(0f, 1f))
+                            contentAlignment = BiasAlignment(0f, 1f - 2f * actualNormalized.coerceIn(0f, 1f))
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -727,8 +745,14 @@ fun MonitorOverlay(
 
                         // 3. Invisible Slider for interactions
                         androidx.compose.material3.Slider(
-                            value = zoomLevel,
-                            onValueChange = onZoomChange,
+                            value = sliderValue,
+                            onValueChange = {
+                                isZoomDragging = true
+                                requestedZoomRatio = it
+                                onZoomRatioChange(it)
+                            },
+                            onValueChangeFinished = { isZoomDragging = false },
+                            valueRange = minDisplayZoomRatio..maxZoomRatio,
                             modifier = Modifier
                                 .graphicsLayer { rotationZ = -90f }
                                 .width(200.dp)
@@ -743,7 +767,7 @@ fun MonitorOverlay(
 
                     // Min Zoom Label (Fixed at Bottom)
                     Text(
-                        text = "${"%.1f".format(minZoomRatio)}x",
+                        text = "${"%.1f".format(minDisplayZoomRatio)}x",
                         color = Color.White.copy(alpha = 0.5f),
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Medium,
@@ -754,6 +778,7 @@ fun MonitorOverlay(
         }
     }
 }
+
 
 // ── Live skeleton ─────────────────────────────────────────────────────────────
 
