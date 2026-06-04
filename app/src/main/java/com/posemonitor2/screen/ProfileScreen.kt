@@ -457,21 +457,14 @@ private fun LanguageSettingsRow(language: AppLanguage, navController: NavControl
                     text = { Text(languageDisplayLabel(value)) },
                     onClick = {
                         expanded = false
-                        scope.launch {
-                            ProfileSettingsPreferences.setLanguage(context, value)
-                            // A brief delay to allow the Dropdown dismissal to animate before any possible recreation
-                            kotlinx.coroutines.delay(150)
-                            // Since these are ComponentActivity, AppCompatDelegate might not auto-recreate.
-                            // We manually recreate to be absolutely sure the change is applied immediately.
-                            context.findActivity()?.let { act ->
-                                // Use a clean restart intent to ensure new locales are picked up in attachBaseContext
-                                val intent = act.intent
-                                navController.currentDestination?.route?.let { route ->
-                                    intent.putExtra("TARGET_ROUTE", route)
-                                }
-                                act.finish()
-                                act.startActivity(intent)
-                                act.overridePendingTransition(0, 0)
+                        // Only recreate if the language actually changed
+                        if (value != language) {
+                            scope.launch {
+                                ProfileSettingsPreferences.setLanguage(context, value)
+                                // A brief delay to allow the Dropdown dismissal to animate before any possible recreation
+                                kotlinx.coroutines.delay(150)
+                                // Use recreate() instead of finish/startActivity to preserve navigation state
+                                context.findActivity()?.recreate()
                             }
                         }
                     },
@@ -508,7 +501,10 @@ private fun UnitsSettingsRow(unitSystem: UnitSystem) {
                     text = { Text(unitSystemDisplayLabel(value)) },
                     onClick = {
                         expanded = false
-                        scope.launch { ProfileSettingsPreferences.setUnitSystem(context, value) }
+                        // Only update if the unit system actually changed
+                        if (value != unitSystem) {
+                            scope.launch { ProfileSettingsPreferences.setUnitSystem(context, value) }
+                        }
                     },
                 )
             }
@@ -720,16 +716,11 @@ private fun ThemeSettingsRow(navController: NavController) {
                     text = { Text(themeModeDisplayLabel(mode)) },
                     onClick = {
                         expanded = false
-                        scope.launch {
-                            ThemePreferences.setThemeMode(context, mode)
-                            context.findActivity()?.let { act ->
-                                val intent = act.intent
-                                navController.currentDestination?.route?.let { route ->
-                                    intent.putExtra("TARGET_ROUTE", route)
-                                }
-                                act.finish()
-                                act.startActivity(intent)
-                                act.overridePendingTransition(0, 0)
+                        // Only update if the theme actually changed
+                        if (mode != themeMode) {
+                            scope.launch {
+                                ThemePreferences.setThemeMode(context, mode)
+                                // No need to recreate - the theme will update reactively via observeThemeMode
                             }
                         }
                     },

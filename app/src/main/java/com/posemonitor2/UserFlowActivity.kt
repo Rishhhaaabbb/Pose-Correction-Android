@@ -160,8 +160,8 @@ fun UserFlowNavigation() {
         ) {
             composable(
                 UserRoute.Home.route,
-                enterTransition = { fadeIn(animationSpec = tween(250)) },
-                exitTransition = { fadeOut(animationSpec = tween(250)) },
+                enterTransition = { fadeIn(animationSpec = tween(150)) },
+                exitTransition = { fadeOut(animationSpec = tween(150)) },
             ) {
                 UserHomeScreen(
                     navController = navController,
@@ -174,15 +174,15 @@ fun UserFlowNavigation() {
             }
             composable(
                 UserRoute.Exercises.route,
-                enterTransition = { fadeIn(animationSpec = tween(300)) },
-                exitTransition = { fadeOut(animationSpec = tween(300)) },
+                enterTransition = { fadeIn(animationSpec = tween(150)) },
+                exitTransition = { fadeOut(animationSpec = tween(150)) },
             ) {
                 ExercisesScreen(navController = navController)
             }
             composable(
                 UserRoute.CustomWorkout.route,
-                enterTransition = { fadeIn(animationSpec = tween(300)) },
-                exitTransition = { fadeOut(animationSpec = tween(300)) },
+                enterTransition = { fadeIn(animationSpec = tween(150)) },
+                exitTransition = { fadeOut(animationSpec = tween(150)) },
             ) {
                 CustomWorkoutScreen(navController = navController)
             }
@@ -191,36 +191,36 @@ fun UserFlowNavigation() {
             }
             composable(
                 UserRoute.Progress.route,
-                enterTransition = { fadeIn(animationSpec = tween(300)) },
-                exitTransition = { fadeOut(animationSpec = tween(300)) },
+                enterTransition = { fadeIn(animationSpec = tween(150)) },
+                exitTransition = { fadeOut(animationSpec = tween(150)) },
             ) {
                 ProgressScreen(navController = navController)
             }
             composable(
                 UserRoute.Library.route,
-                enterTransition = { fadeIn(animationSpec = tween(300)) },
-                exitTransition = { fadeOut(animationSpec = tween(300)) },
+                enterTransition = { fadeIn(animationSpec = tween(150)) },
+                exitTransition = { fadeOut(animationSpec = tween(150)) },
             ) {
                 LibraryScreen(navController = navController)
             }
             composable(
                 UserRoute.Graphs.route,
-                enterTransition = { fadeIn(animationSpec = tween(300)) },
-                exitTransition = { fadeOut(animationSpec = tween(300)) },
+                enterTransition = { fadeIn(animationSpec = tween(150)) },
+                exitTransition = { fadeOut(animationSpec = tween(150)) },
             ) {
                 GraphsScreen(navController = navController)
             }
             composable(
                 UserRoute.AdminStats.route,
-                enterTransition = { fadeIn(animationSpec = tween(300)) },
-                exitTransition = { fadeOut(animationSpec = tween(300)) },
+                enterTransition = { fadeIn(animationSpec = tween(150)) },
+                exitTransition = { fadeOut(animationSpec = tween(150)) },
             ) {
                 AdminStatsScreen(navController = navController)
             }
             composable(
                 UserRoute.Profile.route,
-                enterTransition = { fadeIn(animationSpec = tween(300)) },
-                exitTransition = { fadeOut(animationSpec = tween(300)) },
+                enterTransition = { fadeIn(animationSpec = tween(150)) },
+                exitTransition = { fadeOut(animationSpec = tween(150)) },
             ) {
                 ProfileScreen(navController = navController)
             }
@@ -257,7 +257,7 @@ private fun UserBottomNavBar(navController: NavController, items: List<UserRoute
     val currentRoute   = backStackEntry?.destination?.route
     
     var lastClickTime by remember { mutableLongStateOf(0L) }
-    val debounceMs = 500L
+    val debounceMs = 200L
 
     NavigationBar(containerColor = Color.White) {
         items.forEach { item ->
@@ -275,6 +275,7 @@ private fun UserBottomNavBar(navController: NavController, items: List<UserRoute
                                 saveState = true
                             }
                             launchSingleTop = true
+                            restoreState = true
                         }
                     }
                 },

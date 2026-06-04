@@ -73,7 +73,6 @@ fun ExercisesScreen(
 
     LaunchedEffect(uiState.isLoading) {
         if (uiState.isLoading) {
-            delay(200)
             showSkeleton = true
         } else {
             showSkeleton = false
