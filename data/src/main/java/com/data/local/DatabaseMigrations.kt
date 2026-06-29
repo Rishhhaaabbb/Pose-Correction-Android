@@ -92,4 +92,46 @@ object DatabaseMigrations {
             db.execSQL("ALTER TABLE profiles ADD COLUMN profile_image_url TEXT")
         }
     }
+
+    val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Create the new onboarding_responses table
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS onboarding_responses (
+                    user_id TEXT NOT NULL PRIMARY KEY,
+                    age_group TEXT,
+                    gender TEXT,
+                    goal TEXT,
+                    experience_level TEXT,
+                    yoga_style TEXT,
+                    flexibility_level TEXT,
+                    focus_areas TEXT,
+                    height_cm INTEGER,
+                    weight_kg REAL,
+                    daily_practice_minutes INTEGER,
+                    weekly_frequency TEXT,
+                    injuries TEXT,
+                    medical_conditions TEXT,
+                    camera_permission_granted INTEGER,
+                    is_completed INTEGER NOT NULL DEFAULT 0,
+                    updated_at INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+
+            // Extend profiles table with questionnaire columns (all nullable for backward compat)
+            db.execSQL("ALTER TABLE profiles ADD COLUMN age_group TEXT")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN gender TEXT")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN experience_level TEXT")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN yoga_style TEXT")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN flexibility_level TEXT")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN focus_areas TEXT")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN daily_practice_minutes INTEGER")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN weekly_frequency TEXT")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN injuries TEXT")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN medical_conditions TEXT")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN camera_permission_granted INTEGER")
+        }
+    }
 }

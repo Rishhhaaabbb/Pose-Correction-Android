@@ -37,6 +37,12 @@
         <activity android:name=".GraphGenerationActivity" android:exported="false" />
         <activity android:name=".onboarding.OnboardingActivity" android:exported="false" />
 
+        <!-- ── Questionnaire ─────────────────────────────────────────────── -->
+        <activity
+            android:name=".questionnaire.QuestionnaireActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- ── Camera / pose monitor ────────────────────────────────────── -->
         <activity
             android:name=".MainActivity"

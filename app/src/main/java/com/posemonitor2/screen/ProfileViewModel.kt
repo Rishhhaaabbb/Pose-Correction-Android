@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.domain.model.AuthUser
 import com.domain.model.UserProfile
 import com.domain.model.WorkoutSession
+import com.domain.repository.OnboardingRepository
 import com.domain.usecase.EnsureProfileUseCase
 import com.domain.usecase.ObserveAuthSessionUseCase
 import com.domain.usecase.ObserveProfileUseCase
@@ -36,6 +37,7 @@ class ProfileViewModel @Inject constructor(
     private val observeAuthSessionUseCase: ObserveAuthSessionUseCase,
     private val observeProfileUseCase: ObserveProfileUseCase,
     private val observeWorkoutSessionsUseCase: ObserveWorkoutSessionsUseCase,
+    private val onboardingRepository: OnboardingRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileUiState(isLoading = true))
@@ -58,8 +60,9 @@ class ProfileViewModel @Inject constructor(
                         combine(
                             observeProfileUseCase(userId),
                             observeWorkoutSessionsUseCase(userId, limit = 250),
-                        ) { profile, sessions ->
-                            buildUiState(authUser, profile, sessions)
+                            onboardingRepository.observeAnswers(userId),
+                        ) { profile, sessions, onboarding ->
+                            buildUiState(authUser, profile, sessions, onboarding)
                         }
                     }
                 }
@@ -154,6 +157,7 @@ class ProfileViewModel @Inject constructor(
         authUser: AuthUser,
         profile: UserProfile?,
         sessions: List<WorkoutSession>,
+        onboarding: com.domain.model.OnboardingResponse? = null,
     ): ProfileUiState {
         val displayName = profile?.displayName?.takeIf(String::isNotBlank)
             ?: authUser.fullName?.takeIf(String::isNotBlank)
@@ -229,6 +233,14 @@ class ProfileViewModel @Inject constructor(
                 )
             },
             profileImageUri = currentImage,
+            questionnaireSummary = onboarding?.let {
+                QuestionnaireSummary(
+                    goal = it.goal ?: "Not set",
+                    experienceLevel = it.experienceLevel ?: "Not set",
+                    focusAreas = it.focusAreas?.split(",")?.map { s -> s.trim() }
+                        ?.filter { s -> s.isNotEmpty() }?.joinToString(", ") ?: "Not set",
+                )
+            },
         )
     }
 
@@ -257,6 +269,12 @@ class ProfileViewModel @Inject constructor(
     }
 }
 
+data class QuestionnaireSummary(
+    val goal: String,
+    val experienceLevel: String,
+    val focusAreas: String,
+)
+
 data class ProfileUiState(
     val isLoading: Boolean = false,
     val userId: String? = null,
@@ -280,4 +298,5 @@ data class ProfileUiState(
     val saveErrorMessage: String? = null,
     val signOutCompleted: Boolean = false,
     val profileImageUri: String? = null,
+    val questionnaireSummary: QuestionnaireSummary? = null,
 )

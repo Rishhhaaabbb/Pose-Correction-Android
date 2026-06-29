@@ -49,9 +49,15 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.CommonStatusCodes
 import com.posemonitor2.auth.AuthViewModel
+import com.posemonitor2.questionnaire.QuestionnaireActivity
 import com.posemonitor2.settings.AppLocaleManager
 import com.posemonitor2.ui.theme.PoseMonitorAppTheme
+import com.domain.repository.OnboardingRepository
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 private val Orange      = Color(0xFFE8622E)
@@ -68,6 +74,9 @@ private val TextOnCard  = Color.White
 class LoginActivity : ComponentActivity() {
     private val authViewModel: AuthViewModel by viewModels()
 
+    @Inject
+    lateinit var onboardingRepository: OnboardingRepository
+
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocaleManager.wrapContext(newBase))
     }
@@ -80,13 +89,34 @@ class LoginActivity : ComponentActivity() {
                 AuthNavigation(
                     authViewModel = authViewModel,
                     onAuthenticated = { email ->
-                        val intent = Intent(this, UserFlowActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        // Resolve userId from authViewModel state
+                        val userId = authViewModel.state.value.userId
+                        if (userId.isNullOrBlank()) {
+                            // Fallback: go straight to main app
+                            startActivity(Intent(this, UserFlowActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            })
+                            finish()
+                            return@AuthNavigation
                         }
-                        startActivity(intent)
-                        finish()
+                        // Check questionnaire completion in background
+                        CoroutineScope(Dispatchers.Main).launch {
+                            val completed = try {
+                                onboardingRepository.isCompleted(userId)
+                            } catch (e: Exception) {
+                                false // fail-safe: show questionnaire
+                            }
+                            val intent = if (completed) {
+                                Intent(this@LoginActivity, UserFlowActivity::class.java)
+                            } else {
+                                QuestionnaireActivity.firstRunIntent(this@LoginActivity)
+                            }.apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            }
+                            startActivity(intent)
+                            finish()
+                        }
                     }
-
                 )
             }
         }

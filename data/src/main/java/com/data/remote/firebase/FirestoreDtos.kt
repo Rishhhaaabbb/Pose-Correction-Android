@@ -13,6 +13,17 @@ data class FirestoreProfileDto(
     val fitness_goal: String? = null,
     val target_weight_kg: Double? = null,
     val weekly_goal_sessions: Int? = null,
+    val age_group: String? = null,
+    val gender: String? = null,
+    val experience_level: String? = null,
+    val yoga_style: String? = null,
+    val flexibility_level: String? = null,
+    val focus_areas: String? = null,
+    val daily_practice_minutes: Int? = null,
+    val weekly_frequency: String? = null,
+    val injuries: String? = null,
+    val medical_conditions: String? = null,
+    val camera_permission_granted: Boolean? = null,
     val updated_at: Long,
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
@@ -25,6 +36,17 @@ data class FirestoreProfileDto(
         "fitness_goal" to fitness_goal,
         "target_weight_kg" to target_weight_kg,
         "weekly_goal_sessions" to weekly_goal_sessions,
+        "age_group" to age_group,
+        "gender" to gender,
+        "experience_level" to experience_level,
+        "yoga_style" to yoga_style,
+        "flexibility_level" to flexibility_level,
+        "focus_areas" to focus_areas,
+        "daily_practice_minutes" to daily_practice_minutes,
+        "weekly_frequency" to weekly_frequency,
+        "injuries" to injuries,
+        "medical_conditions" to medical_conditions,
+        "camera_permission_granted" to camera_permission_granted,
         "updated_at" to updated_at,
     )
 }
@@ -115,6 +137,47 @@ data class FirestoreDailyStatDto(
         "sessions_count" to sessions_count,
         "total_reps" to total_reps,
         "avg_accuracy" to avg_accuracy,
+        "updated_at" to updated_at,
+    )
+}
+
+@Serializable
+data class FirestoreOnboardingDto(
+    val user_id: String,
+    val age_group: String? = null,
+    val gender: String? = null,
+    val goal: String? = null,
+    val experience_level: String? = null,
+    val yoga_style: String? = null,
+    val flexibility_level: String? = null,
+    val focus_areas: String? = null,
+    val height_cm: Int? = null,
+    val weight_kg: Double? = null,
+    val daily_practice_minutes: Int? = null,
+    val weekly_frequency: String? = null,
+    val injuries: String? = null,
+    val medical_conditions: String? = null,
+    val camera_permission_granted: Boolean? = null,
+    val is_completed: Boolean,
+    val updated_at: Long,
+) {
+    fun toMap(): Map<String, Any?> = mapOf(
+        "user_id" to user_id,
+        "age_group" to age_group,
+        "gender" to gender,
+        "goal" to goal,
+        "experience_level" to experience_level,
+        "yoga_style" to yoga_style,
+        "flexibility_level" to flexibility_level,
+        "focus_areas" to focus_areas,
+        "height_cm" to height_cm,
+        "weight_kg" to weight_kg,
+        "daily_practice_minutes" to daily_practice_minutes,
+        "weekly_frequency" to weekly_frequency,
+        "injuries" to injuries,
+        "medical_conditions" to medical_conditions,
+        "camera_permission_granted" to camera_permission_granted,
+        "is_completed" to is_completed,
         "updated_at" to updated_at,
     )
 }

@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.posemonitor2.LoginActivity
 import com.posemonitor2.R
+import com.posemonitor2.questionnaire.QuestionnaireActivity
 import com.posemonitor2.settings.AppLanguage
 import com.posemonitor2.settings.ProfileSettingsPreferences
 import com.posemonitor2.settings.UnitSystem
@@ -347,6 +348,25 @@ fun ProfileScreen(
 
         Spacer(Modifier.height(16.dp))
 
+        // ── Your Yoga Profile card ────────────────────────────────────────────
+        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = surface), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Your Yoga Profile", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = onBackground, modifier = Modifier.weight(1f))
+                    Text("🧘", fontSize = 20.sp)
+                }
+                Spacer(Modifier.height(12.dp))
+                val qs = uiState.questionnaireSummary
+                YogaProfileRow("Primary Goal", qs?.goal ?: "Not set", onBackground)
+                HorizontalDivider(color = surfaceVariant, modifier = Modifier.padding(vertical = 6.dp))
+                YogaProfileRow("Experience", qs?.experienceLevel ?: "Not set", onBackground)
+                HorizontalDivider(color = surfaceVariant, modifier = Modifier.padding(vertical = 6.dp))
+                YogaProfileRow("Focus Areas", qs?.focusAreas ?: "Not set", onBackground)
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
         // ── App settings card ─────────────────────────────────────────────────
         Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = surface), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
             Column(modifier = Modifier.padding(horizontal = 20.dp)) {
@@ -358,6 +378,23 @@ fun ProfileScreen(
                 UnitsSettingsRow(unitSystem = unitSystem)
                 HorizontalDivider(color = Color(0xFFF5F5F5))
                 ThemeSettingsRow(navController = navController)
+                HorizontalDivider(color = Color(0xFFF5F5F5))
+                // Edit Questionnaire row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            context.startActivity(QuestionnaireActivity.editIntent(context))
+                        }
+                        .padding(vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Edit Questionnaire", fontSize = 14.sp, color = onBackground, fontWeight = FontWeight.Medium)
+                        Text("Update your yoga profile answers", fontSize = 12.sp, color = onBackground.copy(alpha = 0.6f))
+                    }
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = onBackground.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+                }
                 Spacer(Modifier.height(8.dp))
             }
         }
@@ -741,4 +778,27 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+// ── Yoga Profile summary row ──────────────────────────────────────────────────
+@Composable
+private fun YogaProfileRow(label: String, value: String, onBackground: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            fontSize = 13.sp,
+            color = onBackground.copy(alpha = 0.6f),
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            value,
+            fontSize = 14.sp,
+            color = onBackground,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
 }
