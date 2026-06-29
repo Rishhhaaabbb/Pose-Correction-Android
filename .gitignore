@@ -1,0 +1,29 @@
+*.iml
+.gradle
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+
+# Sensitive Info & Keys
+local.properties
+.env
+*.jks
+*.keystore
+secrets.xml
+google-services.json
+auth.json
+
+# Credentials
+/credentials/
+
+# OS-specific
+Thumbs.db
+desktop.ini
