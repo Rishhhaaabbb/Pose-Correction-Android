@@ -1,5 +1,7 @@
 package com.posemonitor2.screen
 
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -30,6 +32,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -67,6 +70,15 @@ fun UserHomeScreen(
     val context = LocalContext.current
     var showHelpDialog by remember { mutableStateOf(false) }
 
+    // Collect navigation events from HomeViewModel (recommended exercise tapped)
+    LaunchedEffect(Unit) {
+        viewModel.navigationEvents.collect { exercise ->
+            navController.navigate(
+                "exercise_detail/${exercise.name}.json/true?index=0&exerciseList=${exercise.name}"
+            )
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -74,16 +86,87 @@ fun UserHomeScreen(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 16.dp),
     ) {
-        HomeHeader(userName = uiState.displayName, onOpenHelp = { showHelpDialog = true })
+        HomeHeader(
+            userName = uiState.displayName,
+            greetingSubtitle = uiState.greetingSubtitle,
+            onOpenHelp = { showHelpDialog = true },
+        )
         Spacer(Modifier.height(16.dp))
 
         HeroCard(
             modifier = Modifier.padding(horizontal = 16.dp),
             onJoinSession = { navController.navigate(UserRoute.Exercises.route) },
         )
+        Spacer(Modifier.height(12.dp))
+
+        // ── 3A. Daily Goal Progress Card ──────────────────────────────────────
+        DailyGoalProgressCard(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            dailyGoalMinutes = uiState.dailyGoalMinutes,
+            todayMinutesDone = uiState.todayMinutesDone,
+            dailyGoalProgress = uiState.dailyGoalProgress,
+        )
         Spacer(Modifier.height(20.dp))
 
-        Spacer(Modifier.height(24.dp))
+        // ── 3C. Recommended for You ───────────────────────────────────────────
+        if (uiState.recommendedExercises.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Recommended for You",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TealDark,
+                    fontFamily = FontFamily.Serif,
+                )
+                Text(
+                    text = "See All",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Orange,
+                    modifier = Modifier.clickable {
+                        navController.navigate(UserRoute.Exercises.route)
+                    },
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(uiState.recommendedExercises) { exercise ->
+                    RecommendedExerciseCard(
+                        exercise = exercise,
+                        onClick = { viewModel.onExerciseClicked(exercise) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+        }
+
+        // ── 3D. Quick Actions Grid ────────────────────────────────────────────
+        Text(
+            text = "Quick Actions",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = TealDark,
+            fontFamily = FontFamily.Serif,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        Spacer(Modifier.height(10.dp))
+        QuickActionsGrid(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            onStartSession = { navController.navigate(UserRoute.Exercises.route) },
+            onMyProgress = { navController.navigate(UserRoute.Progress.route) },
+            onCustomWorkout = { navController.navigate(UserRoute.CustomWorkout.route) },
+            onMyProfile = { navController.navigate(UserRoute.Profile.route) },
+        )
+        Spacer(Modifier.height(20.dp))
 
         SectionTitle(
             title = stringResource(R.string.home_body_vitals_title),
@@ -143,7 +226,7 @@ fun UserHomeScreen(
 
 // ── Header ────────────────────────────────────────────────────────────────────
 @Composable
-private fun HomeHeader(userName: String, onOpenHelp: () -> Unit) {
+private fun HomeHeader(userName: String, greetingSubtitle: String = "", onOpenHelp: () -> Unit) {
     val greetingResId = getGreeting()
     
     Row(
@@ -180,9 +263,18 @@ private fun HomeHeader(userName: String, onOpenHelp: () -> Unit) {
                 color = TealDark,
                 fontFamily = FontFamily.Serif,
             )
+            // 3B. Personalized greeting subtitle
+            if (greetingSubtitle.isNotEmpty()) {
+                Text(
+                    text = greetingSubtitle,
+                    fontSize = 13.sp,
+                    color = TextGray,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
 
-        // Filter / sliders icon
+        // Help icon
         Box(
             modifier = Modifier
                 .size(42.dp)
@@ -193,6 +285,60 @@ private fun HomeHeader(userName: String, onOpenHelp: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Default.HelpOutline, contentDescription = stringResource(R.string.home_help_title), tint = TealDark, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+// ── Daily Goal Progress Card (3A) ────────────────────────────────────────────
+@Composable
+private fun DailyGoalProgressCard(
+    modifier: Modifier = Modifier,
+    dailyGoalMinutes: Int,
+    todayMinutesDone: Int,
+    dailyGoalProgress: Float,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text(
+                        text = "Today's Goal",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TealDark,
+                    )
+                    Text(
+                        text = "$dailyGoalMinutes min daily practice",
+                        fontSize = 12.sp,
+                        color = TextGray,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                Text(
+                    text = "$todayMinutesDone / $dailyGoalMinutes min",
+                    fontSize = 12.sp,
+                    color = TextGray,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            LinearProgressIndicator(
+                progress = { dailyGoalProgress.coerceIn(0f, 1f) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = Orange,
+                trackColor = Color(0xFFEEEEEE),
+            )
         }
     }
 }
@@ -317,15 +463,156 @@ private fun HeroCard(modifier: Modifier = Modifier, onJoinSession: () -> Unit) {
     }
 }
 
-// ── Quick actions ─────────────────────────────────────────────────────────────
-private data class QAction(val labelRes: Int, val icon: ImageVector, val bg: Color, val iconTint: Color)
+// ── Quick Actions Grid (3D) ───────────────────────────────────────────────────
+@Composable
+private fun QuickActionsGrid(
+    modifier: Modifier = Modifier,
+    onStartSession: () -> Unit,
+    onMyProgress: () -> Unit,
+    onCustomWorkout: () -> Unit,
+    onMyProfile: () -> Unit,
+) {
+    val tiles = listOf(
+        Triple("Start Session",   Icons.Default.PlayArrow,     TealDark),
+        Triple("My Progress",     Icons.AutoMirrored.Filled.TrendingUp, Orange),
+        Triple("Custom Workout",  Icons.Default.FitnessCenter, Color(0xFF1A646A)),
+        Triple("My Profile",      Icons.Default.Person,        Color(0xFF4A3728)),
+    )
+    val actions = listOf(onStartSession, onMyProgress, onCustomWorkout, onMyProfile)
 
-private val quickActions = listOf(
-    QAction(R.string.home_quick_focus,    Icons.Outlined.CenterFocusWeak, TealDark,   Color.White),
-    QAction(R.string.home_quick_vitals,   Icons.Outlined.FavoriteBorder,  CardWhite,  TealDark),
-    QAction(R.string.home_quick_activity, Icons.AutoMirrored.Outlined.DirectionsRun, Orange, Color.White),
-    QAction(R.string.home_quick_ai_coach, Icons.Default.Bolt,             Yellow,     TealDark),
-)
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(0, 2).forEach { rowStart ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf(rowStart, rowStart + 1).forEach { idx ->
+                    val (label, icon, bg) = tiles[idx]
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(80.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(bg)
+                            .clickable { actions[idx]() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = label,
+                                tint = Color.White,
+                                modifier = Modifier.size(26.dp),
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = label,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Recommended Exercise Card (3C) ───────────────────────────────────────────
+@Composable
+private fun RecommendedExerciseCard(
+    exercise: com.domain.model.Exercise,
+    onClick: () -> Unit,
+) {
+    val context = LocalContext.current
+    val drawableResId = remember(exercise.id) {
+        val name = exercise.id.replace("-", "_")
+        context.resources.getIdentifier(name, "drawable", context.packageName)
+    }
+    val difficultyColor = when (exercise.difficulty?.trim()) {
+        "Beginner"     -> Color(0xFF4CAF50)
+        "Intermediate" -> Color(0xFFE8622E)
+        "Advanced"     -> Color(0xFFE85A2E)
+        else           -> Color(0xFF4CAF50)
+    }
+
+    Card(
+        modifier = Modifier
+            .width(160.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+    ) {
+        Column {
+            // Thumbnail area
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (drawableResId != 0) {
+                    Image(
+                        painter = androidx.compose.ui.res.painterResource(drawableResId),
+                        contentDescription = exercise.name,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(TealDark),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.SelfImprovement,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.7f),
+                            modifier = Modifier.size(40.dp),
+                        )
+                    }
+                }
+            }
+
+            // Info area
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = exercise.name.replace("-", " ")
+                        .split(" ")
+                        .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } },
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TealDark,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(6.dp))
+                val difficultyLabel = exercise.difficulty
+                if (difficultyLabel != null) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = difficultyColor,
+                    ) {
+                        Text(
+                            text = difficultyLabel,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
 
 // ── Section title ─────────────────────────────────────────────────────────────
 @Composable

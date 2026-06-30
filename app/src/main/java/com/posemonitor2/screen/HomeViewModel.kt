@@ -3,17 +3,25 @@ package com.posemonitor2.screen
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.domain.model.AuthUser
+import com.domain.model.Exercise
+import com.domain.model.OnboardingResponse
 import com.domain.model.UserProfile
 import com.domain.model.WorkoutSession
 import com.domain.repository.AuthRepository
-import com.domain.usecase.ObserveAuthSessionUseCase
+import com.domain.repository.ExerciseRepository
+import com.domain.repository.OnboardingRepository
+import com.domain.repository.WorkoutSessionRepository
+import com.domain.usecase.GetRecommendedExercisesUseCase
 import com.domain.usecase.ObserveProfileUseCase
 import com.domain.usecase.ObserveWorkoutSessionsUseCase
 import com.domain.usecase.RestoreSessionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
@@ -30,22 +38,30 @@ class HomeViewModel @Inject constructor(
     private val observeProfileUseCase: ObserveProfileUseCase,
     private val observeWorkoutSessionsUseCase: ObserveWorkoutSessionsUseCase,
     private val authRepository: AuthRepository,
+    private val exerciseRepository: ExerciseRepository,
+    private val onboardingRepository: OnboardingRepository,
+    private val workoutSessionRepository: WorkoutSessionRepository,
+    private val getRecommendedExercisesUseCase: GetRecommendedExercisesUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    /** Navigation events emitted when the user taps a recommended exercise card. */
+    private val _navigationEvents = MutableSharedFlow<Exercise>()
+    val navigationEvents: SharedFlow<Exercise> = _navigationEvents.asSharedFlow()
 
     init {
         viewModelScope.launch {
             restoreSessionUseCase()
         }
 
+        // ── Profile + session stream ──────────────────────────────────────────
         viewModelScope.launch {
             authRepository.observeSession()
                 .collect { authUser ->
                     val userId = authUser?.id
                     if (userId.isNullOrBlank()) {
-                        // Fall back to default user
                         val defaultUserId = ProgressViewModel.DEFAULT_USER_ID
                         combine(
                             observeProfileUseCase(defaultUserId),
@@ -59,7 +75,7 @@ class HomeViewModel @Inject constructor(
                         combine(
                             observeProfileUseCase(userId),
                             observeWorkoutSessionsUseCase(userId, limit = 100),
-                            flowOf(authUser)
+                            flowOf(authUser),
                         ) { profile, sessions, auth ->
                             buildHomeUiState(profile, sessions, auth!!)
                         }.collect { newState ->
@@ -68,53 +84,112 @@ class HomeViewModel @Inject constructor(
                     }
                 }
         }
+
+        // ── Recommendation engine ─────────────────────────────────────────────
+        viewModelScope.launch {
+            authRepository.observeSession().collect { authUser ->
+                val userId = authUser?.id ?: return@collect
+                // Collect profile alongside onboarding answers for scoring
+                combine(
+                    observeProfileUseCase(userId),
+                    onboardingRepository.observeAnswers(userId),
+                ) { profile, answers -> profile to answers }
+                    .collect { (profile, answers) ->
+                        if (answers != null && profile != null) {
+                            loadRecommendations(userId, profile, answers)
+                        }
+                    }
+            }
+        }
     }
 
-    private fun buildHomeUiStateForDefaultUser(profile: UserProfile?, sessions: List<WorkoutSession>): HomeUiState {
+    private suspend fun loadRecommendations(
+        userId: String,
+        profile: UserProfile,
+        answers: OnboardingResponse,
+    ) {
+        val allExercises = exerciseRepository.getAll()
+        val recentIds = workoutSessionRepository.getSessionsInLast24Hours(userId)
+            .mapNotNull { it.exerciseName }
+            .toSet()
+
+        val recs = getRecommendedExercisesUseCase(
+            profile = profile,
+            allExercises = allExercises,
+            recentExerciseIds = recentIds,
+        )
+
+        val subtitle = buildGreetingSubtitle(answers)
+        val dailyGoal = answers.dailyPracticeMinutes ?: 20
+
+        _uiState.value = _uiState.value.copy(
+            recommendedExercises = recs,
+            greetingSubtitle = subtitle,
+            dailyGoalMinutes = dailyGoal,
+        )
+    }
+
+    private fun buildGreetingSubtitle(answers: OnboardingResponse): String {
+        return when (answers.goal?.trim()) {
+            "Improve Flexibility"  -> "Let's work on your flexibility today"
+            "Improve Posture"      -> "Let's improve your posture today"
+            "Reduce Stress"        -> "Time for a calming session"
+            "Lose Weight"          -> "Let's burn some calories today"
+            "Build Strength"       -> "Let's build strength today"
+            "Increase Mobility"    -> "Let's increase your mobility today"
+            "General Fitness"      -> "Let's keep up the great work today"
+            else                   -> "Ready for your session today?"
+        }
+    }
+
+    fun onExerciseClicked(exercise: Exercise) {
+        viewModelScope.launch {
+            _navigationEvents.emit(exercise)
+        }
+    }
+
+    // ── UI-state builders ─────────────────────────────────────────────────────
+
+    private fun buildHomeUiStateForDefaultUser(
+        profile: UserProfile?,
+        sessions: List<WorkoutSession>,
+    ): HomeUiState {
         val displayName = profile?.displayName?.takeIf(String::isNotBlank) ?: "User"
-
-        val heightCm = profile?.heightCm
-        val weightKg = profile?.weightKg
-        val targetWeight = profile?.targetWeightKg
-
-        val bmi = calculateBmi(heightCm, weightKg)
-
+        val bmi = calculateBmi(profile?.heightCm, profile?.weightKg)
         val streak = calculateStreak(sessions)
-
-        return HomeUiState(
+        return _uiState.value.copy(
             displayName = displayName,
             bmi = bmi,
-            weightKg = weightKg,
-            targetWeightKg = targetWeight,
+            weightKg = profile?.weightKg,
+            targetWeightKg = profile?.targetWeightKg,
             currentStreak = streak.first,
             bestStreak = streak.second,
         )
     }
 
-    private fun buildHomeUiState(profile: UserProfile?, sessions: List<WorkoutSession>, authUser: AuthUser): HomeUiState {
+    private fun buildHomeUiState(
+        profile: UserProfile?,
+        sessions: List<WorkoutSession>,
+        authUser: AuthUser,
+    ): HomeUiState {
         val displayName = profile?.displayName?.takeIf(String::isNotBlank)
             ?: authUser.fullName?.takeIf(String::isNotBlank)
             ?: authUser.email?.substringBefore('@')?.takeIf(String::isNotBlank)
             ?: "User"
-
-        val heightCm = profile?.heightCm
-        val weightKg = profile?.weightKg
-        val targetWeight = profile?.targetWeightKg
-
-        val bmi = calculateBmi(heightCm, weightKg)
-
+        val bmi = calculateBmi(profile?.heightCm, profile?.weightKg)
         val streak = calculateStreak(sessions)
-
-        return HomeUiState(
+        return _uiState.value.copy(
             displayName = displayName,
             bmi = bmi,
-            weightKg = weightKg,
-            targetWeightKg = targetWeight,
+            weightKg = profile?.weightKg,
+            targetWeightKg = profile?.targetWeightKg,
             currentStreak = streak.first,
             bestStreak = streak.second,
-            userEmail = authUser.email
+            userEmail = authUser.email,
         )
     }
+
+    // ── Pure helpers ──────────────────────────────────────────────────────────
 
     private fun calculateBmi(heightCm: Int?, weightKg: Double?): Double? {
         if (heightCm == null || weightKg == null || heightCm <= 0 || weightKg <= 0.0) return null
@@ -126,37 +201,29 @@ class HomeViewModel @Inject constructor(
         if (sessions.isEmpty()) return Pair(0, 0)
 
         val daySet = sessions.map { startOfDayMillis(it.startedAtEpochMs) }.toSet()
-        
-        // Find the most recent session date
         val mostRecentSessionDay = daySet.maxOrNull() ?: return Pair(0, 0)
-        
-        // Calculate best streak (consecutive days in history)
+
         val sortedDays = daySet.toList().sorted()
         var best = 1
         var currentRun = 1
         for (i in 1 until sortedDays.size) {
             if (sortedDays[i] - sortedDays[i - 1] == DAY_MS) {
-                currentRun += 1
+                currentRun++
                 if (currentRun > best) best = currentRun
             } else {
                 currentRun = 1
             }
         }
 
-        // Calculate current streak - check from yesterday first (user might not have worked out today yet)
         var current = 0
-        var probe = addDays(startOfDayMillis(System.currentTimeMillis()), -1)
-        
-        // First check if today has a session
         val todayStart = startOfDayMillis(System.currentTimeMillis())
+        var probe = addDays(todayStart, -1)
         if (daySet.contains(todayStart)) {
             current = 1
             probe = addDays(todayStart, -1)
         }
-        
-        // Count consecutive days backwards
         while (daySet.contains(probe)) {
-            current += 1
+            current++
             probe = addDays(probe, -1)
         }
 
@@ -191,4 +258,10 @@ data class HomeUiState(
     val currentStreak: Int = 0,
     val bestStreak: Int = 0,
     val userEmail: String? = null,
+    // ── Personalization fields ────────────────────────────────────────────────
+    val recommendedExercises: List<Exercise> = emptyList(),
+    val greetingSubtitle: String = "",
+    val dailyGoalMinutes: Int = 20,
+    val todayMinutesDone: Int = 0,
+    val dailyGoalProgress: Float = 0f,
 )
