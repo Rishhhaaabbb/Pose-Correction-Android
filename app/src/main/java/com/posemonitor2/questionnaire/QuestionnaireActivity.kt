@@ -8,11 +8,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
 import com.posemonitor2.UserFlowActivity
+import com.posemonitor2.onboarding.OnboardingManager
 import com.posemonitor2.ui.theme.PoseMonitorAppTheme
 import dagger.hilt.android.AndroidEntryPoint
 import com.domain.repository.AuthRepository
@@ -40,23 +40,31 @@ class QuestionnaireActivity : ComponentActivity() {
         val mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_FIRST_RUN
         viewModel.setMode(mode)
 
-        // Fetch userId from auth session and load existing answers if in edit mode
+        // Fetch userId from auth session
         lifecycleScope.launch {
             val authUser = authRepository.observeSession().firstOrNull()
             val userId = authUser?.id ?: return@launch
             viewModel.setUserId(userId)
-            if (mode == MODE_EDIT) {
-                viewModel.loadExistingAnswers(userId)
-            }
+            // Edit mode pre-population is now handled by LaunchedEffect(userId)
+            // inside QuestionnaireFlow so that it runs on the correct Compose thread
+            // and reacts to userId becoming available after composition starts.
         }
 
         setContent {
             PoseMonitorAppTheme {
                 val uiState by viewModel.uiState.collectAsState()
 
-                LaunchedEffect(uiState.isSaved) {
-                    if (uiState.isSaved) {
+                QuestionnaireFlow(
+                    viewModel = viewModel,
+                    isEditMode = (mode == MODE_EDIT),
+                    userId = uiState.userId ?: "",
+                    onDismiss = { finish() },
+                    onCompleted = {
                         if (mode == MODE_FIRST_RUN) {
+                            // Reset the onboarding-seen flag so the app tour
+                            // carousel shows automatically on first entry to
+                            // UserFlowActivity after completing the questionnaire.
+                            OnboardingManager(this@QuestionnaireActivity).resetOnboarding()
                             startActivity(
                                 Intent(this@QuestionnaireActivity, UserFlowActivity::class.java).apply {
                                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -64,16 +72,10 @@ class QuestionnaireActivity : ComponentActivity() {
                             )
                         }
                         finish()
-                    }
-                }
-
-                QuestionnaireFlow(
-                    viewModel = viewModel,
-                    mode = mode,
+                    },
                     onRequestCameraPermission = {
                         cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
                     },
-                    onFinish = { finish() },
                 )
             }
         }

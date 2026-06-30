@@ -53,9 +53,8 @@ import com.posemonitor2.questionnaire.QuestionnaireActivity
 import com.posemonitor2.settings.AppLocaleManager
 import com.posemonitor2.ui.theme.PoseMonitorAppTheme
 import com.domain.repository.OnboardingRepository
+import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -77,6 +76,10 @@ class LoginActivity : ComponentActivity() {
     @Inject
     lateinit var onboardingRepository: OnboardingRepository
 
+    // Tracks whether we are performing the post-auth questionnaire check.
+    // Exposed as mutable state so the Compose UI can show a blocking spinner.
+    private val isCheckingOnboarding = mutableStateOf(false)
+
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocaleManager.wrapContext(newBase))
     }
@@ -86,40 +89,64 @@ class LoginActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PoseMonitorAppTheme {
-                AuthNavigation(
-                    authViewModel = authViewModel,
-                    onAuthenticated = { email ->
-                        // Resolve userId from authViewModel state
-                        val userId = authViewModel.state.value.userId
-                        if (userId.isNullOrBlank()) {
-                            // Fallback: go straight to main app
-                            startActivity(Intent(this, UserFlowActivity::class.java).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            })
-                            finish()
-                            return@AuthNavigation
+                val checking by isCheckingOnboarding
+                Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+                    AuthNavigation(
+                        authViewModel = authViewModel,
+                        isCheckingOnboarding = checking,
+                        onAuthenticated = { _ ->
+                            val userId = authViewModel.state.value.userId
+                            if (userId.isNullOrBlank()) {
+                                // Fallback: userId missing, go straight to main app
+                                startActivity(Intent(this@LoginActivity, UserFlowActivity::class.java).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                })
+                                finish()
+                                return@AuthNavigation
+                            }
+                            lifecycleScope.launch {
+                                navigateAfterAuth(userId)
+                            }
                         }
-                        // Check questionnaire completion in background
-                        CoroutineScope(Dispatchers.Main).launch {
-                            val completed = try {
-                                onboardingRepository.isCompleted(userId)
-                            } catch (e: Exception) {
-                                false // fail-safe: show questionnaire
-                            }
-                            val intent = if (completed) {
-                                Intent(this@LoginActivity, UserFlowActivity::class.java)
-                            } else {
-                                QuestionnaireActivity.firstRunIntent(this@LoginActivity)
-                            }.apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            }
-                            startActivity(intent)
-                            finish()
+                    )
+                    // Blocking overlay while the questionnaire completion check runs
+                    if (checking) {
+                        Box(
+                            modifier = androidx.compose.ui.Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.4f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(color = Orange)
                         }
                     }
-                )
+                }
             }
         }
+    }
+
+    /**
+     * Checks whether [userId] has completed the questionnaire and navigates
+     * to the appropriate destination. Extracted so both Google and email auth
+     * flows share the same logic without duplication.
+     */
+    private suspend fun navigateAfterAuth(userId: String) {
+        isCheckingOnboarding.value = true
+        val completed = try {
+            onboardingRepository.isCompleted(userId)
+        } catch (e: Exception) {
+            false // fail-safe: always show questionnaire on error
+        }
+        isCheckingOnboarding.value = false
+        val intent = if (completed) {
+            Intent(this, UserFlowActivity::class.java)
+        } else {
+            QuestionnaireActivity.firstRunIntent(this)
+        }.apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        startActivity(intent)
+        finish()
     }
 }
 
@@ -140,6 +167,7 @@ private sealed class AuthScreen {
 @Composable
 private fun AuthNavigation(
     authViewModel: AuthViewModel,
+    isCheckingOnboarding: Boolean = false,
     onAuthenticated: (String?) -> Unit,
 ) {
     val context = LocalContext.current
@@ -175,11 +203,14 @@ private fun AuthNavigation(
     }
 
     var screen by remember { mutableStateOf<AuthScreen>(AuthScreen.Landing) }
+    // Combine authState.isLoading with the post-auth onboarding check so all
+    // buttons stay disabled while either operation is in progress.
+    val isLoading = authState.isLoading || isCheckingOnboarding
     when (screen) {
         AuthScreen.Landing        -> LandingScreen(
             onSignUpWithEmail = { authViewModel.clearError(); screen = AuthScreen.SignUp },
             onSignIn          = { authViewModel.clearError(); screen = AuthScreen.SignIn },
-            isLoading = authState.isLoading,
+            isLoading = isLoading,
             errorMessage = authState.errorMessage,
             onGoogleSignIn = {
                 authViewModel.clearError()
@@ -201,20 +232,20 @@ private fun AuthNavigation(
             onForgotPassword = { authViewModel.clearError(); screen = AuthScreen.ForgotPassword },
             onCreateAccount  = { authViewModel.clearError(); screen = AuthScreen.SignUp },
             onSignIn         = { email, password -> authViewModel.signInWithEmail(email, password) },
-            isLoading        = authState.isLoading,
+            isLoading        = isLoading,
             errorMessage     = authState.errorMessage,
         )
         AuthScreen.SignUp         -> SignUpScreen(
             onBack    = { authViewModel.clearError(); screen = AuthScreen.Landing },
             onLogin   = { authViewModel.clearError(); screen = AuthScreen.SignIn },
             onSignUp  = { name, email, password -> authViewModel.signUpWithEmail(name, email, password) },
-            isLoading = authState.isLoading,
+            isLoading = isLoading,
             errorMessage = authState.errorMessage,
         )
         AuthScreen.ForgotPassword -> ForgotPasswordScreen(
             onBack          = { authViewModel.clearError(); screen = AuthScreen.SignIn },
             onSendReset     = { email -> authViewModel.sendPasswordReset(email) {} },
-            isLoading       = authState.isLoading,
+            isLoading       = isLoading,
             errorMessage    = authState.errorMessage,
         )
     }
