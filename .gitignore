@@ -36,3 +36,6 @@ Thumbs.db
 /captures/
 *.bak
 *.swp
+
+# Kiro IDE spec/planning files
+.kiro/
