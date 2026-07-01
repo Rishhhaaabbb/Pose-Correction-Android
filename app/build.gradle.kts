@@ -148,7 +148,7 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     implementation(libs.play.services.auth)
     // Firebase
-    implementation(platform(libs.compose.bom)) // BOM already added above, but good practice
+    implementation(platform(libs.firebase.bom)) // Firebase BOM for version management
     implementation(libs.firebase.auth.ktx)
     implementation(libs.firebase.firestore.ktx)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
