@@ -8,6 +8,7 @@ import com.domain.usecase.ObserveAuthSessionUseCase
 import com.domain.usecase.ObserveWorkoutSessionsUseCase
 import com.domain.usecase.RestoreSessionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Locale
 import javax.inject.Inject
@@ -49,12 +51,12 @@ class ProgressViewModel @Inject constructor(
                         val defaultUserId = DEFAULT_USER_ID
                         observeWorkoutSessionsUseCase(defaultUserId, limit = 200).collect { sessions ->
                             allSessions = sessions
-                            _uiState.value = buildUiState(sessions, _uiState.value.selectedRange)
+                            _uiState.value = withContext(Dispatchers.Default) { buildUiState(sessions, _uiState.value.selectedRange) }
                         }
                     } else {
                         observeWorkoutSessionsUseCase(userId, limit = 200).collect { sessions ->
                             allSessions = sessions
-                            _uiState.value = buildUiState(sessions, _uiState.value.selectedRange)
+                            _uiState.value = withContext(Dispatchers.Default) { buildUiState(sessions, _uiState.value.selectedRange) }
                         }
                     }
                 }
@@ -63,7 +65,9 @@ class ProgressViewModel @Inject constructor(
 
     fun selectRange(range: StatsRange) {
         _uiState.update { it.copy(selectedRange = range) }
-        _uiState.value = buildUiState(allSessions, range)
+        viewModelScope.launch(Dispatchers.Default) {
+            _uiState.value = buildUiState(allSessions, range)
+        }
     }
 
     private fun buildUiState(sessions: List<WorkoutSession>, selectedRange: StatsRange): ProgressUiState {

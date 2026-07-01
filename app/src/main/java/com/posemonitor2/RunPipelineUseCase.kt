@@ -12,7 +12,9 @@ import com.core.poseengine.monitor.MonitorConfig
 import com.core.poseengine.monitor.PoseMonitorEngine
 import com.core.poseengine.monitor.SystemTimeSource
 import com.data.mediapipe.PoseDetectorResult
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 
 /**
@@ -147,7 +149,7 @@ class RunPipelineUseCase(
                     }
                 }
             }
-        }
+        }.flowOn(Dispatchers.Default)
 
     private fun buildLayerLog(
         landmarkCount: Int,
