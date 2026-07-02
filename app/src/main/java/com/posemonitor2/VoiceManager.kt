@@ -6,166 +6,124 @@ import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import java.util.Locale
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
- * High-Reliability Sequential Voice Engine.
- * 
- * Uses a Conflated Actor model to ensure:
- * 1. Only the MOST RECENT instruction is spoken (no backlog).
- * 2. Every sentence is spoken to completion (no cutoffs).
- * 3. Next API call starts ONLY when the speakers are silent.
+ * Manages Text-to-Speech (TTS) for the tracking session.
+ *
+ * Features:
+ * - Flushing instructions (new instructions interrupt old ones).
+ * - Debounced feedback (prevents repeating the same correction too frequently).
+ * - Optional Groq AI rephrasing for more natural feedback.
  */
 class VoiceManager(context: Context) : TextToSpeech.OnInitListener {
 
     private val lock = Any()
     private var tts: TextToSpeech? = TextToSpeech(context, this)
-    
     @Volatile
     private var isInitialized = false
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val groqProvider = GroqFeedbackProvider(BuildConfig.GROQ_API_KEY)
-    
-    // Channel size 1 with DROP_OLDEST ensures we only process the LATEST relevant coaching tip
-    private val speechChannel = Channel<SpeechRequest>(1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-    
-    private var lastSpokenText: String = ""
+
+    // Feedback debouncing state
     private var lastFeedbackTime: Long = 0
-    private var msgCounter = 0
+    private var lastSpokenText: String = ""
+    private val globalFeedbackCooldownMs = 4000L  // Wait 4s between any two phrases
+    private val samePhraseCooldownMs = 8000L      // Wait 8s before repeating the same instruction
 
-    // Sequential signal binding
-    private var activeUtteranceId: String? = null
-    private var utteranceDeferred: CompletableDeferred<Unit>? = null
+    private fun isLanguageSupported(status: Int): Boolean {
+        return status != TextToSpeech.LANG_MISSING_DATA && status != TextToSpeech.LANG_NOT_SUPPORTED
+    }
 
-    data class SpeechRequest(
-        val text: String,
-        val isInstruction: Boolean,
-        val useGroq: Boolean
-    )
-
-    init {
-        // The Background Worker (Actor)
-        scope.launch {
-            for (request in speechChannel) {
-                processSequentially(request)
-            }
-        }
+    private fun tryApplyLanguage(locale: Locale): Boolean {
+        val status = tts?.setLanguage(locale) ?: return false
+        return isLanguageSupported(status)
     }
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             val preferredLocales = listOf(Locale.getDefault(), Locale.UK, Locale.US).distinct()
-            tts?.setLanguage(preferredLocales.firstOrNull { 
-                val s = tts?.setLanguage(it) ?: TextToSpeech.LANG_NOT_SUPPORTED
-                s != TextToSpeech.LANG_MISSING_DATA && s != TextToSpeech.LANG_NOT_SUPPORTED
-            } ?: Locale.US)
+            val selectedLocale = preferredLocales.firstOrNull { tryApplyLanguage(it) }
 
-            tts?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {
-                    Log.d("VoiceManager", "Audio playback started: $utteranceId")
-                }
-                
-                override fun onDone(utteranceId: String?) {
-                    synchronized(lock) {
-                        if (utteranceId == activeUtteranceId) {
-                            utteranceDeferred?.complete(Unit)
-                            Log.d("VoiceManager", "Audio playback finished: $utteranceId")
-                        }
-                    }
-                }
-                
-                override fun onError(utteranceId: String?) {
-                    synchronized(lock) {
-                        if (utteranceId == activeUtteranceId) utteranceDeferred?.complete(Unit)
-                        Log.e("VoiceManager", "TTS Hardware Error: $utteranceId")
-                    }
-                }
-            })
+            if (selectedLocale == null) {
+                // Keep TTS usable with engine defaults even if explicit locale data is missing.
+                Log.w("VoiceManager", "Preferred TTS language data unavailable; using engine default voice")
+            } else {
+                Log.d("VoiceManager", "TTS language set to ${selectedLocale.toLanguageTag()}")
+            }
 
             isInitialized = true
-            tts?.setSpeechRate(0.85f)
-            Log.d("VoiceManager", "Conflated Actor Engine Ready")
+            tts?.setSpeechRate(0.9f) // Slower for clearer instructions
+            tts?.setPitch(1.0f)
+            Log.d("VoiceManager", "TTS Initialized successfully with speech rate 0.9")
+        } else {
+            Log.e("VoiceManager", "TTS Initialization failed")
         }
     }
 
     /**
-     * Enqueues a coaching instruction. The engine will skip old feedback
-     * and only process the newest one once it finishes the current sentence.
+     * Speaks the given text.
+     * @param text The text to speak.
+     * @param isInstruction If true, it flushes the queue to speak immediately.
+     * @param useGroq If true, uses AI to rephrase the text.
      */
     fun speak(text: String, isInstruction: Boolean = false, useGroq: Boolean = false) {
-        if (!isInitialized || text.isBlank()) return
-        
-        // Cooldown to prevent repeating the EXACT same string too fast
-        val now = System.currentTimeMillis()
-        val cooldown = if (isInstruction) 3000L else 12000L
-        if (text == lastSpokenText && (now - lastFeedbackTime) < cooldown) {
+        if (!isInitialized) {
+            Log.w("VoiceManager", "TTS not initialized yet. Skipping: $text")
             return
         }
 
-        // Send to sequential processor
-        scope.launch {
-            speechChannel.send(SpeechRequest(text, isInstruction, useGroq))
-        }
-    }
+        val now = System.currentTimeMillis()
 
-    private suspend fun processSequentially(request: SpeechRequest) {
-        try {
-            val isSystemWarning = request.text.contains("one person", ignoreCase = true) || 
-                                 request.text.contains("visible", ignoreCase = true) ||
-                                 request.text.contains("to begin", ignoreCase = true)
+        val shouldProceed = synchronized(lock) {
+            if (tts == null) return@synchronized false
 
-            // Step 1: Fetch from AI
-            // We now allow Groq AI to handle system warnings for more natural coaching,
-            // unless the user has requested direct feedback or AI is disabled.
-            var spokenText = if (request.useGroq) {
-                groqProvider.getDynamicFeedback(request.text)
+            val isGlobalCooldownActive = (now - lastFeedbackTime) < globalFeedbackCooldownMs
+            val isSamePhraseCooldownActive = (!isInstruction && text == lastSpokenText && (now - lastFeedbackTime) < samePhraseCooldownMs)
+
+            if (isGlobalCooldownActive || isSamePhraseCooldownActive) {
+                Log.d("VoiceManager", "Skipping feedback ($text). Global: $isGlobalCooldownActive, Same: $isSamePhraseCooldownActive")
+                false
             } else {
-                request.text
+                if (isInstruction) {
+                    // Instructions (like state changes) still interrupt if the cooldown has passed
+                    tts?.stop()
+                }
+                lastFeedbackTime = now
+                lastSpokenText = text
+                true
             }
+        }
 
-            // Ensure sentence completes fully for TTS
-            if (!spokenText.trim().endsWith(".") && !spokenText.contains("!") && !spokenText.contains("?")) {
-                spokenText = spokenText.trim() + "."
+        if (shouldProceed) {
+            scope.launch {
+                try {
+                    val spokenText = if (useGroq && text.isNotEmpty()) {
+                        groqProvider.getDynamicFeedback(text)
+                    } else {
+                        text
+                    }
+
+                    synchronized(lock) {
+                        // Use QUEUE_FLUSH for everything to ensure instructions are "sharp" and immediate
+                        tts?.speak(spokenText, TextToSpeech.QUEUE_FLUSH, null, null)
+                    }
+                    Log.d("VoiceManager", "Speaking: $spokenText (Original: $text)")
+                } catch (e: Exception) {
+                    Log.e("VoiceManager", "Groq error, falling back to direct TTS", e)
+                    synchronized(lock) {
+                        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+                    }
+                }
             }
-
-            // Step 2: Bind ID and start audio
-            val deferred = CompletableDeferred<Unit>()
-            val msgId = "v_${++msgCounter}"
-            
-            synchronized(lock) {
-                activeUtteranceId = msgId
-                utteranceDeferred = deferred
-                
-                // Use QUEUE_ADD as a safety net. The Actor handles the logic, 
-                // QUEUE_ADD ensures the hardware never stutters.
-                tts?.speak(spokenText, TextToSpeech.QUEUE_ADD, null, msgId)
-            }
-
-            lastSpokenText = request.text
-            lastFeedbackTime = System.currentTimeMillis()
-
-            // Step 3: Wait for VERIFIED completion from hardware
-            withTimeoutOrNull(30000L) { // 30s safety timeout
-                deferred.await()
-            }
-            
-            // Step 4: POST-SPEECH HARDWARE FLUSH
-            // Extra second to ensure physical speakers are clear before next API call
-            delay(1000)
-
-        } catch (e: Exception) {
-            Log.e("VoiceManager", "Sequential processing error", e)
-        } finally {
-            synchronized(lock) { utteranceDeferred = null }
         }
     }
 
     fun shutdown() {
-        speechChannel.close()
-        scope.cancel()
         synchronized(lock) {
             tts?.stop()
             tts?.shutdown()

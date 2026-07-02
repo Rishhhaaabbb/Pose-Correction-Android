@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.posemonitor2.LoginActivity
 import com.posemonitor2.R
+import com.posemonitor2.questionnaire.QuestionnaireActivity
 import com.posemonitor2.settings.AppLanguage
 import com.posemonitor2.settings.ProfileSettingsPreferences
 import com.posemonitor2.settings.UnitSystem
@@ -50,7 +51,7 @@ import kotlin.math.roundToInt
 
 // Theme-aware design tokens (map to Material color scheme)
 
-// ── Screen ────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Screen ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 fun ProfileScreen(
     navController: NavController,
@@ -160,7 +161,7 @@ fun ProfileScreen(
     ) {
         Spacer(Modifier.height(20.dp))
 
-        // ── Header ────────────────────────────────────────────────────────────
+        // ΓöÇΓöÇ Header ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.profile_title), fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = onBackground, fontFamily = FontFamily.Serif, modifier = Modifier.weight(1f))
             Box(
@@ -176,7 +177,7 @@ fun ProfileScreen(
 
         Spacer(Modifier.height(20.dp))
 
-        // ── User info card ────────────────────────────────────────────────────
+        // ΓöÇΓöÇ User info card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = surface), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -241,7 +242,7 @@ fun ProfileScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Fitness goals card ────────────────────────────────────────────────
+        // ΓöÇΓöÇ Fitness goals card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Box(
             modifier = Modifier.fillMaxWidth().shadow(4.dp, RoundedCornerShape(20.dp)).clip(RoundedCornerShape(20.dp)).background(primary).padding(20.dp),
         ) {
@@ -276,7 +277,7 @@ fun ProfileScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Workout preferences card ──────────────────────────────────────────
+        // ΓöÇΓöÇ Workout preferences card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = surface), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
             Column(modifier = Modifier.padding(20.dp)) {
                     Text(stringResource(R.string.profile_workout_preferences_title), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = onBackground)
@@ -298,7 +299,7 @@ fun ProfileScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Health information card ───────────────────────────────────────────
+        // ΓöÇΓöÇ Health information card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(surfaceVariant).padding(20.dp)) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -320,7 +321,7 @@ fun ProfileScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Notifications card ────────────────────────────────────────────────
+        // ΓöÇΓöÇ Notifications card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = surface), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(stringResource(R.string.profile_notifications_title), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = onBackground)
@@ -347,7 +348,26 @@ fun ProfileScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── App settings card ─────────────────────────────────────────────────
+        // ΓöÇΓöÇ Your Yoga Profile card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = surface), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Your Yoga Profile", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = onBackground, modifier = Modifier.weight(1f))
+                    Text("≡ƒºÿ", fontSize = 20.sp)
+                }
+                Spacer(Modifier.height(12.dp))
+                val qs = uiState.questionnaireSummary
+                YogaProfileRow("Primary Goal", qs?.goal ?: "Not set", onBackground)
+                HorizontalDivider(color = surfaceVariant, modifier = Modifier.padding(vertical = 6.dp))
+                YogaProfileRow("Experience", qs?.experienceLevel ?: "Not set", onBackground)
+                HorizontalDivider(color = surfaceVariant, modifier = Modifier.padding(vertical = 6.dp))
+                YogaProfileRow("Focus Areas", qs?.focusAreas ?: "Not set", onBackground)
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ΓöÇΓöÇ App settings card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = surface), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
             Column(modifier = Modifier.padding(horizontal = 20.dp)) {
                 Spacer(Modifier.height(20.dp))
@@ -358,13 +378,30 @@ fun ProfileScreen(
                 UnitsSettingsRow(unitSystem = unitSystem)
                 HorizontalDivider(color = Color(0xFFF5F5F5))
                 ThemeSettingsRow(navController = navController)
+                HorizontalDivider(color = Color(0xFFF5F5F5))
+                // Edit Questionnaire row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            context.startActivity(QuestionnaireActivity.editIntent(context))
+                        }
+                        .padding(vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Edit Questionnaire", fontSize = 14.sp, color = onBackground, fontWeight = FontWeight.Medium)
+                        Text("Update your yoga profile answers", fontSize = 12.sp, color = onBackground.copy(alpha = 0.6f))
+                    }
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = onBackground.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+                }
                 Spacer(Modifier.height(8.dp))
             }
         }
 
         Spacer(Modifier.height(24.dp))
 
-        // ── Log out ───────────────────────────────────────────────────────────
+        // ΓöÇΓöÇ Log out ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Box(modifier = Modifier.fillMaxWidth().clickable(enabled = !uiState.isLoading) { profileViewModel.signOut() }, contentAlignment = Alignment.Center) {
             Text(if (uiState.isLoading) stringResource(R.string.profile_signing_out) else stringResource(R.string.profile_log_out), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = secondary)
         }
@@ -373,7 +410,7 @@ fun ProfileScreen(
     }
 }
 
-// ── Body metric ───────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Body metric ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun BodyMetric(label: String, value: String, unit: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -386,7 +423,7 @@ private fun BodyMetric(label: String, value: String, unit: String) {
     }
 }
 
-// ── Goal row ──────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Goal row ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun GoalRow(label: String, value: String, valueColor: Color) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -396,7 +433,7 @@ private fun GoalRow(label: String, value: String, valueColor: Color) {
     HorizontalDivider(color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.18f))
 }
 
-// ── Pref detail box ───────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Pref detail box ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun PrefDetailBox(label: String, value: String, modifier: Modifier = Modifier) {
     Box(modifier = modifier.clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(12.dp)) {
@@ -408,7 +445,7 @@ private fun PrefDetailBox(label: String, value: String, modifier: Modifier = Mod
     }
 }
 
-// ── Health info row ───────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Health info row ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun HealthInfoRow(label: String, value: String) {
     Text(label, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.secondary, letterSpacing = 0.8.sp)
@@ -416,7 +453,7 @@ private fun HealthInfoRow(label: String, value: String) {
     Text(value, fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground)
 }
 
-// ── Notification toggle row ───────────────────────────────────────────────────
+// ΓöÇΓöÇ Notification toggle row ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun NotificationToggleRow(label: String, checked: Boolean, onToggle: (Boolean) -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -429,7 +466,7 @@ private fun NotificationToggleRow(label: String, checked: Boolean, onToggle: (Bo
     }
 }
 
-// ── Settings row ──────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Settings row ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun LanguageSettingsRow(language: AppLanguage, navController: NavController) {
     val context = LocalContext.current
@@ -741,4 +778,27 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+// ΓöÇΓöÇ Yoga Profile summary row ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+@Composable
+private fun YogaProfileRow(label: String, value: String, onBackground: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            fontSize = 13.sp,
+            color = onBackground.copy(alpha = 0.6f),
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            value,
+            fontSize = 14.sp,
+            color = onBackground,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
 }

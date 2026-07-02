@@ -7,4 +7,7 @@ interface WorkoutSessionRepository {
     fun observeSessions(userId: String, limit: Int): Flow<List<WorkoutSession>>
 
     suspend fun saveSession(session: WorkoutSession): Result<Unit>
+
+    /** Returns all sessions for [userId] that started within the last 24 hours. */
+    suspend fun getSessionsInLast24Hours(userId: String): List<WorkoutSession>
 }

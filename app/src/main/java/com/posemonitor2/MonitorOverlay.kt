@@ -310,6 +310,30 @@ fun MonitorOverlay(
             }
         }
 
+        // ── Critical Status Message ──────────────────────────────────────────
+        if (isBodyMissing) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 120.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    color = Color(0xCC000000),
+                    shape = RoundedCornerShape(16.dp),
+                ) {
+                    Text(
+                        text = frameStatus.feedback,
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp, vertical = 20.dp)
+                    )
+                }
+            }
+        }
+
         AnimatedVisibility(
             visible = panelExpanded,
             enter = fadeIn(tween(200)),

@@ -43,15 +43,18 @@ class ExercisesViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ExercisesUiState())
     val uiState: StateFlow<ExercisesUiState> = _uiState.asStateFlow()
 
-    private val searchQuery = MutableStateFlow("")
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
     private val selectedDifficulty = MutableStateFlow<String?>(null)
     private val selectedCategory = MutableStateFlow<String?>(null)
 
     val filteredExercises: StateFlow<List<Exercise>> =
-        combine(uiState, searchQuery, selectedDifficulty, selectedCategory) { state, query, diff, cat ->
+        combine(uiState, _searchQuery, selectedDifficulty, selectedCategory) { state, query, diff, cat ->
             val exercises = state.exercises
             exercises.filter { exercise ->
-                val matchesSearch = query.isBlank() || exercise.name.contains(query, ignoreCase = true)
+                val matchesSearch = query.isBlank() ||
+                    exercise.name.contains(query, ignoreCase = true) ||
+                    (exercise.category?.contains(query, ignoreCase = true) == true)
                 val matchesDifficulty = diff == null || diff == "All Levels" || exercise.difficulty == diff
                 val matchesCategory = cat == null || cat == "All" || exercise.category == cat
                 matchesSearch && matchesDifficulty && matchesCategory
@@ -162,12 +165,16 @@ class ExercisesViewModel @Inject constructor(
         return normalized == "admin" || normalized == "admin@poseapp.com"
     }
 
+    fun onSearchQueryChanged(query: String) {
+        _searchQuery.value = query
+    }
+
     fun updateFilters(
         search: String,
         difficulty: String?,
         category: String?,
     ) {
-        searchQuery.value = search
+        _searchQuery.value = search
         selectedDifficulty.value = difficulty
         selectedCategory.value = category
     }
@@ -183,6 +190,7 @@ data class ExercisesUiState(
     val drawableByExerciseId: Map<String, Int> = emptyMap(),
     val preloadedThumbnails: Map<String, ImageBitmap?> = emptyMap(),
     val isLoading: Boolean = false,
+    val searchQuery: String = "",
 )
 
 data class ProfileInfo(

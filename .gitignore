@@ -27,3 +27,23 @@ auth.json
 # OS-specific
 Thumbs.db
 desktop.ini
+
+# Build output logs (local only)
+build_*.txt
+
+# Kotlin daemon error logs
+.kotlin/
+
+# IDE bin/ output (compiled class cache from IDE, not Gradle)
+**/bin/
+
+# Kiro spec files (local dev tooling)
+.kiro/
+
+# Helper scripts (local only)
+fix_files.ps1
+fix_results.txt
+
+# Performance analysis docs (local only)
+PERFORMANCE_ANALYSIS.md
+PERFORMANCE_OPTIMIZATIONS_APPLIED.md

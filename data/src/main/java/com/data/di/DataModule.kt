@@ -7,6 +7,7 @@ import com.data.local.PoseDatabase
 import com.data.local.SessionTokenStore
 import com.data.local.dao.DailyStatDao
 import com.data.local.dao.ExerciseDao
+import com.data.local.dao.OnboardingResponseDao
 import com.data.local.dao.PoseGraphDao
 import com.data.local.dao.ProfileDao
 import com.data.local.dao.SessionDao
@@ -16,6 +17,7 @@ import com.data.remote.firebase.FirebaseRemoteClient
 import com.data.repository.AuthRepositoryImpl
 import com.data.repository.DailyStatsRepositoryImpl
 import com.data.repository.ExerciseRepositoryImpl
+import com.data.repository.OnboardingRepositoryImpl
 import com.data.repository.PoseGraphRepositoryImpl
 import com.data.repository.ProfileRepositoryImpl
 import com.data.repository.SessionMetricsRepositoryImpl
@@ -23,6 +25,7 @@ import com.data.repository.WorkoutSessionRepositoryImpl
 import com.domain.repository.AuthRepository
 import com.domain.repository.DailyStatsRepository
 import com.domain.repository.ExerciseRepository
+import com.domain.repository.OnboardingRepository
 import com.domain.repository.PoseGraphRepository
 import com.domain.repository.ProfileRepository
 import com.domain.repository.SessionMetricsRepository
@@ -74,6 +77,7 @@ object DataProvidesModule {
             .addMigrations(DatabaseMigrations.MIGRATION_2_3)
             .addMigrations(DatabaseMigrations.MIGRATION_3_4)
             .addMigrations(DatabaseMigrations.MIGRATION_4_5)
+            .addMigrations(DatabaseMigrations.MIGRATION_5_6)
             .build()
     }
 
@@ -97,6 +101,9 @@ object DataProvidesModule {
 
     @Provides
     fun provideSyncQueueDao(db: PoseDatabase): SyncQueueDao = db.syncQueueDao()
+
+    @Provides
+    fun provideOnboardingResponseDao(db: PoseDatabase): OnboardingResponseDao = db.onboardingResponseDao()
 }
 
 @Module
@@ -129,4 +136,8 @@ abstract class DataBindsModule {
     @Binds
     @Singleton
     abstract fun bindDailyStatsRepository(impl: DailyStatsRepositoryImpl): DailyStatsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindOnboardingRepository(impl: OnboardingRepositoryImpl): OnboardingRepository
 }

@@ -29,6 +29,12 @@
         <!-- ── User flow ────────────────────────────────────────────────── -->
         <activity android:name=".UserFlowActivity" android:exported="false" />
 
+        <!-- ── Questionnaire ────────────────────────────────────────────── -->
+        <activity
+            android:name=".questionnaire.QuestionnaireActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- ── Admin flow ───────────────────────────────────────────────── -->
         <activity
             android:name=".HomeActivity"

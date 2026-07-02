@@ -2,15 +2,18 @@ package com.data.repository.mapper
 
 import com.data.local.entity.ProfileEntity
 import com.data.local.entity.DailyStatEntity
+import com.data.local.entity.OnboardingResponseEntity
 import com.data.local.entity.PoseGraphEntity
 import com.data.local.entity.SessionEntity
 import com.data.local.entity.SessionMetricEntity
 import com.data.remote.firebase.FirestoreDailyStatDto
+import com.data.remote.firebase.FirestoreOnboardingDto
 import com.data.remote.firebase.FirestorePoseGraphDto
 import com.data.remote.firebase.FirestoreProfileDto
 import com.data.remote.firebase.FirestoreSessionDto
 import com.data.remote.firebase.FirestoreSessionMetricDto
 import com.domain.model.DailyStat
+import com.domain.model.OnboardingResponse
 import com.domain.model.PoseGraphRecord
 import com.domain.model.SessionStatus
 import com.domain.model.SessionMetric
@@ -27,6 +30,17 @@ fun ProfileEntity.toDomain(): UserProfile = UserProfile(
     fitnessGoal = fitnessGoal,
     targetWeightKg = targetWeightKg,
     weeklyGoalSessions = weeklyGoalSessions,
+    ageGroup = ageGroup,
+    gender = gender,
+    experienceLevel = experienceLevel,
+    yogaStyle = yogaStyle,
+    flexibilityLevel = flexibilityLevel,
+    focusAreas = focusAreas,
+    dailyPracticeMinutes = dailyPracticeMinutes,
+    weeklyFrequency = weeklyFrequency,
+    injuries = injuries,
+    medicalConditions = medicalConditions,
+    cameraPermissionGranted = cameraPermissionGranted?.let { it == 1 },
 )
 
 fun UserProfile.toEntity(now: Long): ProfileEntity = ProfileEntity(
@@ -40,6 +54,17 @@ fun UserProfile.toEntity(now: Long): ProfileEntity = ProfileEntity(
     targetWeightKg = targetWeightKg,
     weeklyGoalSessions = weeklyGoalSessions,
     updatedAtEpochMs = now,
+    ageGroup = ageGroup,
+    gender = gender,
+    experienceLevel = experienceLevel,
+    yogaStyle = yogaStyle,
+    flexibilityLevel = flexibilityLevel,
+    focusAreas = focusAreas,
+    dailyPracticeMinutes = dailyPracticeMinutes,
+    weeklyFrequency = weeklyFrequency,
+    injuries = injuries,
+    medicalConditions = medicalConditions,
+    cameraPermissionGranted = cameraPermissionGranted?.let { if (it) 1 else 0 },
 )
 
 fun UserProfile.toFirestoreDto(now: Long): FirestoreProfileDto = FirestoreProfileDto(
@@ -53,6 +78,17 @@ fun UserProfile.toFirestoreDto(now: Long): FirestoreProfileDto = FirestoreProfil
     target_weight_kg = targetWeightKg,
     weekly_goal_sessions = weeklyGoalSessions,
     updated_at = now,
+    age_group = ageGroup,
+    gender = gender,
+    experience_level = experienceLevel,
+    yoga_style = yogaStyle,
+    flexibility_level = flexibilityLevel,
+    focus_areas = focusAreas,
+    daily_practice_minutes = dailyPracticeMinutes,
+    weekly_frequency = weeklyFrequency,
+    injuries = injuries,
+    medical_conditions = medicalConditions,
+    camera_permission_granted = cameraPermissionGranted,
 )
 
 fun FirestoreProfileDto.toEntity(): ProfileEntity = ProfileEntity(
@@ -66,6 +102,17 @@ fun FirestoreProfileDto.toEntity(): ProfileEntity = ProfileEntity(
     targetWeightKg = target_weight_kg,
     weeklyGoalSessions = weekly_goal_sessions,
     updatedAtEpochMs = updated_at,
+    ageGroup = age_group,
+    gender = gender,
+    experienceLevel = experience_level,
+    yogaStyle = yoga_style,
+    flexibilityLevel = flexibility_level,
+    focusAreas = focus_areas,
+    dailyPracticeMinutes = daily_practice_minutes,
+    weeklyFrequency = weekly_frequency,
+    injuries = injuries,
+    medicalConditions = medical_conditions,
+    cameraPermissionGranted = camera_permission_granted?.let { if (it) 1 else 0 },
 )
 
 fun SessionEntity.toDomain(): WorkoutSession = WorkoutSession(
@@ -191,4 +238,86 @@ fun DailyStat.toFirestoreDto(now: Long): FirestoreDailyStatDto = FirestoreDailyS
     total_reps = totalReps,
     avg_accuracy = avgAccuracy,
     updated_at = now,
+)
+
+// ΓöÇΓöÇ OnboardingResponse mappers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+fun OnboardingResponseEntity.toDomain(): OnboardingResponse = OnboardingResponse(
+    userId = userId,
+    ageGroup = ageGroup,
+    gender = gender,
+    goal = goal,
+    experienceLevel = experienceLevel,
+    yogaStyle = yogaStyle,
+    flexibilityLevel = flexibilityLevel,
+    focusAreas = focusAreas,
+    heightCm = heightCm,
+    weightKg = weightKg,
+    dailyPracticeMinutes = dailyPracticeMinutes,
+    weeklyFrequency = weeklyFrequency,
+    injuries = injuries,
+    medicalConditions = medicalConditions,
+    cameraPermissionGranted = cameraPermissionGranted?.let { it == 1 },
+    isCompleted = isCompleted == 1,
+    updatedAtEpochMs = updatedAt,
+)
+
+fun OnboardingResponse.toEntity(): OnboardingResponseEntity = OnboardingResponseEntity(
+    userId = userId,
+    ageGroup = ageGroup,
+    gender = gender,
+    goal = goal,
+    experienceLevel = experienceLevel,
+    yogaStyle = yogaStyle,
+    flexibilityLevel = flexibilityLevel,
+    focusAreas = focusAreas,
+    heightCm = heightCm,
+    weightKg = weightKg,
+    dailyPracticeMinutes = dailyPracticeMinutes,
+    weeklyFrequency = weeklyFrequency,
+    injuries = injuries,
+    medicalConditions = medicalConditions,
+    cameraPermissionGranted = cameraPermissionGranted?.let { if (it) 1 else 0 },
+    isCompleted = if (isCompleted) 1 else 0,
+    updatedAt = updatedAtEpochMs,
+)
+
+fun OnboardingResponse.toFirestoreDto(): FirestoreOnboardingDto = FirestoreOnboardingDto(
+    user_id = userId,
+    age_group = ageGroup,
+    gender = gender,
+    goal = goal,
+    experience_level = experienceLevel,
+    yoga_style = yogaStyle,
+    flexibility_level = flexibilityLevel,
+    focus_areas = focusAreas,
+    height_cm = heightCm,
+    weight_kg = weightKg,
+    daily_practice_minutes = dailyPracticeMinutes,
+    weekly_frequency = weeklyFrequency,
+    injuries = injuries,
+    medical_conditions = medicalConditions,
+    camera_permission_granted = cameraPermissionGranted,
+    is_completed = isCompleted,
+    updated_at = updatedAtEpochMs,
+)
+
+fun FirestoreOnboardingDto.toEntity(): OnboardingResponseEntity = OnboardingResponseEntity(
+    userId = user_id,
+    ageGroup = age_group,
+    gender = gender,
+    goal = goal,
+    experienceLevel = experience_level,
+    yogaStyle = yoga_style,
+    flexibilityLevel = flexibility_level,
+    focusAreas = focus_areas,
+    heightCm = height_cm,
+    weightKg = weight_kg,
+    dailyPracticeMinutes = daily_practice_minutes,
+    weeklyFrequency = weekly_frequency,
+    injuries = injuries,
+    medicalConditions = medical_conditions,
+    cameraPermissionGranted = camera_permission_granted?.let { if (it) 1 else 0 },
+    isCompleted = if (is_completed) 1 else 0,
+    updatedAt = updated_at,
 )

@@ -12,8 +12,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -52,7 +54,7 @@ fun ExercisesScreen(
     viewModel: ExercisesViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var searchQuery         by remember { mutableStateOf("") }
+    val searchQuery by viewModel.searchQuery.collectAsState()
     var selectedDifficulty  by remember { mutableStateOf<String?>(null) }
     var selectedCategory    by remember { mutableStateOf<String?>(null) }
     
@@ -65,18 +67,14 @@ fun ExercisesScreen(
     val preloadedThumbnails = uiState.preloadedThumbnails
     val filteredExercises by viewModel.filteredExercises.collectAsState()
 
-    LaunchedEffect(searchQuery, selectedDifficulty, selectedCategory) {
+    LaunchedEffect(selectedDifficulty, selectedCategory) {
         viewModel.updateFilters(searchQuery, selectedDifficulty, selectedCategory)
     }
 
     var showSkeleton by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isLoading) {
-        if (uiState.isLoading) {
-            showSkeleton = true
-        } else {
-            showSkeleton = false
-        }
+        showSkeleton = uiState.isLoading
     }
 
     LazyColumn(
@@ -127,31 +125,46 @@ fun ExercisesScreen(
 
         item { Spacer(Modifier.height(20.dp)) }
 
+        // ΓöÇΓöÇ Search bar ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         item {
-            Surface(
-                shape = RoundedCornerShape(50.dp),
-                color = Color.White,
-                shadowElevation = 2.dp,
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { viewModel.onSearchQueryChanged(it) },
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = GrayText, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(10.dp))
-                    if (searchQuery.isEmpty()) {
-                        Text(stringResource(R.string.exercises_search_hint), color = GrayText, fontSize = 14.sp)
-                    }
-                    BasicTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        singleLine = true,
-                        textStyle = TextStyle(fontSize = 14.sp, color = TealDark),
-                        modifier = Modifier.weight(1f),
+                placeholder = {
+                    Text("Search exercises...", color = GrayText, fontSize = 14.sp)
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint = TealDark,
+                        modifier = Modifier.size(20.dp),
                     )
-                }
-            }
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = "Clear search",
+                                tint = GrayText,
+                            )
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(28.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedBorderColor = TealDark,
+                    unfocusedBorderColor = ChipBorder,
+                    cursorColor = TealDark,
+                    focusedTextColor = TealDark,
+                    unfocusedTextColor = TealDark,
+                ),
+            )
         }
 
         item { Spacer(Modifier.height(20.dp)) }
@@ -212,6 +225,31 @@ fun ExercisesScreen(
             items(6) {
                 WorkoutCardSkeleton()
                 Spacer(Modifier.height(12.dp))
+            }
+        } else if (filteredExercises.isEmpty() && searchQuery.isNotEmpty()) {
+            // ΓöÇΓöÇ Empty state ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 48.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SearchOff,
+                        contentDescription = null,
+                        tint = GrayText,
+                        modifier = Modifier.size(48.dp),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "No exercises found for \"$searchQuery\"",
+                        fontSize = 14.sp,
+                        color = GrayText,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                }
             }
         } else {
             items(filteredExercises, key = { it.id }) { exercise ->
@@ -321,7 +359,7 @@ private fun WorkoutCard(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "$difficulty • AI Session",
+                    "$difficulty ΓÇó AI Session",
                     fontSize = 12.sp,
                     color = GrayText,
                 )

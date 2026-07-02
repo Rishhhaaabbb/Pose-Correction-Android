@@ -110,15 +110,15 @@ class PoseDetector(private val context: Context) {
                 val optionsGpu = PoseLandmarkerOptions.builder()
                     .setBaseOptions(baseOptionsGpu)
                     .setRunningMode(RunningMode.LIVE_STREAM)
-                    .setNumPoses(3) // Increased to 3 to better detect multiple people
+                    .setNumPoses(2)
                     .setResultListener { result, _ -> handleLiveResult(result) }
                     .setErrorListener { error ->
                         Log.e(TAG, "MediaPipe error: ${error.message}")
                         onResult?.invoke(PoseDetectorResult.NoPose)
                     }
-                    .setMinPoseDetectionConfidence(0.5f)
-                    .setMinPosePresenceConfidence(0.5f)
-                    .setMinTrackingConfidence(0.5f)
+                    .setMinPoseDetectionConfidence(confidenceThreshold)
+                    .setMinPosePresenceConfidence(confidenceThreshold)
+                    .setMinTrackingConfidence(confidenceThreshold)
                     .build()
 
                 landmarker = PoseLandmarker.createFromOptions(context, optionsGpu)
@@ -137,15 +137,15 @@ class PoseDetector(private val context: Context) {
                 val optionsCpu = PoseLandmarkerOptions.builder()
                     .setBaseOptions(baseOptionsCpu)
                     .setRunningMode(RunningMode.LIVE_STREAM)
-                    .setNumPoses(3) // Increased to 3 to better detect multiple people
+                    .setNumPoses(2)
                     .setResultListener { result, _ -> handleLiveResult(result) }
                     .setErrorListener { error ->
                         Log.e(TAG, "MediaPipe error: ${error.message}")
                         onResult?.invoke(PoseDetectorResult.NoPose)
                     }
-                    .setMinPoseDetectionConfidence(0.5f)
-                    .setMinPosePresenceConfidence(0.5f)
-                    .setMinTrackingConfidence(0.5f)
+                    .setMinPoseDetectionConfidence(confidenceThreshold)
+                    .setMinPosePresenceConfidence(confidenceThreshold)
+                    .setMinTrackingConfidence(confidenceThreshold)
                     .build()
 
                 landmarker = PoseLandmarker.createFromOptions(context, optionsCpu)

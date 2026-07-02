@@ -12,9 +12,7 @@ import com.core.poseengine.monitor.MonitorConfig
 import com.core.poseengine.monitor.PoseMonitorEngine
 import com.core.poseengine.monitor.SystemTimeSource
 import com.data.mediapipe.PoseDetectorResult
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 
 /**
@@ -75,7 +73,6 @@ class RunPipelineUseCase(
                 }
 
                 is PoseDetectorResult.NoPose -> {
-                    engine.notifyNoPose()
                     val status = engine.processFeatures(null)
                     if (DEBUG_LOG) Log.d(TAG, "Layer 1 ❌ No pose detected")
                     PipelineResult(
@@ -88,7 +85,6 @@ class RunPipelineUseCase(
                 }
 
                 is PoseDetectorResult.MultiplePoses -> {
-                    Log.d(TAG, "Multiple poses detected - notifying engine")
                     engine.notifyMultiplePeople()
                     val status = engine.processFeatures(null)
                     if (DEBUG_LOG) Log.d(TAG, "Layer 1 ❌ Multiple poses detected")
@@ -109,7 +105,6 @@ class RunPipelineUseCase(
 
                     if (features == null) {
                         if (DEBUG_LOG) Log.d(TAG, "Layer 3 ❌ — feature extraction failed")
-                        engine.notifyPartiallyVisible()
                         val status = engine.processFeatures(null)
                         PipelineResult(
                             detectorResult = detectorResult,
@@ -149,7 +144,7 @@ class RunPipelineUseCase(
                     }
                 }
             }
-        }.flowOn(Dispatchers.Default)
+        }
 
     private fun buildLayerLog(
         landmarkCount: Int,

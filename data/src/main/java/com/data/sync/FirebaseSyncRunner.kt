@@ -3,6 +3,7 @@ package com.data.sync
 import com.data.local.dao.SyncQueueDao
 import com.data.remote.firebase.FirebaseRemoteClient
 import com.data.remote.firebase.FirestoreDailyStatDto
+import com.data.remote.firebase.FirestoreOnboardingDto
 import com.data.remote.firebase.FirestorePoseGraphDto
 import com.data.remote.firebase.FirestoreProfileDto
 import com.data.remote.firebase.FirestoreSessionDto
@@ -45,6 +46,10 @@ class FirebaseSyncRunner @Inject constructor(
                     "daily_stats" -> {
                         val dto = json.decodeFromString<FirestoreDailyStatDto>(item.payload)
                         firebaseRemoteClient.upsertDailyStat(dto)
+                    }
+                    "onboarding_responses" -> {
+                        val dto = json.decodeFromString<FirestoreOnboardingDto>(item.payload)
+                        firebaseRemoteClient.upsertOnboardingResponse(dto)
                     }
                 }
                 syncQueueDao.deleteById(item.id)

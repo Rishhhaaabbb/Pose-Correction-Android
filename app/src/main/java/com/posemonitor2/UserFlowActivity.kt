@@ -39,7 +39,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import androidx.activity.compose.BackHandler
 import android.content.Intent
 
-// ── Bottom-nav destinations ───────────────────────────────────────────────────
+// ΓöÇΓöÇ Bottom-nav destinations ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 sealed class UserRoute(val route: String, val labelResId: Int, val icon: ImageVector) {
     object Home      : UserRoute("home",      R.string.nav_home,    Icons.Outlined.Home)
@@ -67,7 +67,7 @@ private val adminBottomNavItems = listOf(
     UserRoute.Profile,
 )
 
-// ── Activity ──────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Activity ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @AndroidEntryPoint
 class UserFlowActivity : ComponentActivity() {
@@ -92,7 +92,7 @@ class UserFlowActivity : ComponentActivity() {
     }
 }
 
-// ── Root composable ───────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Root composable ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @Composable
 fun UserFlowNavigation() {
@@ -249,7 +249,7 @@ fun UserFlowNavigation() {
     }
 }
 
-// ── Bottom nav bar ────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Bottom nav bar ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @Composable
 private fun UserBottomNavBar(navController: NavController, items: List<UserRoute>) {

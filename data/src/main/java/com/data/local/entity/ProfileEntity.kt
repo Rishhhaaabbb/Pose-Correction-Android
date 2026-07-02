@@ -25,4 +25,25 @@ data class ProfileEntity(
     val weeklyGoalSessions: Int?,
     @ColumnInfo(name = "updated_at")
     val updatedAtEpochMs: Long,
+    // Questionnaire fields (added in migration 5ΓåÆ6)
+    @ColumnInfo(name = "age_group")
+    val ageGroup: String? = null,
+    val gender: String? = null,
+    @ColumnInfo(name = "experience_level")
+    val experienceLevel: String? = null,
+    @ColumnInfo(name = "yoga_style")
+    val yogaStyle: String? = null,
+    @ColumnInfo(name = "flexibility_level")
+    val flexibilityLevel: String? = null,
+    @ColumnInfo(name = "focus_areas")
+    val focusAreas: String? = null,
+    @ColumnInfo(name = "daily_practice_minutes")
+    val dailyPracticeMinutes: Int? = null,
+    @ColumnInfo(name = "weekly_frequency")
+    val weeklyFrequency: String? = null,
+    val injuries: String? = null,
+    @ColumnInfo(name = "medical_conditions")
+    val medicalConditions: String? = null,
+    @ColumnInfo(name = "camera_permission_granted")
+    val cameraPermissionGranted: Int? = null,
 )

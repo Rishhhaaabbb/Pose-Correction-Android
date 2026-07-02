@@ -49,24 +49,37 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.CommonStatusCodes
 import com.posemonitor2.auth.AuthViewModel
+import com.posemonitor2.onboarding.OnboardingManager
+import com.posemonitor2.questionnaire.QuestionnaireActivity
 import com.posemonitor2.settings.AppLocaleManager
 import com.posemonitor2.ui.theme.PoseMonitorAppTheme
+import com.domain.repository.OnboardingRepository
+import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Design tokens ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 private val Orange      = Color(0xFFE8622E)
 private val Yellow      = Color(0xFFF4C430)
 private val Teal        = Color(0xFF0A4A4E)
-private val HeroBg      = Color(0xFFC4A882)   // yoga photo placeholder — swap when asset added
+private val HeroBg      = Color(0xFFC4A882)   // yoga photo placeholder ΓÇö swap when asset added
 private val LabelColor  = Color(0xFFFFD0C0)
 private val FieldBg     = Color(0xFFEF7A52)
 private val FieldStroke = Color(0xFFD4563A)
 private val TextOnCard  = Color.White
 
-// ── Activity ──────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Activity ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @AndroidEntryPoint
 class LoginActivity : ComponentActivity() {
     private val authViewModel: AuthViewModel by viewModels()
+
+    @Inject
+    lateinit var onboardingRepository: OnboardingRepository
+
+    // Tracks whether we are performing the post-auth questionnaire check.
+    // Exposed as mutable state so the Compose UI can show a blocking spinner.
+    private val isCheckingOnboarding = mutableStateOf(false)
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocaleManager.wrapContext(newBase))
@@ -77,19 +90,92 @@ class LoginActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PoseMonitorAppTheme {
-                AuthNavigation(
-                    authViewModel = authViewModel,
-                    onAuthenticated = { email ->
-                        val intent = Intent(this, UserFlowActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                val checking by isCheckingOnboarding
+                Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+                    AuthNavigation(
+                        authViewModel = authViewModel,
+                        isCheckingOnboarding = checking,
+                        onAuthenticated = { _ ->
+                            val userId = authViewModel.state.value.userId
+                            if (userId.isNullOrBlank()) {
+                                // Fallback: userId missing, go straight to main app
+                                startActivity(Intent(this@LoginActivity, UserFlowActivity::class.java).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                })
+                                finish()
+                                return@AuthNavigation
+                            }
+                            lifecycleScope.launch {
+                                navigateAfterAuth(userId)
+                            }
                         }
-                        startActivity(intent)
-                        finish()
+                    )
+                    // Blocking overlay while the questionnaire completion check runs
+                    if (checking) {
+                        Box(
+                            modifier = androidx.compose.ui.Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.4f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(color = Orange)
+                        }
                     }
-
-                )
+                }
             }
         }
+    }
+
+    /**
+     * Checks whether [userId] has completed the questionnaire and navigates
+     * to the appropriate destination.
+     *
+     * Strategy:
+     * 1. Check per-user local SharedPreferences flag first (fast, offline-safe).
+     *    This key is scoped to [userId] so different accounts on the same device
+     *    each get their own flag.
+     * 2. If local flag is not set, check Room DB / Firestore.
+     *    This handles reinstalls or new-device sign-ins for existing accounts.
+     * 3. If completed anywhere, mark the local flag and go to UserFlowActivity.
+     * 4. Otherwise show the questionnaire (first-run flow).
+     *
+     * Clear data / uninstall — local prefs wiped → falls through to Firestore.
+     * New account — Firestore has no record → questionnaire shown.
+     * Different account on same device — per-user key is empty → questionnaire shown.
+     */
+    private suspend fun navigateAfterAuth(userId: String) {
+        isCheckingOnboarding.value = true
+
+        val onboardingManager = OnboardingManager(this)
+
+        val completed = when {
+            // Per-user local flag is the fastest check
+            onboardingManager.hasCompletedQuestionnaire(userId) -> true
+            else -> {
+                // No local flag — check DB/Firestore (handles reinstalls or new devices)
+                try {
+                    val remoteCompleted = onboardingRepository.isCompleted(userId)
+                    if (remoteCompleted) {
+                        // Sync local flag so future logins on this account are instant
+                        onboardingManager.markQuestionnaireCompleted(userId)
+                    }
+                    remoteCompleted
+                } catch (e: Exception) {
+                    false // fail-safe: show questionnaire on error
+                }
+            }
+        }
+
+        isCheckingOnboarding.value = false
+        val intent = if (completed) {
+            Intent(this, UserFlowActivity::class.java)
+        } else {
+            QuestionnaireActivity.firstRunIntent(this)
+        }.apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        startActivity(intent)
+        finish()
     }
 }
 
@@ -99,7 +185,7 @@ private fun isAdminEmail(email: String?): Boolean {
     return normalized == "admin" || normalized == "admin@poseapp.com"
 }
 
-// ── Internal navigation ───────────────────────────────────────────────────────
+// ΓöÇΓöÇ Internal navigation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 private sealed class AuthScreen {
     object Landing        : AuthScreen()
     object SignIn         : AuthScreen()
@@ -110,6 +196,7 @@ private sealed class AuthScreen {
 @Composable
 private fun AuthNavigation(
     authViewModel: AuthViewModel,
+    isCheckingOnboarding: Boolean = false,
     onAuthenticated: (String?) -> Unit,
 ) {
     val context = LocalContext.current
@@ -145,11 +232,14 @@ private fun AuthNavigation(
     }
 
     var screen by remember { mutableStateOf<AuthScreen>(AuthScreen.Landing) }
+    // Combine authState.isLoading with the post-auth onboarding check so all
+    // buttons stay disabled while either operation is in progress.
+    val isLoading = authState.isLoading || isCheckingOnboarding
     when (screen) {
         AuthScreen.Landing        -> LandingScreen(
             onSignUpWithEmail = { authViewModel.clearError(); screen = AuthScreen.SignUp },
             onSignIn          = { authViewModel.clearError(); screen = AuthScreen.SignIn },
-            isLoading = authState.isLoading,
+            isLoading = isLoading,
             errorMessage = authState.errorMessage,
             onGoogleSignIn = {
                 authViewModel.clearError()
@@ -171,28 +261,28 @@ private fun AuthNavigation(
             onForgotPassword = { authViewModel.clearError(); screen = AuthScreen.ForgotPassword },
             onCreateAccount  = { authViewModel.clearError(); screen = AuthScreen.SignUp },
             onSignIn         = { email, password -> authViewModel.signInWithEmail(email, password) },
-            isLoading        = authState.isLoading,
+            isLoading        = isLoading,
             errorMessage     = authState.errorMessage,
         )
         AuthScreen.SignUp         -> SignUpScreen(
             onBack    = { authViewModel.clearError(); screen = AuthScreen.Landing },
             onLogin   = { authViewModel.clearError(); screen = AuthScreen.SignIn },
             onSignUp  = { name, email, password -> authViewModel.signUpWithEmail(name, email, password) },
-            isLoading = authState.isLoading,
+            isLoading = isLoading,
             errorMessage = authState.errorMessage,
         )
         AuthScreen.ForgotPassword -> ForgotPasswordScreen(
             onBack          = { authViewModel.clearError(); screen = AuthScreen.SignIn },
             onSendReset     = { email -> authViewModel.sendPasswordReset(email) {} },
-            isLoading       = authState.isLoading,
+            isLoading       = isLoading,
             errorMessage    = authState.errorMessage,
         )
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // Shared scaffold: beige hero area (top) + orange card (bottom, overlapping)
-// ─────────────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun AuthScaffold(
     heroFraction: Float = 0.40f,
@@ -208,7 +298,7 @@ private fun AuthScaffold(
             .imePadding() // Ensures layout moves up when keyboard appears
             .verticalScroll(scrollState)
     ) {
-        // ── Background layers (Hero Image) ────────────────────────────────────
+        // ΓöÇΓöÇ Background layers (Hero Image) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -236,7 +326,7 @@ private fun AuthScaffold(
                         .background(Orange),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("⚡", fontSize = 16.sp)
+                    Text("ΓÜí", fontSize = 16.sp)
                 }
                 Text(
                     stringResource(R.string.login_brand_name),
@@ -247,7 +337,7 @@ private fun AuthScaffold(
             }
         }
 
-        // ── Orange card (Content) ─────────────────────────────────────────────
+        // ΓöÇΓöÇ Orange card (Content) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -261,9 +351,9 @@ private fun AuthScaffold(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Screen 1 — Landing  ("Join the Movement")
-// ─────────────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Screen 1 ΓÇö Landing  ("Join the Movement")
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun LandingScreen(
     onSignUpWithEmail: () -> Unit,
@@ -405,9 +495,9 @@ private fun LandingScreen(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Screen 2 — Sign In  ("Welcome Back")
-// ─────────────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Screen 2 ΓÇö Sign In  ("Welcome Back")
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun SignInScreen(
     onBack: () -> Unit,
@@ -482,9 +572,9 @@ private fun SignInScreen(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Screen 3 — Sign Up  ("Create Your Account")
-// ─────────────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Screen 3 ΓÇö Sign Up  ("Create Your Account")
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun SignUpScreen(
     onBack: () -> Unit,
@@ -563,9 +653,9 @@ private fun SignUpScreen(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Screen 4 — Forgot Password  ("Reset Password")
-// ─────────────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Screen 4 ΓÇö Forgot Password  ("Reset Password")
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun ForgotPasswordScreen(
     onBack: () -> Unit,
@@ -580,7 +670,7 @@ private fun ForgotPasswordScreen(
     AuthScaffold {
         // Back link
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onBack() }) {
-            Text("‹ ", fontSize = 18.sp, color = TextOnCard, fontWeight = FontWeight.Bold)
+            Text("ΓÇ╣ ", fontSize = 18.sp, color = TextOnCard, fontWeight = FontWeight.Bold)
             Text(stringResource(R.string.login_back_to_login), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextOnCard, letterSpacing = 1.sp)
         }
 
@@ -640,9 +730,9 @@ private fun ForgotPasswordScreen(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // Shared micro-components
-// ─────────────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun AuthLabel(text: String, modifier: Modifier = Modifier) {
     Text(text, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = LabelColor, letterSpacing = 1.sp, modifier = modifier.padding(bottom = 6.dp))

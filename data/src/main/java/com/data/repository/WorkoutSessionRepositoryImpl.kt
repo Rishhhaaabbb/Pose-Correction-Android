@@ -27,6 +27,11 @@ class WorkoutSessionRepositoryImpl @Inject constructor(
         return sessionDao.observeSessions(userId, limit).map { list -> list.map { it.toDomain() } }
     }
 
+    override suspend fun getSessionsInLast24Hours(userId: String): List<WorkoutSession> {
+        val since = System.currentTimeMillis() - 24L * 60L * 60L * 1000L
+        return sessionDao.getSessionsSince(userId, since).map { it.toDomain() }
+    }
+
     override suspend fun saveSession(session: WorkoutSession): Result<Unit> = runCatching {
         val now = System.currentTimeMillis()
         sessionDao.upsert(session.toEntity(now))
@@ -51,4 +56,3 @@ class WorkoutSessionRepositoryImpl @Inject constructor(
         )
     }
 }
-

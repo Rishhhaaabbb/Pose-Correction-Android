@@ -271,14 +271,10 @@ class PoseMonitorEngine(
 
         // ── No skeleton visible ───────────────────────────────────────────────
         if (features == null || features.isEmpty) {
-            // Only clear if it wasn't already set to a specific system warning.
-            // This preserves the message when notify methods are called just before.
-            val isSystemWarning = currentFeedback.contains("one person") || 
-                                 currentFeedback.contains("visible") || 
-                                 currentFeedback.contains("to begin")
-            
-            if (!isSystemWarning) {
-                currentFeedback = "Step into the frame to begin"
+            // Only clear if it wasn't already set to the multiple-people warning.
+            // This preserves the message when notifyMultiplePeople() is called just before.
+            if (!currentFeedback.contains("only one person")) {
+                currentFeedback = ""
             }
             lastWasCorrect = false
             currentStreak = 0
@@ -326,19 +322,7 @@ class PoseMonitorEngine(
     val guidancePreviewState: PoseState? get() = nextStateForGuidance
 
     fun notifyMultiplePeople() {
-        currentFeedback = "Multiple people detected. Only one person should be in the frame."
-        lastWasCorrect = false
-        currentStreak = 0
-    }
-
-    fun notifyPartiallyVisible() {
-        currentFeedback = "You are only partially visible. Please step into the frame completely."
-        lastWasCorrect = false
-        currentStreak = 0
-    }
-
-    fun notifyNoPose() {
-        currentFeedback = "Step into the frame to begin"
+        currentFeedback = "make sure that only one person should be there in frame"
         lastWasCorrect = false
         currentStreak = 0
     }

@@ -148,7 +148,7 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     implementation(libs.play.services.auth)
     // Firebase
-    implementation(platform(libs.firebase.bom)) // Firebase BOM for version management
+    implementation(platform(libs.compose.bom)) // BOM already added above, but good practice
     implementation(libs.firebase.auth.ktx)
     implementation(libs.firebase.firestore.ktx)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
@@ -160,7 +160,7 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
 
-    // Ktor
+    // Ktor (for GroqFeedbackProvider AI coaching)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)

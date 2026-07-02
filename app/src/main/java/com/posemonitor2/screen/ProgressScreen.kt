@@ -32,7 +32,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Design tokens ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 private val BgCream   = Color(0xFFF2EEE4)
 private val TealDark  = Color(0xFF0A3D3F)
 private val Orange    = Color(0xFFE85A2E)
@@ -43,7 +43,7 @@ private val GreenOk   = Color(0xFF4CAF82)
 private val TealBar   = Color(0xFF0A3D3F)
 private val TealLight = Color(0xFF4AADAA)
 
-// ── Screen ────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Screen ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 fun ProgressScreen(
     navController: NavController,
@@ -66,7 +66,7 @@ fun ProgressScreen(
     ) {
         Spacer(Modifier.height(20.dp))
 
-        // ── Header ────────────────────────────────────────────────────────────
+        // ΓöÇΓöÇ Header ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -127,7 +127,7 @@ fun ProgressScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // ── Stats summary card ────────────────────────────────────────────────
+        // ΓöÇΓöÇ Stats summary card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -201,7 +201,7 @@ fun ProgressScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Weekly activity card ──────────────────────────────────────────────
+        // ΓöÇΓöÇ Weekly activity card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -261,7 +261,7 @@ fun ProgressScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Workout distribution card ─────────────────────────────────────────
+        // ΓöÇΓöÇ Workout distribution card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -288,7 +288,7 @@ fun ProgressScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Daily streak banner ───────────────────────────────────────────────
+        // ΓöÇΓöÇ Daily streak banner ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -313,7 +313,7 @@ fun ProgressScreen(
 
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("🔥", fontSize = 20.sp)
+                    Text("≡ƒöÑ", fontSize = 20.sp)
                     Spacer(Modifier.width(6.dp))
                     Text(
                         stringResource(R.string.progress_daily_streak_title),
@@ -337,7 +337,7 @@ fun ProgressScreen(
                 )
             }
 
-            // Best badge — top right
+            // Best badge ΓÇö top right
             Column(
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -360,7 +360,7 @@ fun ProgressScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        // ── Recent sessions ───────────────────────────────────────────────────
+        // ΓöÇΓöÇ Recent sessions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -408,7 +408,7 @@ private fun sessionsDeltaLabel(delta: Int, range: StatsRange): String = when {
     else -> stringResource(R.string.progress_delta_none, range.label)
 }
 
-// ── Stat cell ─────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Stat cell ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun StatCell(
     label: String,
@@ -432,7 +432,7 @@ private fun StatCell(
     }
 }
 
-// ── Distribution row ──────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Distribution row ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun DistributionRow(item: DistributionUiItem) {
     val color = when (item.colorIndex % 4) {
@@ -479,7 +479,7 @@ private fun DistributionRow(item: DistributionUiItem) {
     }
 }
 
-// ── Recent session row ────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Recent session row ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
 private fun RecentSessionRow(session: RecentSessionUiItem) {
     val title = session.title ?: stringResource(R.string.progress_pose_session_fallback)
