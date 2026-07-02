@@ -37,6 +37,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.posemonitor2.BuildConfig
 import com.posemonitor2.LoginActivity
 import com.posemonitor2.R
 import com.posemonitor2.questionnaire.QuestionnaireActivity
@@ -47,6 +50,7 @@ import com.posemonitor2.ui.theme.ThemeMode
 import com.posemonitor2.ui.theme.ThemePreferences
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlin.math.roundToInt
 
 // Theme-aware design tokens (map to Material color scheme)
@@ -98,6 +102,19 @@ fun ProfileScreen(
 
     LaunchedEffect(uiState.signOutCompleted) {
         if (uiState.signOutCompleted) {
+            // Sign out Google Sign-In client so the account picker shows next time.
+            // This clears the cached Google account — without this, the SDK
+            // silently re-selects the last account and skips the chooser.
+            runCatching {
+                val webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
+                if (webClientId.isNotBlank()) {
+                    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                        .requestEmail()
+                        .requestIdToken(webClientId)
+                        .build()
+                    GoogleSignIn.getClient(context, gso).signOut().await()
+                }
+            }
             val intent = Intent(context, LoginActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             }

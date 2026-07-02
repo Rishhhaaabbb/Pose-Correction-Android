@@ -25,6 +25,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.core.poseengine.PoseGraph
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.posemonitor2.R
 import com.posemonitor2.settings.AppLocaleManager
 import com.posemonitor2.ui.theme.PoseMonitorAppTheme
@@ -36,6 +38,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 @AndroidEntryPoint
 class HomeActivity : ComponentActivity() {
@@ -78,11 +82,27 @@ private fun HomeNav() {
     }
 
     var screen by remember { mutableStateOf<HomeScreen>(HomeScreen.Home) }
+    val scope = rememberCoroutineScope()
 
     when (val s = screen) {
         is HomeScreen.Home -> HomeScreen(
             onViewGraphs = { screen = HomeScreen.GraphList },
-            onLogout = { authViewModel.signOut() }
+            onLogout = {
+                scope.launch {
+                    // Sign out Google client so the account chooser shows next sign-in
+                    runCatching {
+                        val webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
+                        if (webClientId.isNotBlank()) {
+                            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                                .requestEmail()
+                                .requestIdToken(webClientId)
+                                .build()
+                            GoogleSignIn.getClient(context, gso).signOut().await()
+                        }
+                    }
+                    authViewModel.signOut()
+                }
+            }
         )
         is HomeScreen.GraphList -> GraphListScreen(
             onBack = { screen = HomeScreen.Home },
