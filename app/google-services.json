@@ -1,0 +1,92 @@
+{
+  "project_info": {
+    "project_number": "651796601115",
+    "project_id": "posemonitor-1df1f",
+    "storage_bucket": "posemonitor-1df1f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:651796601115:android:d975c5194f612fd9ccdbbe",
+        "android_client_info": {
+          "package_name": "com.posemonitor2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "651796601115-0uubscs3ptm88fesremijiiptarlhvd4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.posemonitor2",
+            "certificate_hash": "9a7605ac4ce25e31162c153c763e2c088dcbb4c7"
+          }
+        },
+        {
+          "client_id": "651796601115-jhp3fmm29htfgioif62d0mrp117sbakv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxYykO3tV_SB-7nMqBvTsJ4XkGmdxgFBA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "651796601115-jhp3fmm29htfgioif62d0mrp117sbakv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:651796601115:android:44fe0525df535f66ccdbbe",
+        "android_client_info": {
+          "package_name": "com.posemonitor2.debug"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "651796601115-ee1h9eq6b4md1gukb7tmnhj342nr8sjj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.posemonitor2.debug",
+            "certificate_hash": "9a7605ac4ce25e31162c153c763e2c088dcbb4c7"
+          }
+        },
+        {
+          "client_id": "651796601115-om8dp9e9oe8e4i4p2o86os6pfj4bodvq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.posemonitor2.debug",
+            "certificate_hash": "83a081c3e92b0a936f5a3f3c0276974a77ccf8ad"
+          }
+        },
+        {
+          "client_id": "651796601115-jhp3fmm29htfgioif62d0mrp117sbakv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxYykO3tV_SB-7nMqBvTsJ4XkGmdxgFBA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "651796601115-jhp3fmm29htfgioif62d0mrp117sbakv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
