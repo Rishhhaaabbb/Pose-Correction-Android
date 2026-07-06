@@ -1,0 +1,123 @@
+package com.core.poseengine.model
+
+import kotlinx.serialization.Serializable
+
+/**
+ * Type-safe container for all extracted pose features.
+ * (See RawFeatureMap below for full design rationale.)
+ */
+
+@Serializable
+enum class FeatureKey(val serializedName: String) {
+    LEFT_ELBOW_ANGLE("left_elbow_angle"),
+    RIGHT_ELBOW_ANGLE("right_elbow_angle"),
+    LEFT_KNEE_ANGLE("left_knee_angle"),
+    RIGHT_KNEE_ANGLE("right_knee_angle"),
+    LEFT_SHOULDER_ANGLE("left_shoulder_angle"),
+    RIGHT_SHOULDER_ANGLE("right_shoulder_angle"),
+    LEFT_HIP_ANGLE("left_hip_angle"),
+    RIGHT_HIP_ANGLE("right_hip_angle"),
+    TORSO_ANGLE("torso_angle"),
+    LEFT_ARM_ELEVATION("left_arm_elevation"),
+    RIGHT_ARM_ELEVATION("right_arm_elevation"),
+    LEFT_LEG_SPREAD("left_leg_spread"),
+    RIGHT_LEG_SPREAD("right_leg_spread"),
+    BODY_CENTER_Y("body_center_y"),
+    HIP_ASYMMETRY_DELTA("hip_asymmetry_delta"),
+    KNEE_ASYMMETRY_DELTA("knee_asymmetry_delta");
+
+    /** True if this feature is a body-side asymmetry metric. */
+    val isAsymmetry: Boolean get() = serializedName.contains("asymmetry")
+
+    /** True if this feature is an angle (degrees). Drives distance normalization. */
+    val isAngle: Boolean get() = serializedName.endsWith("_angle")
+
+    /**
+     * True for the 8 structural joint angles: hip, knee, elbow, shoulder.
+     * Excludes TORSO_ANGLE (treated as secondary in strict matching).
+     *
+     * Used by [PoseState.matches] to require each joint angle to pass
+     * individually in non-strict mode.
+     */
+    val isJointAngle: Boolean get() = when (this) {
+        LEFT_HIP_ANGLE, RIGHT_HIP_ANGLE,
+        LEFT_KNEE_ANGLE, RIGHT_KNEE_ANGLE,
+        LEFT_SHOULDER_ANGLE, RIGHT_SHOULDER_ANGLE,
+        LEFT_ELBOW_ANGLE, RIGHT_ELBOW_ANGLE -> true
+        else -> false
+    }
+
+    /**
+     * True for structural joints: hip, knee, elbow, torso.
+     *
+     * Used by [PoseMonitorEngine.adaptiveScaleFor] with an explicit exclusion
+     * of TORSO_ANGLE (shoulder and torso get ×1.1 wider tolerance), and by
+     * [FeedbackGenerator] for core-joint feedback prioritization.
+     *
+     * Matches Python: core_features = ['hip', 'knee', 'elbow', 'torso']
+     */
+    val isCoreJoint: Boolean get() = when (this) {
+        LEFT_HIP_ANGLE, RIGHT_HIP_ANGLE,
+        LEFT_KNEE_ANGLE, RIGHT_KNEE_ANGLE,
+        LEFT_ELBOW_ANGLE, RIGHT_ELBOW_ANGLE,
+        TORSO_ANGLE -> true
+        else -> false
+    }
+
+    companion object {
+        private val byName: Map<String, FeatureKey> =
+            entries.associateBy { it.serializedName }
+
+        /**
+         * Look up by the Python-compatible string key.
+         * Returns null for unknown keys (forward-compatibility safety).
+         */
+        fun fromSerializedName(name: String): FeatureKey? = byName[name]
+    }
+}
+
+/**
+ * Immutable map of pose features extracted from a single frame.
+ *
+ * Only features whose keypoints had sufficient confidence are present.
+ * Absence of a key is meaningful (keypoint not visible) — do not default to 0.
+ */
+@JvmInline
+value class RawFeatureMap(val map: Map<FeatureKey, Double>) {
+
+    val size: Int get() = map.size
+    val isEmpty: Boolean get() = map.isEmpty()
+
+    operator fun get(key: FeatureKey): Double? = map[key]
+    operator fun contains(key: FeatureKey): Boolean = key in map
+
+    /**
+     * Merge two feature maps — keys in [other] override keys in [this].
+     * Matches Python: merged = features_2d.copy(); merged.update(features_3d)
+     */
+    operator fun plus(other: RawFeatureMap): RawFeatureMap =
+        RawFeatureMap(map + other.map)
+
+    fun commonKeysWith(other: RawFeatureMap): Set<FeatureKey> =
+        map.keys.intersect(other.map.keys)
+
+    companion object {
+        val EMPTY = RawFeatureMap(emptyMap())
+
+        fun of(vararg pairs: Pair<FeatureKey, Double>): RawFeatureMap =
+            RawFeatureMap(mapOf(*pairs))
+
+        fun fromStringMap(stringMap: Map<String, Double>): RawFeatureMap {
+            val result = buildMap<FeatureKey, Double>(stringMap.size) {
+                for ((k, v) in stringMap) {
+                    val key = FeatureKey.fromSerializedName(k) ?: continue
+                    put(key, v)
+                }
+            }
+            return RawFeatureMap(result)
+        }
+
+        fun RawFeatureMap.toStringMap(): Map<String, Double> =
+            map.entries.associate { (k, v) -> k.serializedName to v }
+    }
+}

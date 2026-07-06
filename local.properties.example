@@ -1,0 +1,18 @@
+# local.properties.example - copy to local.properties and fill
+# Android and Supabase configuration for local debug
+
+# Google
+#GOOGLE_WEB_CLIENT_ID_DEBUG=your-web-client-id.apps.googleusercontent.com
+
+# Supabase
+SUPABASE_URL_DEBUG=https://<your-project>.supabase.co
+SUPABASE_ANON_KEY_DEBUG=<your-anon-key>
+
+# (Optional) If using a self-hosted Supabase on localhost, set to http://10.0.2.2:8000
+# SUPABASE_URL_DEBUG=http://10.0.2.2:8000
+
+# Twilio (for SMS provider) - DO NOT COMMIT real secrets to the repo
+#TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+#TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+#TWILIO_PHONE_NUMBER=+1234567890
+#TWILIO_MESSAGING_SERVICE_SID=MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
