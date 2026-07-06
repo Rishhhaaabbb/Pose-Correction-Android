@@ -247,6 +247,7 @@
     <string name="CustomWorkout_card_duplicate">Duplicate</string>
     <string name="CustomWorkout_card_start">Start</string>
     <string name="CustomWorkout_card_edit">Edit</string>
+    <string name="CustomWorkout_exercises_label">Exercises:</string>
 
     <string name="exercises_good_morning">GOOD MORNING</string>
     <string name="exercises_user_name_placeholder">Alex</string>

@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.data.local.DatabaseMigrations
 import com.data.local.PoseDatabase
 import com.data.local.SessionTokenStore
+import com.data.local.dao.CustomWorkoutDao
 import com.data.local.dao.DailyStatDao
 import com.data.local.dao.ExerciseDao
 import com.data.local.dao.OnboardingResponseDao
@@ -78,6 +79,7 @@ object DataProvidesModule {
             .addMigrations(DatabaseMigrations.MIGRATION_3_4)
             .addMigrations(DatabaseMigrations.MIGRATION_4_5)
             .addMigrations(DatabaseMigrations.MIGRATION_5_6)
+            .addMigrations(DatabaseMigrations.MIGRATION_6_7)
             .build()
     }
 
@@ -104,6 +106,9 @@ object DataProvidesModule {
 
     @Provides
     fun provideOnboardingResponseDao(db: PoseDatabase): OnboardingResponseDao = db.onboardingResponseDao()
+
+    @Provides
+    fun provideCustomWorkoutDao(db: PoseDatabase): CustomWorkoutDao = db.customWorkoutDao()
 }
 
 @Module

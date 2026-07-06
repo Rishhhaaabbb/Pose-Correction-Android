@@ -1,51 +1,83 @@
 package com.posemonitor2.screen
 
+import com.data.local.dao.CustomWorkoutDao
+import com.data.local.entity.CustomWorkoutEntity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class CustomWorkoutStore @Inject constructor() {
+class CustomWorkoutStore @Inject constructor(
+    private val customWorkoutDao: CustomWorkoutDao,
+) {
 
-    private val _CustomWorkouts = MutableStateFlow<List<UserCustomWorkout>>(emptyList())
-    val CustomWorkouts: StateFlow<List<UserCustomWorkout>> = _CustomWorkouts.asStateFlow()
+    private val storeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private val _customWorkouts = MutableStateFlow<List<UserCustomWorkout>>(emptyList())
+    val CustomWorkouts: StateFlow<List<UserCustomWorkout>> = _customWorkouts.asStateFlow()
 
     private var hasSeededDefault = false
+
+    init {
+        // Load workouts from database on initialization
+        storeScope.launch {
+            customWorkoutDao.observeAll()
+                .map { entities -> entities.map { it.toDomain() } }
+                .collect { workouts ->
+                    _customWorkouts.value = workouts
+                }
+        }
+    }
 
     fun ensureDefaultCustomWorkout(defaultExerciseIds: List<String>) {
         if (hasSeededDefault) return
         hasSeededDefault = true
 
-        val defaultTargets = defaultExerciseIds.associateWith { DEFAULT_TARGET_REPS }
+        storeScope.launch {
+            // Check if default workout already exists in database
+            val existingDefault = customWorkoutDao.getById(DEFAULT_CustomWorkout_ID)
+            if (existingDefault != null) return@launch
 
-        _CustomWorkouts.value = listOf(
-            UserCustomWorkout(
+            val defaultTargets = defaultExerciseIds.associateWith { DEFAULT_TARGET_REPS }
+            val defaultWorkout = UserCustomWorkout(
                 id = DEFAULT_CustomWorkout_ID,
                 title = DEFAULT_CustomWorkout_TITLE,
                 exerciseIds = defaultExerciseIds,
                 exerciseTargetReps = defaultTargets,
                 isDefault = true,
             )
-        )
+            customWorkoutDao.upsert(defaultWorkout.toEntity())
+        }
     }
 
     fun getCustomWorkout(id: String): UserCustomWorkout? {
-        return _CustomWorkouts.value.firstOrNull { it.id == id }
+        return _customWorkouts.value.firstOrNull { it.id == id }
     }
 
     fun deleteCustomWorkout(id: String): UserCustomWorkout? {
-        val deleted = _CustomWorkouts.value.firstOrNull { it.id == id } ?: return null
-        _CustomWorkouts.value = _CustomWorkouts.value.filterNot { it.id == id }
+        val deleted = _customWorkouts.value.firstOrNull { it.id == id } ?: return null
+        storeScope.launch {
+            customWorkoutDao.deleteById(id)
+        }
         return deleted
     }
 
     fun restoreCustomWorkout(CustomWorkout: UserCustomWorkout) {
-        _CustomWorkouts.value = (_CustomWorkouts.value + CustomWorkout)
-            .distinctBy { it.id }
-            .sortedByDescending { it.createdAtEpochMs }
+        storeScope.launch {
+            customWorkoutDao.upsert(CustomWorkout.toEntity())
+        }
     }
 
     fun createCustomWorkout(
@@ -64,7 +96,9 @@ class CustomWorkoutStore @Inject constructor() {
             createdAtEpochMs = now,
             updatedAtEpochMs = now,
         )
-        _CustomWorkouts.value = _CustomWorkouts.value + CustomWorkout
+        storeScope.launch {
+            customWorkoutDao.upsert(CustomWorkout.toEntity())
+        }
         return id
     }
 
@@ -74,15 +108,16 @@ class CustomWorkoutStore @Inject constructor() {
         exerciseIds: List<String>,
         exerciseTargetReps: Map<String, Int>,
     ) {
+        val existingWorkout = getCustomWorkout(id) ?: return
         val now = System.currentTimeMillis()
-        _CustomWorkouts.value = _CustomWorkouts.value.map { CustomWorkout ->
-            if (CustomWorkout.id != id) return@map CustomWorkout
-            CustomWorkout.copy(
-                title = title,
-                exerciseIds = exerciseIds.distinct(),
-                exerciseTargetReps = sanitizeTargets(exerciseIds, exerciseTargetReps),
-                updatedAtEpochMs = now,
-            )
+        val updatedWorkout = existingWorkout.copy(
+            title = title,
+            exerciseIds = exerciseIds.distinct(),
+            exerciseTargetReps = sanitizeTargets(exerciseIds, exerciseTargetReps),
+            updatedAtEpochMs = now,
+        )
+        storeScope.launch {
+            customWorkoutDao.upsert(updatedWorkout.toEntity())
         }
     }
 
@@ -97,12 +132,14 @@ class CustomWorkoutStore @Inject constructor() {
             createdAtEpochMs = now,
             updatedAtEpochMs = now,
         )
-        _CustomWorkouts.value = _CustomWorkouts.value + duplicate
+        storeScope.launch {
+            customWorkoutDao.upsert(duplicate.toEntity())
+        }
         return duplicateId
     }
 
-    fun nextCustomWorkoutTitle(): String {
-        val customCount = _CustomWorkouts.value.count { !it.isDefault }
+    suspend fun nextCustomWorkoutTitle(): String {
+        val customCount = customWorkoutDao.countNonDefault()
         return "My CustomWorkout ${customCount + 1}"
     }
 
@@ -112,16 +149,40 @@ class CustomWorkoutStore @Inject constructor() {
     ): Map<String, Int> {
         val orderedIds = exerciseIds.distinct()
         return orderedIds.associateWith { exerciseId ->
-            val raw = targetMap[exerciseId] ?: DEFAULT_TARGET_REPS
-            raw.coerceIn(MIN_TARGET_REPS, MAX_TARGET_REPS)
+            val providedValue = targetMap[exerciseId] ?: DEFAULT_TARGET_REPS
+            providedValue.coerceIn(MIN_TARGET_REPS, MAX_TARGET_REPS)
         }
+    }
+
+    private fun UserCustomWorkout.toEntity(): CustomWorkoutEntity {
+        return CustomWorkoutEntity(
+            id = id,
+            title = title,
+            exerciseIds = json.encodeToString(exerciseIds),
+            exerciseTargetReps = json.encodeToString(exerciseTargetReps),
+            isDefault = isDefault,
+            createdAtEpochMs = createdAtEpochMs,
+            updatedAtEpochMs = updatedAtEpochMs,
+        )
+    }
+
+    private fun CustomWorkoutEntity.toDomain(): UserCustomWorkout {
+        return UserCustomWorkout(
+            id = id,
+            title = title,
+            exerciseIds = json.decodeFromString<List<String>>(exerciseIds),
+            exerciseTargetReps = json.decodeFromString<Map<String, Int>>(exerciseTargetReps),
+            isDefault = isDefault,
+            createdAtEpochMs = createdAtEpochMs,
+            updatedAtEpochMs = updatedAtEpochMs,
+        )
     }
 
     private companion object {
         const val DEFAULT_CustomWorkout_ID = "default_CustomWorkout"
         const val DEFAULT_CustomWorkout_TITLE = "Default CustomWorkout"
         const val DEFAULT_TARGET_REPS = 12
-        const val MIN_TARGET_REPS = 4
+        const val MIN_TARGET_REPS = 1
         const val MAX_TARGET_REPS = 60
     }
 }

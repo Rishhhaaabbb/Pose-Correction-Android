@@ -2,6 +2,7 @@ package com.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import com.data.local.dao.CustomWorkoutDao
 import com.data.local.dao.DailyStatDao
 import com.data.local.dao.ExerciseDao
 import com.data.local.dao.OnboardingResponseDao
@@ -10,6 +11,7 @@ import com.data.local.dao.ProfileDao
 import com.data.local.dao.SessionDao
 import com.data.local.dao.SessionMetricDao
 import com.data.local.dao.SyncQueueDao
+import com.data.local.entity.CustomWorkoutEntity
 import com.data.local.entity.DailyStatEntity
 import com.data.local.entity.ExerciseEntity
 import com.data.local.entity.OnboardingResponseEntity
@@ -29,8 +31,9 @@ import com.data.local.entity.SyncQueueEntity
         DailyStatEntity::class,
         SyncQueueEntity::class,
         OnboardingResponseEntity::class,
+        CustomWorkoutEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class PoseDatabase : RoomDatabase() {
@@ -42,4 +45,5 @@ abstract class PoseDatabase : RoomDatabase() {
     abstract fun dailyStatDao(): DailyStatDao
     abstract fun syncQueueDao(): SyncQueueDao
     abstract fun onboardingResponseDao(): OnboardingResponseDao
+    abstract fun customWorkoutDao(): CustomWorkoutDao
 }

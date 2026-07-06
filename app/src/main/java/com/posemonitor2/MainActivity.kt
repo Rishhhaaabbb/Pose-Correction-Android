@@ -59,13 +59,29 @@ data class ExerciseResult(
     val targetReps: Int,
     val accuracy: Int,
     val calories: Int
-)
+) : java.io.Serializable
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val viewModel: DebugViewModel by viewModels()
     private lateinit var voiceManager: VoiceManager
+    
+    companion object {
+        // Temporary storage for session results during workout transitions
+        private val tempSessionResults = mutableListOf<ExerciseResult>()
+        
+        fun setSessionResults(results: List<ExerciseResult>) {
+            tempSessionResults.clear()
+            tempSessionResults.addAll(results)
+        }
+        
+        fun getAndClearSessionResults(): List<ExerciseResult> {
+            val results = tempSessionResults.toList()
+            tempSessionResults.clear()
+            return results
+        }
+    }
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -327,7 +343,11 @@ private fun MainNavigation(
                         viewModel.initError.value = e.message
                     }
                 }
-                val sessionResults = remember { mutableStateListOf<ExerciseResult>() }
+                val sessionResults = remember { 
+                    mutableStateListOf<ExerciseResult>().apply {
+                        addAll(MainActivity.getAndClearSessionResults())
+                    }
+                }
                 var showSummary by remember { mutableStateOf(false) }
 
                 MonitorScreen(
@@ -359,11 +379,40 @@ private fun MainNavigation(
                         sessionResults.add(currentResult)
                         viewModel.stopPipeline()
                         val nextExercise = exerciseList[nextIdx]
-                        val intent = Intent(context, UserFlowActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                            putExtra("TARGET_ROUTE", "exercise_detail/$nextExercise.json/true?workoutId=${workoutId ?: ""}&index=$nextIdx&exerciseList=${exerciseList.joinToString(",")}")
+                        
+                        // Parse target reps map to get target reps for next exercise
+                        val targetRepsMapParam = activity.intent.getStringExtra("EXTRA_TARGET_REPS_MAP")
+                        val nextTargetReps = if (targetRepsMapParam != null) {
+                            // Parse "exercise1:reps1,exercise2:reps2,..." format
+                            val repsMap = targetRepsMapParam.split(",").mapNotNull { pair ->
+                                val parts = pair.split(":")
+                                if (parts.size == 2) {
+                                    val exerciseName = parts[0]
+                                    val reps = parts[1].toIntOrNull()
+                                    if (reps != null) exerciseName to reps else null
+                                } else null
+                            }.toMap()
+                            repsMap[nextExercise] ?: 10
+                        } else {
+                            10
                         }
-                        context.startActivity(intent)
+                        
+                        // Save session results to companion object for next activity
+                        MainActivity.setSessionResults(sessionResults)
+                        
+                        // Directly start MainActivity with next exercise to avoid home screen flash
+                        val newIntent = Intent(context, MainActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            putExtra("EXTRA_FILE_NAME", "$nextExercise.json")
+                            putExtra("EXTRA_IS_ASSET", true)
+                            putExtra("EXTRA_TARGET_REPS", nextTargetReps)
+                            putExtra("EXTRA_LOCK_ORIENTATION", true)
+                            putExtra("EXTRA_WORKOUT_ID", workoutId)
+                            putExtra("EXTRA_CURRENT_INDEX", nextIdx)
+                            putExtra("EXTRA_EXERCISE_LIST", exerciseList.joinToString(","))
+                            putExtra("EXTRA_TARGET_REPS_MAP", targetRepsMapParam)
+                        }
+                        context.startActivity(newIntent)
                         (context as? Activity)?.finish()
                     },
                     onShowSummary = { finalResult ->

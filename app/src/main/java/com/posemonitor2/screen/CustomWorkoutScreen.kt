@@ -168,8 +168,15 @@ fun CustomWorkoutScreen(
                                         }
                                     } else {
                                         val listStr = exerciseNames.joinToString(",")
+                                        // Get target reps for the first exercise
+                                        val targetRepsForFirstExercise = viewModel.getTargetRepsForExercise(CustomWorkout.id, firstExercise)
+                                        // Get all target reps and create a map string: "exercise1:reps1,exercise2:reps2,..."
+                                        val targetRepsMap = exerciseNames.joinToString(",") { name ->
+                                            val reps = viewModel.getTargetRepsForExercise(CustomWorkout.id, name)
+                                            "$name:$reps"
+                                        }
                                         navController.navigate(
-                                            "exercise_detail/${graphEntry.fileName}/${graphEntry.isAsset}?CustomWorkoutId=${CustomWorkout.id}&index=0&exerciseList=$listStr"
+                                            "exercise_detail/${graphEntry.fileName}/${graphEntry.isAsset}?workoutId=${CustomWorkout.id}&index=0&exerciseList=$listStr&targetReps=$targetRepsForFirstExercise&targetRepsMap=$targetRepsMap"
                                         )
                                     }
                                 },
@@ -315,10 +322,18 @@ private fun CustomWorkoutHubCard(
                 }
             }
 
+            // Exercise list preview
+            Text(
+                text = stringResource(R.string.CustomWorkout_exercises_label),
+                style = MaterialTheme.typography.labelMedium,
+                color = HubDark,
+                fontWeight = FontWeight.SemiBold,
+            )
             Text(
                 text = CustomWorkout.previewText,
                 style = MaterialTheme.typography.bodyMedium,
-                color = HubMuted,
+                color = HubDark.copy(alpha = 0.8f),
+                modifier = Modifier.padding(start = 4.dp),
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
