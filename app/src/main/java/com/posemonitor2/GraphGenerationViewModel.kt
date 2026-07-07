@@ -52,9 +52,23 @@ class GraphGenerationViewModel @Inject constructor(
                 ?.plus(".json")
                 ?: resolveVideoFileName(videoUri)
 
-            val outputPath = File(outputDir, fileName).absolutePath
+            Log.d(TAG, "Resolved fileName from video: $fileName")
+
+            // Check if file exists and append timestamp if needed
+            val finalFileName = if (File(outputDir, fileName).exists()) {
+                val baseName = fileName.removeSuffix(".json")
+                val timestamp = System.currentTimeMillis()
+                "${baseName}_${timestamp}.json"
+            } else {
+                fileName
+            }
+
+            Log.d(TAG, "Final fileName: $finalFileName")
+
+            val outputPath = File(outputDir, finalFileName).absolutePath
 
             Log.d(TAG, "Starting generation: $videoUri → $outputPath")
+            Log.d(TAG, "Output dir: ${outputDir.absolutePath}, exists: ${outputDir.exists()}")
             Log.d(TAG, "Config: $config")
 
             generator.generate(
@@ -112,9 +126,9 @@ class GraphGenerationViewModel @Inject constructor(
                         Log.d(TAG, "Generation complete: ${progress.result.outputPath}")
                         
                         // Automatically add to exercise library
-                        val baseName = fileName.removeSuffix(".json")
+                        val baseName = finalFileName.removeSuffix(".json")
                         val newExercise = Exercise(
-                            id = baseName.lowercase().replace(" ", "-"),
+                            id = baseName.lowercase().replace(" ", "-").replace("_", "-"),
                             name = baseName,
                             category = "Generated",
                             difficulty = "Intermediate",

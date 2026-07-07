@@ -35,16 +35,15 @@ object DistanceCalculator {
      * Compute mean normalized distance between two feature maps.
      *
      * Matches Python: StateDiscovery._compute_feature_distance()
-     *
-     * OPTIMIZATION: Avoids Set allocations from commonKeysWith by iterating
-     * over known FeatureKey entries.
      */
     fun compute(features1: RawFeatureMap, features2: RawFeatureMap): Double {
+        val commonKeys = features1.commonKeysWith(features2)
+        if (commonKeys.isEmpty()) return Double.POSITIVE_INFINITY
+
         var sum = 0.0
         var count = 0
 
-        // Iterate over all possible keys — faster than Set intersection/allocation
-        for (key in FeatureKey.entries) {
+        for (key in commonKeys) {
             val val1 = features1[key] ?: continue
             val val2 = features2[key] ?: continue
 

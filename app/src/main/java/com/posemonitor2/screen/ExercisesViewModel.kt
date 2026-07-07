@@ -51,13 +51,19 @@ class ExercisesViewModel @Inject constructor(
     val filteredExercises: StateFlow<List<Exercise>> =
         combine(uiState, _searchQuery, selectedDifficulty, selectedCategory) { state, query, diff, cat ->
             val exercises = state.exercises
+            val graphsByFileName = state.graphByFileName
+            
             exercises.filter { exercise ->
                 val matchesSearch = query.isBlank() ||
                     exercise.name.contains(query, ignoreCase = true) ||
                     (exercise.category?.contains(query, ignoreCase = true) == true)
                 val matchesDifficulty = diff == null || diff == "All Levels" || exercise.difficulty == diff
                 val matchesCategory = cat == null || cat == "All" || exercise.category == cat
-                matchesSearch && matchesDifficulty && matchesCategory
+                
+                // Filter out exercises that don't have a corresponding graph file
+                val hasGraph = graphsByFileName.containsKey("${exercise.name}.json")
+                
+                matchesSearch && matchesDifficulty && matchesCategory && hasGraph
             }
         }.distinctUntilChanged()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -152,11 +158,18 @@ class ExercisesViewModel @Inject constructor(
     private fun loadGraphs() {
         viewModelScope.launch(Dispatchers.IO) {
             val graphs = loadAvailableGraphs(getApplication())
+            android.util.Log.d("ExercisesViewModel", "Loaded ${graphs.size} graphs: ${graphs.map { it.fileName }}")
             _uiState.value = _uiState.value.copy(
                 graphs = graphs,
                 graphByFileName = graphs.associateBy { it.fileName },
             )
+            android.util.Log.d("ExercisesViewModel", "Updated state with graphs")
         }
+    }
+    
+    fun refreshGraphs() {
+        android.util.Log.d("ExercisesViewModel", "refreshGraphs() called")
+        loadGraphs()
     }
 
     private fun isAdminEmail(email: String?): Boolean {

@@ -14,6 +14,9 @@ interface SessionDao {
 
     @Query("SELECT * FROM sessions WHERE user_id = :userId AND started_at >= :sinceEpochMs ORDER BY started_at DESC")
     suspend fun getSessionsSince(userId: String, sinceEpochMs: Long): List<SessionEntity>
+    
+    @Query("SELECT * FROM sessions ORDER BY started_at DESC")
+    suspend fun getAllSessions(): List<SessionEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(session: SessionEntity)

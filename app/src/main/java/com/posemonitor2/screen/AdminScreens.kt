@@ -50,7 +50,12 @@ fun LibraryScreen(
     val videoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        if (uri != null) pendingVideoUri = uri
+        if (uri != null) {
+            android.util.Log.d("LibraryScreen", "Video selected: $uri")
+            viewModel.reset()  // Ensure clean state
+            pendingVideoUri = uri
+            android.util.Log.d("LibraryScreen", "State reset, pendingVideoUri set")
+        }
     }
 
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -58,7 +63,24 @@ fun LibraryScreen(
     ) { success ->
         if (success && capturedVideoFile != null) {
             pendingVideoUri = Uri.fromFile(capturedVideoFile)
+        } else {
+            capturedVideoFile = null
         }
+    }
+
+    var showError by remember { mutableStateOf<String?>(null) }
+
+    if (showError != null) {
+        AlertDialog(
+            onDismissRequest = { showError = null },
+            title = { Text("Camera Error") },
+            text = { Text(showError ?: "") },
+            confirmButton = {
+                TextButton(onClick = { showError = null }) {
+                    Text("OK")
+                }
+            }
+        )
     }
 
     Box(
@@ -70,6 +92,7 @@ fun LibraryScreen(
     ) {
         when (val state = uiState) {
             is GenerationUiState.Idle -> {
+                android.util.Log.d("LibraryScreen", "State is Idle, pendingVideoUri=$pendingVideoUri")
                 if (pendingVideoUri == null) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -102,14 +125,18 @@ fun LibraryScreen(
 
                         OutlinedButton(
                             onClick = {
-                                val file = File(context.cacheDir, "captured_video_${System.currentTimeMillis()}.mp4")
-                                capturedVideoFile = file
-                                val uri = FileProvider.getUriForFile(
-                                    context,
-                                    "${context.packageName}.provider",
-                                    file
-                                )
-                                cameraLauncher.launch(uri)
+                                try {
+                                    val file = File(context.cacheDir, "captured_video_${System.currentTimeMillis()}.mp4")
+                                    capturedVideoFile = file
+                                    val uri = FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.provider",
+                                        file
+                                    )
+                                    cameraLauncher.launch(uri)
+                                } catch (e: Exception) {
+                                    showError = "Camera launch failed: ${e.message}"
+                                }
                             },
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(12.dp),
@@ -122,37 +149,22 @@ fun LibraryScreen(
                         }
                     }
                 } else {
-                    // Automatically start generation with default config or show settings
-                    // For "automatic" requirement, we'll just use defaults or a simple name prompt
-                    var graphName by remember { mutableStateOf("") }
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text("Confirm Graph Details", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        OutlinedTextField(
-                            value = graphName,
-                            onValueChange = { graphName = it },
-                            label = { Text("Graph Name (Optional)") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Button(
-                            onClick = {
-                                viewModel.startGeneration(
-                                    videoUri = pendingVideoUri.toString(),
-                                    config = GeneratorConfig.DEFAULT,
-                                    graphName = graphName
-                                )
-                                pendingVideoUri = null
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Generate Graph Automatically")
+                    // Show full parameter settings
+                    android.util.Log.d("LibraryScreen", "Showing SettingsContent")
+                    SettingsContent(
+                        videoUri = pendingVideoUri.toString(),
+                        onConfirm = { config, graphName ->
+                            viewModel.startGeneration(
+                                videoUri = pendingVideoUri.toString(),
+                                config = config,
+                                graphName = graphName
+                            )
+                        },
+                        onBack = { 
+                            pendingVideoUri = null
+                            viewModel.reset()
                         }
-                        TextButton(onClick = { pendingVideoUri = null }) {
-                            Text("Cancel")
-                        }
-                    }
+                    )
                 }
             }
             is GenerationUiState.Processing -> {
@@ -164,12 +176,117 @@ fun LibraryScreen(
                 }
             }
             is GenerationUiState.Success -> {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("✅ Success!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
-                    Text("Graph saved to library.", fontSize = 14.sp)
-                    Spacer(Modifier.height(24.dp))
-                    Button(onClick = { viewModel.reset() }) {
-                        Text("Done")
+                val fileName = remember(state.outputPath) {
+                    state.outputPath.substringAfterLast("/").substringBeforeLast(".")
+                }
+                
+                val graph = remember(state.outputPath) {
+                    runCatching {
+                        PoseGraph.fromJson(File(state.outputPath).readText(Charsets.UTF_8))
+                    }.getOrNull()
+                }
+                
+                var showVisualization by remember { mutableStateOf(false) }
+                
+                if (showVisualization && graph != null) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF1A1A1A))
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            TextButton(onClick = { showVisualization = false }) {
+                                Text("← Back", color = Color(0xFF2196F3), fontSize = 15.sp)
+                            }
+                            Text(
+                                text = "Graph Visualization",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White,
+                            )
+                        }
+                        PoseGraphVisualizationScreen(graph = graph)
+                    }
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("✅ Success!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
+                        Text("Graph saved to library.", fontSize = 14.sp)
+                        
+                        Spacer(Modifier.height(16.dp))
+                        
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFF5F5F5),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Filename", fontSize = 13.sp, color = Color.Gray)
+                                    Text(fileName, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("States", fontSize = 13.sp, color = Color.Gray)
+                                    Text("${state.numStates}", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Valid Frames", fontSize = 13.sp, color = Color.Gray)
+                                    Text("${state.numFrames}", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        }
+                        
+                        Spacer(Modifier.height(16.dp))
+                        
+                        Button(
+                            onClick = {
+                                if (graph != null) {
+                                    showVisualization = true
+                                }
+                            },
+                            enabled = graph != null,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(52.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF37474F),
+                                contentColor = Color.White,
+                                disabledContainerColor = Color(0xFF2A2A2A),
+                                disabledContentColor = Color(0xFF666666)
+                            ),
+                        ) {
+                            Text("View Graph", fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                        }
+                        
+                        Spacer(Modifier.height(8.dp))
+                        
+                        Button(
+                            onClick = { viewModel.reset() },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(52.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2196F3),
+                                contentColor = Color.White
+                            ),
+                        ) {
+                            Text("Generate Another", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
             }
@@ -195,6 +312,57 @@ fun GraphsScreen(
     var graphs by remember { mutableStateOf(loadAvailableGraphs(context)) }
     var selectedGraph by remember { mutableStateOf<GraphEntry?>(null) }
     var graphPendingDelete by remember { mutableStateOf<GraphEntry?>(null) }
+    var graphPendingRename by remember { mutableStateOf<GraphEntry?>(null) }
+    
+    // Refresh graphs when returning to this screen
+    DisposableEffect(Unit) {
+        onDispose {
+            // Reload graphs when leaving to ensure fresh state on return
+            graphs = loadAvailableGraphs(context)
+        }
+    }
+    
+    // Rename dialog
+    graphPendingRename?.let { entry ->
+        var newName by remember { mutableStateOf(entry.fileName.removeSuffix(".json")) }
+        
+        AlertDialog(
+            onDismissRequest = { graphPendingRename = null },
+            title = { Text("Rename Graph") },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Graph Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val trimmed = newName.trim()
+                        if (trimmed.isNotEmpty() && !entry.isAsset) {
+                            val oldFile = File(entry.filePath)
+                            val newFile = File(oldFile.parent, "$trimmed.json")
+                            if (oldFile.renameTo(newFile)) {
+                                graphs = loadAvailableGraphs(context)
+                            }
+                        }
+                        graphPendingRename = null
+                    },
+                    enabled = newName.trim().isNotEmpty()
+                ) {
+                    Text("Rename")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { graphPendingRename = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     if (selectedGraph != null) {
         val entry = selectedGraph!!
@@ -247,21 +415,40 @@ fun GraphsScreen(
                 )
 
                 if (graphPendingDelete != null) {
-                    IconButton(
-                        onClick = {
-                            val file = File(graphPendingDelete!!.filePath)
-                            if (file.exists()) {
-                                file.delete()
-                                graphs = loadAvailableGraphs(context)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Rename button (only for non-assets)
+                        if (!graphPendingDelete!!.isAsset) {
+                            IconButton(
+                                onClick = {
+                                    graphPendingRename = graphPendingDelete
+                                    graphPendingDelete = null
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add, // Using Add as placeholder for rename/edit
+                                    contentDescription = "Rename Graph",
+                                    tint = Color(0xFF2196F3)
+                                )
                             }
-                            graphPendingDelete = null
                         }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete Graph",
-                            tint = Color(0xFFE85A2E) // Orange
-                        )
+                        
+                        // Delete button
+                        IconButton(
+                            onClick = {
+                                val file = File(graphPendingDelete!!.filePath)
+                                if (file.exists()) {
+                                    file.delete()
+                                }
+                                graphs = loadAvailableGraphs(context)
+                                graphPendingDelete = null
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete Graph",
+                                tint = Color(0xFFE85A2E)
+                            )
+                        }
                     }
                 }
             }

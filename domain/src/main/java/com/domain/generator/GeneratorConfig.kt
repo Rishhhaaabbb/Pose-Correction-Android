@@ -9,7 +9,7 @@ package com.domain.generator
  * @param confidenceThreshold  Keypoint confidence required for a landmark to
  *   be used in feature extraction. Default 0.6 matches Python default.
  * @param stabilityThreshold   Max normalized feature distance for a frame to
- *   remain in the same stable segment. Default 0.10 matches Python default.
+ *   remain in the same stable segment. Default 0.12 matches Python default.
  * @param mergeThreshold       Max normalized feature distance for two segments
  *   to be merged into the same canonical state.
  *
@@ -18,13 +18,13 @@ package com.domain.generator
  *   Python uses the SAME threshold for both detection and merging.
  *
  *   Previous Kotlin default was stabilityThreshold × 0.5 — this caused
- *   states that Python merges (distance ≤ 0.10) to remain separate in Kotlin
- *   (distance > 0.05), requiring artificially inflated hyperparameters to
+ *   states that Python merges (distance ≤ 0.15) to remain separate in Kotlin
+ *   (distance > 0.075), requiring artificially inflated hyperparameters to
  *   compensate and producing different graphs from the same video.
  * @param minHoldFrames        A segment shorter than this (after skip_frames)
- *   is discarded. Default 12 matches Python default.
+ *   is discarded. Default 15 matches Python default.
  * @param smoothingWindow      Rolling average window for temporal smoothing.
- *   Default 7 matches Python default.
+ *   Default 5 matches Python default.
  * @param transitionBuffer     Frames skipped at segment boundaries to ignore
  *   transition motion. Default 3 matches Python default.
  * @param toleranceMultiplier  Per-feature tolerance = std × this value.
@@ -34,8 +34,8 @@ package com.domain.generator
  */
 data class GeneratorConfig(
     val confidenceThreshold: Double = 0.6,
-    val stabilityThreshold: Double = 0.10,
-    val minHoldFrames: Int = 12,
+    val stabilityThreshold: Double = 0.12,
+    val minHoldFrames: Int = 18,
     val smoothingWindow: Int = 7,
     val transitionBuffer: Int = 3,
     val toleranceMultiplier: Double = 2.0,

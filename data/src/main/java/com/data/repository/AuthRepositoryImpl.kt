@@ -36,6 +36,23 @@ class AuthRepositoryImpl @Inject constructor(
         // Try to restore dummy session from storage
         val dummySession = sessionTokenStore.readDummySession()
         if (dummySession != null) {
+            android.util.Log.d("AuthRepository", "Restoring dummy session for: ${dummySession.email}")
+            
+            // If this is admin, also sign into Firebase anonymously
+            if (dummySession.email == "admin@poseapp.com" || dummySession.email == "admin") {
+                android.util.Log.d("AuthRepository", "Admin dummy session detected, signing into Firebase...")
+                try {
+                    if (firebaseAuth.currentUser == null) {
+                        val result = firebaseAuth.signInAnonymously().await()
+                        android.util.Log.d("AuthRepository", "✓ Signed into Firebase anonymously: uid=${result.user?.uid}")
+                    } else {
+                        android.util.Log.d("AuthRepository", "Already signed into Firebase: uid=${firebaseAuth.currentUser?.uid}")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("AuthRepository", "✗ Failed to sign into Firebase: ${e.message}", e)
+                }
+            }
+            
             val dummyUser = AuthUser(
                 id = dummySession.userId,
                 email = dummySession.email,
@@ -78,13 +95,31 @@ class AuthRepositoryImpl @Inject constructor(
         val normalizedEmail = email.trim().lowercase().replace(" ", "")
         val normalizedPassword = password.trim()
         
+        // Special handling for admin - sign into Firebase anonymously to enable Firestore access
         if (normalizedEmail == "admin" || normalizedEmail == "admin@poseapp.com") {
             if (normalizedPassword == "admin") {
+                android.util.Log.d("AuthRepository", "Admin login detected, attempting Firebase anonymous sign-in...")
+                
+                // Sign in anonymously to Firebase so Firestore rules work
+                try {
+                    val result = firebaseAuth.signInAnonymously().await()
+                    android.util.Log.d("AuthRepository", "✓ Admin signed into Firebase anonymously: uid=${result.user?.uid}")
+                } catch (e: Exception) {
+                    android.util.Log.e("AuthRepository", "✗ Failed to sign into Firebase anonymously: ${e.message}", e)
+                    // Continue anyway - admin will work locally but not have Firestore access
+                }
+                
                 val adminUser = AuthUser(id = "admin-dev-id", email = "admin@poseapp.com", fullName = "Admin")
                 setDummySession(adminUser)
+                
+                // Verify Firebase auth state
+                val currentUser = firebaseAuth.currentUser
+                android.util.Log.d("AuthRepository", "Firebase currentUser after sign-in: ${currentUser?.uid}, isAnonymous: ${currentUser?.isAnonymous}")
+                
                 return@runCatching adminUser
             }
         }
+        
         val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
         val authUser = result.user?.toAuthUser()
             ?: throw IllegalStateException("Sign-in succeeded but user is null")

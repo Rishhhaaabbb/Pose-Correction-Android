@@ -123,26 +123,6 @@ class AuthViewModel @Inject constructor(
     }
 
     fun signInWithEmail(email: String, password: String) {
-        val normalizedEmail = email.trim().lowercase().replace(" ", "")
-        val normalizedPassword = password.trim()
-        
-        if (normalizedEmail == "admin" || normalizedEmail == "admin@poseapp.com") {
-            if (normalizedPassword == "admin") {
-                val adminUser = AuthUser(id = "admin-dev-id", email = "admin@poseapp.com", fullName = "Admin")
-                authRepository.setDummySession(adminUser)
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        isAuthenticated = true,
-                        userId = adminUser.id,
-                        userEmail = adminUser.email,
-                        errorMessage = null,
-                    )
-                }
-                return
-            }
-        }
-
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, errorMessage = null) }
             signInWithEmailUseCase(email, password)

@@ -184,7 +184,13 @@ private fun MainNavigation(
 
     var selectedGraph by remember { mutableStateOf<GraphEntry?>(
         initialFileName?.let { fn ->
-            GraphEntry(fileName = fn, filePath = if (initialIsAsset) "assets:$fn" else "", isAsset = initialIsAsset)
+            val filePath = if (initialIsAsset) {
+                "assets:$fn"
+            } else {
+                // Custom graph - construct full path
+                File(context.filesDir, "graphs/$fn").absolutePath
+            }
+            GraphEntry(fileName = fn, filePath = filePath, isAsset = initialIsAsset)
         }
     ) }
 
