@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -73,6 +74,12 @@ fun CustomWorkoutScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
+    // Theme-aware colors
+    val bgColor = MaterialTheme.colorScheme.background
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val tealColor = MaterialTheme.colorScheme.primary
+    val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
+
     var deleteTarget by remember { mutableStateOf<CustomWorkoutListItemUi?>(null) }
 
     LaunchedEffect(uiState.errorMessage) {
@@ -81,7 +88,7 @@ fun CustomWorkoutScreen(
     }
 
     Scaffold(
-        containerColor = HubBg,
+        containerColor = bgColor,
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { innerPadding ->
         Column(
@@ -98,14 +105,14 @@ fun CustomWorkoutScreen(
                     Text(
                         text = stringResource(R.string.CustomWorkout_hub_title),
                         style = MaterialTheme.typography.headlineSmall,
-                        color = HubDark,
+                        color = tealColor,
                         fontWeight = FontWeight.ExtraBold,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = stringResource(R.string.CustomWorkout_hub_subtitle),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = HubMuted,
+                        color = mutedColor,
                     )
                 }
                 FilledTonalIconButton(
@@ -135,6 +142,9 @@ fun CustomWorkoutScreen(
                 uiState.CustomWorkouts.isEmpty() -> {
                     CustomWorkoutHubEmptyState(
                         onCreate = { navController.navigate(customWorkoutEditorRoute(NEW_WORKOUT_ID)) },
+                        surfaceColor = surfaceColor,
+                        tealColor = tealColor,
+                        mutedColor = mutedColor
                     )
                 }
 
@@ -187,6 +197,9 @@ fun CustomWorkoutScreen(
                                     }
                                 },
                                 onDelete = { deleteTarget = CustomWorkout },
+                                surfaceColor = surfaceColor,
+                                tealColor = tealColor,
+                                mutedColor = mutedColor
                             )
                         }
                     }
@@ -239,11 +252,16 @@ fun CustomWorkoutScreen(
 }
 
 @Composable
-private fun CustomWorkoutHubEmptyState(onCreate: () -> Unit) {
+private fun CustomWorkoutHubEmptyState(
+    onCreate: () -> Unit,
+    surfaceColor: Color,
+    tealColor: Color,
+    mutedColor: Color
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = surfaceColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
         Column(
@@ -256,13 +274,13 @@ private fun CustomWorkoutHubEmptyState(onCreate: () -> Unit) {
             Text(
                 text = stringResource(R.string.CustomWorkout_empty_hub_title),
                 style = MaterialTheme.typography.titleMedium,
-                color = HubDark,
+                color = tealColor,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text = stringResource(R.string.CustomWorkout_empty_hub_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
-                color = HubMuted,
+                color = mutedColor,
             )
             Button(
                 onClick = onCreate,
@@ -281,11 +299,14 @@ private fun CustomWorkoutHubCard(
     onEdit: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
+    surfaceColor: Color,
+    tealColor: Color,
+    mutedColor: Color
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = surfaceColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
         Column(
@@ -301,7 +322,7 @@ private fun CustomWorkoutHubCard(
                 Text(
                     text = CustomWorkout.title,
                     style = MaterialTheme.typography.titleLarge,
-                    color = HubDark,
+                    color = tealColor,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                 )
@@ -318,7 +339,7 @@ private fun CustomWorkoutHubCard(
             Text(
                 text = CustomWorkout.previewText,
                 style = MaterialTheme.typography.bodyMedium,
-                color = HubMuted,
+                color = mutedColor,
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -337,7 +358,7 @@ private fun CustomWorkoutHubCard(
                         CustomWorkout.estimatedMinutes,
                     ),
                     style = MaterialTheme.typography.labelLarge,
-                    color = HubDark,
+                    color = tealColor,
                     fontWeight = FontWeight.Medium,
                 )
             }
@@ -353,7 +374,7 @@ private fun CustomWorkoutHubCard(
                         modifier = Modifier.size(16.dp),
                     )
                     Spacer(Modifier.size(4.dp))
-                    Text(stringResource(R.string.CustomWorkout_card_duplicate))
+                    Text(stringResource(R.string.CustomWorkout_card_duplicate), color = tealColor)
                 }
             }
 
@@ -388,7 +409,7 @@ private fun CustomWorkoutHubCard(
                     Icon(
                         imageVector = Icons.Default.DeleteOutline,
                         contentDescription = stringResource(R.string.CustomWorkout_card_delete),
-                        tint = Color(0xFF888888),
+                        tint = mutedColor,
                     )
                 }
             }

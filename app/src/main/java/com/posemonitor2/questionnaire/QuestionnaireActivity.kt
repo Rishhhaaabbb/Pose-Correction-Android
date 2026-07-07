@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
 import com.posemonitor2.UserFlowActivity
 import com.posemonitor2.onboarding.OnboardingManager
+import com.posemonitor2.ui.theme.PoseMonitor2Theme
 import com.posemonitor2.ui.theme.PoseMonitorAppTheme
 import dagger.hilt.android.AndroidEntryPoint
 import com.domain.repository.AuthRepository
@@ -51,7 +52,8 @@ class QuestionnaireActivity : ComponentActivity() {
         }
 
         setContent {
-            PoseMonitorAppTheme {
+            // Questionnaire runs before the user is fully in the app — always light theme
+            PoseMonitor2Theme(darkTheme = false, dynamicColor = false) {
                 val uiState by viewModel.uiState.collectAsState()
                 val currentUserId = uiState.userId ?: ""
 

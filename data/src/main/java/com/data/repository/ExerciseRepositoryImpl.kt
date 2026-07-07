@@ -43,6 +43,10 @@ class ExerciseRepositoryImpl @Inject constructor(
         exerciseDao.insertAll(exercises.map { it.toEntity() })
     }
 
+    override suspend fun deleteById(id: String) {
+        exerciseDao.deleteById(id)
+    }
+
     override suspend fun getCount(): Int {
         return exerciseDao.getCount()
     }

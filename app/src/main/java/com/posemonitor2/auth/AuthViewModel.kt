@@ -1,6 +1,7 @@
 package com.posemonitor2.auth
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.domain.model.AuthUser
 import com.domain.model.UserProfile
@@ -11,6 +12,8 @@ import com.domain.usecase.SendPasswordResetUseCase
 import com.domain.usecase.SignInWithEmailUseCase
 import com.domain.usecase.SignInWithGoogleUseCase
 import com.domain.usecase.SignUpWithEmailUseCase
+import com.posemonitor2.ui.theme.ThemeMode
+import com.posemonitor2.ui.theme.ThemePreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +24,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
+    application: Application,
     private val restoreSessionUseCase: RestoreSessionUseCase,
     private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
     private val signUpWithEmailUseCase: SignUpWithEmailUseCase,
@@ -28,7 +32,7 @@ class AuthViewModel @Inject constructor(
     private val sendPasswordResetUseCase: SendPasswordResetUseCase,
     private val ensureProfileUseCase: EnsureProfileUseCase,
     private val authRepository: AuthRepository,
-) : ViewModel() {
+) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(AuthUiState())
     val state: StateFlow<AuthUiState> = _state.asStateFlow()
@@ -191,6 +195,8 @@ class AuthViewModel @Inject constructor(
 
     fun signOut() {
         viewModelScope.launch {
+            // Reset to light theme so login/onboarding screens are never shown in dark mode
+            ThemePreferences.setThemeMode(getApplication(), ThemeMode.LIGHT)
             authRepository.signOut()
             _state.update {
                 it.copy(

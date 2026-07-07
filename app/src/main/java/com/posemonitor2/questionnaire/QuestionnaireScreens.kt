@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -44,7 +45,7 @@ fun QuestionPageScaffold(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgDark),
+            .background(MaterialTheme.colorScheme.background),
     ) {
         Column(
             modifier = Modifier
@@ -69,7 +70,7 @@ fun SingleChoiceQuestionScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgDark)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .imePadding()
             .padding(24.dp),
@@ -78,14 +79,14 @@ fun SingleChoiceQuestionScreen(
             text = title,
             fontSize = 26.sp,
             fontWeight = FontWeight.ExtraBold,
-            color = TextWhite,
+            color = MaterialTheme.colorScheme.onBackground,
             fontFamily = FontFamily.Serif,
         )
         if (subtitle.isNotBlank()) {
             Text(
                 text = subtitle,
                 fontSize = 14.sp,
-                color = TextGray,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
@@ -97,9 +98,9 @@ fun SingleChoiceQuestionScreen(
                     .fillMaxWidth()
                     .padding(vertical = 6.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isSelected) CardTeal else Color(0xFF122425),
+                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
                 ),
-                border = if (isSelected) BorderStroke(2.dp, Orange) else BorderStroke(1.dp, Color(0xFF2A4A4C)),
+                border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 shape = RoundedCornerShape(14.dp),
                 onClick = { onSelect(option) },
             ) {
@@ -115,14 +116,14 @@ fun SingleChoiceQuestionScreen(
                             .size(20.dp)
                             .clip(CircleShape)
                             .then(
-                                if (isSelected) Modifier.background(Orange)
+                                if (isSelected) Modifier.background(MaterialTheme.colorScheme.primary)
                                 else Modifier
                                     .background(Color.Transparent)
-                                    .border(1.dp, Orange, CircleShape)
+                                    .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape)
                             ),
                     )
                     Spacer(Modifier.width(16.dp))
-                    Text(text = option, fontSize = 16.sp, color = TextWhite)
+                    Text(text = option, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }
@@ -136,11 +137,11 @@ fun SingleChoiceQuestionScreen(
                     .height(56.dp),
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Orange,
-                    disabledContainerColor = Orange.copy(alpha = 0.4f),
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    disabledContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f),
                 ),
             ) {
-                Text("Next", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextWhite)
+                Text("Next", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondary)
             }
         }
     }
@@ -177,7 +178,7 @@ fun MultiSelectQuestionScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgDark)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .imePadding()
             .padding(24.dp),
@@ -186,14 +187,14 @@ fun MultiSelectQuestionScreen(
             text = title,
             fontSize = 26.sp,
             fontWeight = FontWeight.ExtraBold,
-            color = TextWhite,
+            color = MaterialTheme.colorScheme.onBackground,
             fontFamily = FontFamily.Serif,
         )
         if (subtitle.isNotBlank()) {
             Text(
                 text = subtitle,
                 fontSize = 14.sp,
-                color = TextGray,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
@@ -205,9 +206,9 @@ fun MultiSelectQuestionScreen(
                     .fillMaxWidth()
                     .padding(vertical = 6.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isSelected) CardTeal else Color(0xFF122425),
+                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
                 ),
-                border = if (isSelected) BorderStroke(2.dp, Orange) else BorderStroke(1.dp, Color(0xFF2A4A4C)),
+                border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 shape = RoundedCornerShape(14.dp),
                 onClick = { onToggle(option) },
             ) {
@@ -220,11 +221,11 @@ fun MultiSelectQuestionScreen(
                     Icon(
                         imageVector = if (isSelected) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
                         contentDescription = null,
-                        tint = if (isSelected) Orange else TextGray,
+                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(24.dp),
                     )
                     Spacer(Modifier.width(16.dp))
-                    Text(option, fontSize = 16.sp, color = TextWhite)
+                    Text(option, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }
@@ -238,11 +239,11 @@ fun MultiSelectQuestionScreen(
                     .height(56.dp),
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Orange,
-                    disabledContainerColor = Orange.copy(alpha = 0.4f),
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    disabledContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f),
                 ),
             ) {
-                Text("Next", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextWhite)
+                Text("Next", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondary)
             }
         }
     }
@@ -279,7 +280,7 @@ fun HeightInputScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgDark)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .imePadding()
             .padding(24.dp),
@@ -288,13 +289,13 @@ fun HeightInputScreen(
             text = "What is your height?",
             fontSize = 26.sp,
             fontWeight = FontWeight.ExtraBold,
-            color = TextWhite,
+            color = MaterialTheme.colorScheme.onBackground,
             fontFamily = FontFamily.Serif,
         )
         Text(
             text = "We use this to personalise your experience.",
             fontSize = 14.sp,
-            color = TextGray,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             modifier = Modifier.padding(top = 4.dp),
         )
         Spacer(Modifier.height(24.dp))
@@ -309,7 +310,7 @@ fun HeightInputScreen(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(if (isMetric) Orange else CardTeal)
+                    .background(if (isMetric) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface)
                     .clickable { onToggleUnit() }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
@@ -317,7 +318,7 @@ fun HeightInputScreen(
                 Text(
                     text = "cm",
                     fontSize = 14.sp,
-                    color = if (isMetric) TextWhite else TextGray,
+                    color = if (isMetric) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = if (isMetric) FontWeight.Bold else FontWeight.Normal,
                 )
             }
@@ -326,7 +327,7 @@ fun HeightInputScreen(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(if (!isMetric) Orange else CardTeal)
+                    .background(if (!isMetric) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface)
                     .clickable { onToggleUnit() }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
@@ -334,7 +335,7 @@ fun HeightInputScreen(
                 Text(
                     text = "ft / in",
                     fontSize = 14.sp,
-                    color = if (!isMetric) TextWhite else TextGray,
+                    color = if (!isMetric) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = if (!isMetric) FontWeight.Bold else FontWeight.Normal,
                 )
             }
@@ -347,20 +348,20 @@ fun HeightInputScreen(
             OutlinedTextField(
                 value = heightRawInput,
                 onValueChange = onInputChange,
-                label = { Text("Height (cm)", color = TextGray) },
+                label = { Text("Height (cm)", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Orange,
-                    unfocusedBorderColor = CardTeal,
-                    cursorColor = Orange,
-                    focusedTextColor = TextWhite,
-                    unfocusedTextColor = TextWhite,
-                    focusedContainerColor = CardTeal,
-                    unfocusedContainerColor = CardTeal,
-                    focusedLabelColor = Orange,
-                    unfocusedLabelColor = TextGray,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    cursorColor = MaterialTheme.colorScheme.primary,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 ),
                 shape = RoundedCornerShape(12.dp),
             )
@@ -372,40 +373,40 @@ fun HeightInputScreen(
                 OutlinedTextField(
                     value = feetText,
                     onValueChange = { newFeet -> onInputChange("$newFeet.$inchesText") },
-                    label = { Text("Feet", color = TextGray) },
+                    label = { Text("Feet", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Orange,
-                        unfocusedBorderColor = CardTeal,
-                        cursorColor = Orange,
-                        focusedTextColor = TextWhite,
-                        unfocusedTextColor = TextWhite,
-                        focusedContainerColor = CardTeal,
-                        unfocusedContainerColor = CardTeal,
-                        focusedLabelColor = Orange,
-                        unfocusedLabelColor = TextGray,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
                     shape = RoundedCornerShape(12.dp),
                 )
                 OutlinedTextField(
                     value = inchesText,
                     onValueChange = { newInches -> onInputChange("$feetText.$newInches") },
-                    label = { Text("Inches", color = TextGray) },
+                    label = { Text("Inches", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Orange,
-                        unfocusedBorderColor = CardTeal,
-                        cursorColor = Orange,
-                        focusedTextColor = TextWhite,
-                        unfocusedTextColor = TextWhite,
-                        focusedContainerColor = CardTeal,
-                        unfocusedContainerColor = CardTeal,
-                        focusedLabelColor = Orange,
-                        unfocusedLabelColor = TextGray,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
                     shape = RoundedCornerShape(12.dp),
                 )
@@ -456,7 +457,7 @@ fun WeightInputScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgDark)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .imePadding()
             .padding(24.dp),
@@ -465,13 +466,13 @@ fun WeightInputScreen(
             text = "What is your weight?",
             fontSize = 26.sp,
             fontWeight = FontWeight.ExtraBold,
-            color = TextWhite,
+            color = MaterialTheme.colorScheme.onBackground,
             fontFamily = FontFamily.Serif,
         )
         Text(
             text = "We use this to personalise your experience.",
             fontSize = 14.sp,
-            color = TextGray,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             modifier = Modifier.padding(top = 4.dp),
         )
         Spacer(Modifier.height(24.dp))
@@ -486,7 +487,7 @@ fun WeightInputScreen(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(if (isMetric) Orange else CardTeal)
+                    .background(if (isMetric) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface)
                     .clickable { onToggleUnit() }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
@@ -494,7 +495,7 @@ fun WeightInputScreen(
                 Text(
                     text = "kg",
                     fontSize = 14.sp,
-                    color = if (isMetric) TextWhite else TextGray,
+                    color = if (isMetric) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = if (isMetric) FontWeight.Bold else FontWeight.Normal,
                 )
             }
@@ -503,7 +504,7 @@ fun WeightInputScreen(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(if (!isMetric) Orange else CardTeal)
+                    .background(if (!isMetric) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface)
                     .clickable { onToggleUnit() }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
@@ -511,7 +512,7 @@ fun WeightInputScreen(
                 Text(
                     text = "lb",
                     fontSize = 14.sp,
-                    color = if (!isMetric) TextWhite else TextGray,
+                    color = if (!isMetric) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = if (!isMetric) FontWeight.Bold else FontWeight.Normal,
                 )
             }
@@ -523,20 +524,18 @@ fun WeightInputScreen(
         OutlinedTextField(
             value = weightRawInput,
             onValueChange = onInputChange,
-            label = { Text(if (isMetric) "Weight (kg)" else "Weight (lb)", color = TextGray) },
+            label = { Text(if (isMetric) "Weight (kg)" else "Weight (lb)", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Orange,
-                unfocusedBorderColor = CardTeal,
-                cursorColor = Orange,
-                focusedTextColor = TextWhite,
-                unfocusedTextColor = TextWhite,
-                focusedContainerColor = CardTeal,
-                unfocusedContainerColor = CardTeal,
-                focusedLabelColor = Orange,
-                unfocusedLabelColor = TextGray,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                cursorColor = MaterialTheme.colorScheme.primary,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
             ),
             shape = RoundedCornerShape(12.dp),
         )
@@ -585,7 +584,7 @@ fun CameraPermissionScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgDark)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .imePadding()
             .padding(24.dp),
@@ -599,7 +598,7 @@ fun CameraPermissionScreen(
             modifier = Modifier
                 .size(80.dp)
                 .align(Alignment.CenterHorizontally),
-            tint = Orange,
+            tint = MaterialTheme.colorScheme.primary,
         )
 
         Spacer(Modifier.height(24.dp))
@@ -608,7 +607,7 @@ fun CameraPermissionScreen(
             text = "Enable AI Pose Correction",
             fontSize = 26.sp,
             fontWeight = FontWeight.ExtraBold,
-            color = TextWhite,
+            color = MaterialTheme.colorScheme.onBackground,
             fontFamily = FontFamily.Serif,
         )
 
@@ -617,22 +616,22 @@ fun CameraPermissionScreen(
         Text(
             text = "Your camera is used only on-device for real-time pose correction. Video is never uploaded or stored.",
             fontSize = 14.sp,
-            color = TextGray,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             lineHeight = 22.sp,
         )
 
         Spacer(Modifier.height(28.dp))
 
-        // Option card 1 ΓÇö Enable Pose Correction
+        // Option card 1 — Enable Pose Correction
         val isEnableSelected = cameraPermissionGranted == true
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 6.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isEnableSelected) CardTeal else Color(0xFF122425),
+                containerColor = if (isEnableSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
             ),
-            border = if (isEnableSelected) BorderStroke(2.dp, Orange) else BorderStroke(1.dp, Color(0xFF2A4A4C)),
+            border = if (isEnableSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             shape = RoundedCornerShape(14.dp),
             onClick = { onEnablePoseCorrection() },
         ) {
@@ -647,29 +646,29 @@ fun CameraPermissionScreen(
                         .size(20.dp)
                         .clip(CircleShape)
                         .then(
-                            if (isEnableSelected) Modifier.background(Orange)
+                            if (isEnableSelected) Modifier.background(MaterialTheme.colorScheme.primary)
                             else Modifier
                                 .background(Color.Transparent)
-                                .border(1.dp, Orange, CircleShape)
+                                .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape)
                         ),
                 )
                 Spacer(Modifier.width(16.dp))
-                Text("Enable Pose Correction", fontSize = 16.sp, color = TextWhite)
+                Text("Enable Pose Correction", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
             }
         }
 
         Spacer(Modifier.height(4.dp))
 
-        // Option card 2 ΓÇö Continue Without Pose Correction
+        // Option card 2 — Continue Without Pose Correction
         val isSkipSelected = cameraPermissionGranted == false
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 6.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isSkipSelected) CardTeal else Color(0xFF122425),
+                containerColor = if (isSkipSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
             ),
-            border = if (isSkipSelected) BorderStroke(2.dp, Orange) else BorderStroke(1.dp, Color(0xFF2A4A4C)),
+            border = if (isSkipSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             shape = RoundedCornerShape(14.dp),
             onClick = { onContinueWithout() },
         ) {
@@ -684,14 +683,14 @@ fun CameraPermissionScreen(
                         .size(20.dp)
                         .clip(CircleShape)
                         .then(
-                            if (isSkipSelected) Modifier.background(Orange)
+                            if (isSkipSelected) Modifier.background(MaterialTheme.colorScheme.primary)
                             else Modifier
                                 .background(Color.Transparent)
-                                .border(1.dp, Orange, CircleShape)
+                                .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape)
                         ),
                 )
                 Spacer(Modifier.width(16.dp))
-                Text("Continue Without Pose Correction", fontSize = 16.sp, color = TextWhite)
+                Text("Continue Without Pose Correction", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
             }
         }
 
@@ -707,11 +706,11 @@ fun CameraPermissionScreen(
                     .height(56.dp),
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Orange,
-                    disabledContainerColor = Orange.copy(alpha = 0.4f),
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    disabledContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f),
                 ),
             ) {
-                Text("Next", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextWhite)
+                Text("Next", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondary)
             }
         }
     }
@@ -743,16 +742,16 @@ fun QuestionnaireSummaryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgDark)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .imePadding()
             .padding(24.dp),
     ) {
         Text(
-            text = "You're all set! ≡ƒÄë",
+            text = "You're all set! 🎉",
             fontSize = 28.sp,
             fontWeight = FontWeight.ExtraBold,
-            color = TextWhite,
+            color = MaterialTheme.colorScheme.onBackground,
             fontFamily = FontFamily.Serif,
         )
 
@@ -761,7 +760,7 @@ fun QuestionnaireSummaryScreen(
         Text(
             text = "Here's a summary of your profile.",
             fontSize = 14.sp,
-            color = TextGray,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
         )
 
         Spacer(Modifier.height(24.dp))
@@ -769,21 +768,21 @@ fun QuestionnaireSummaryScreen(
         // Summary card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = CardTeal),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(16.dp),
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                SummaryRow("Primary Goal", answers.goal ?: "ΓÇö")
-                HorizontalDivider(color = Color(0xFF2A4A4C))
-                SummaryRow("Experience", answers.experienceLevel ?: "ΓÇö")
-                HorizontalDivider(color = Color(0xFF2A4A4C))
-                SummaryRow("Focus Areas", answers.focusAreas.joinToString(", ").ifEmpty { "ΓÇö" })
-                HorizontalDivider(color = Color(0xFF2A4A4C))
-                SummaryRow("Daily Practice", "${answers.dailyPracticeMinutes ?: "ΓÇö"} min")
-                HorizontalDivider(color = Color(0xFF2A4A4C))
-                SummaryRow("Height", answers.heightCm?.let { "$it cm" } ?: "ΓÇö")
-                HorizontalDivider(color = Color(0xFF2A4A4C))
-                SummaryRow("Weight", answers.weightKg?.let { "${"%.1f".format(it)} kg" } ?: "ΓÇö")
+                SummaryRow("Primary Goal", answers.goal ?: "—")
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                SummaryRow("Experience", answers.experienceLevel ?: "—")
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                SummaryRow("Focus Areas", answers.focusAreas.joinToString(", ").ifEmpty { "—" })
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                SummaryRow("Daily Practice", "${answers.dailyPracticeMinutes ?: "—"} min")
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                SummaryRow("Height", answers.heightCm?.let { "$it cm" } ?: "—")
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                SummaryRow("Weight", answers.weightKg?.let { "${"%.1f".format(it)} kg" } ?: "—")
             }
         }
 
@@ -799,18 +798,18 @@ fun QuestionnaireSummaryScreen(
                     .height(56.dp),
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Orange,
-                    disabledContainerColor = Orange.copy(alpha = 0.4f),
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    disabledContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f),
                 ),
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         strokeWidth = 2.dp,
-                        color = TextWhite,
+                        color = MaterialTheme.colorScheme.onSecondary,
                     )
                 } else {
-                    Text("Start Your Journey", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextWhite)
+                    Text("Start Your Journey", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondary)
                 }
             }
         }
@@ -841,7 +840,7 @@ private fun SummaryRow(label: String, value: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, fontSize = 13.sp, color = TextGray)
-        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextWhite)
+        Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
     }
 }

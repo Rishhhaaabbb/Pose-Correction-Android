@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -52,6 +53,7 @@ import com.posemonitor2.auth.AuthViewModel
 import com.posemonitor2.onboarding.OnboardingManager
 import com.posemonitor2.questionnaire.QuestionnaireActivity
 import com.posemonitor2.settings.AppLocaleManager
+import com.posemonitor2.ui.theme.PoseMonitor2Theme
 import com.posemonitor2.ui.theme.PoseMonitorAppTheme
 import com.domain.repository.OnboardingRepository
 import androidx.lifecycle.lifecycleScope
@@ -89,7 +91,9 @@ class LoginActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            PoseMonitorAppTheme {
+            // Login/onboarding screens always use light theme — the user's dark mode
+            // preference must not affect pre-authentication screens
+            PoseMonitor2Theme(darkTheme = false, dynamicColor = false) {
                 val checking by isCheckingOnboarding
                 Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
                     AuthNavigation(
@@ -290,15 +294,19 @@ private fun AuthScaffold(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val scrollState = rememberScrollState()
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val themeBg = MaterialTheme.colorScheme.background
+    // Orange card below the hero photo — matches the brand color on login/signup
+    val cardBg = Orange
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Orange)
-            .imePadding() // Ensures layout moves up when keyboard appears
+            .background(Orange)  // matches the card — no white bleed on scroll
+            .imePadding()
             .verticalScroll(scrollState)
     ) {
-        // ΓöÇΓöÇ Background layers (Hero Image) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // ── Background layers (Hero Image) ───────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -323,27 +331,27 @@ private fun AuthScaffold(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(Orange),
+                        .background(MaterialTheme.colorScheme.secondary),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("ΓÜí", fontSize = 16.sp)
+                    Text("💡", fontSize = 16.sp)
                 }
                 Text(
                     stringResource(R.string.login_brand_name),
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Teal,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
 
-        // ΓöÇΓöÇ Orange card (Content) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // ── Card (Content) ───────────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .offset(y = (-30).dp) // Overlap the hero
                 .clip(RoundedCornerShape(topStart = cardRadius, topEnd = cardRadius))
-                .background(Orange)
+                .background(cardBg)
                 .padding(horizontal = 24.dp)
                 .padding(top = 20.dp, bottom = 40.dp),
             content = content,
@@ -382,10 +390,11 @@ private fun LandingScreen(
 
         Spacer(Modifier.height(32.dp))
 
-        // Google button (white pill)
+        // Google button (pill)
         Surface(
             shape = RoundedCornerShape(50.dp),
-            color = Color.White,
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp)
@@ -405,14 +414,14 @@ private fun LandingScreen(
                     if (isLoading) stringResource(R.string.login_signing_in) else stringResource(R.string.login_continue_google),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF1A1A1A)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 if (isLoading) {
                     Spacer(Modifier.width(10.dp))
                     CircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
                         strokeWidth = 2.dp,
-                        color = Color(0xFF1A1A1A),
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
@@ -438,12 +447,12 @@ private fun LandingScreen(
 
         Spacer(Modifier.height(18.dp))
 
-        // Sign up with Email (yellow pill)
+        // Sign up with Email (pill)
         Button(
             onClick = onSignUpWithEmail,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(50.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Yellow),
+            colors = ButtonDefaults.buttonColors(containerColor = Yellow, contentColor = Color(0xFF1A1A1A)),
         ) {
             Icon(Icons.Default.Email, contentDescription = null, tint = Color(0xFF1A1A1A), modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
@@ -530,7 +539,7 @@ private fun SignInScreen(
 
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             AuthLabel(stringResource(R.string.login_password), modifier = Modifier.weight(1f))
-            Text(stringResource(R.string.login_forgot), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextOnCard, letterSpacing = 0.5.sp, modifier = Modifier.clickable { onForgotPassword() })
+            Text(stringResource(R.string.login_forgot), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = LabelColor, letterSpacing = 0.5.sp, modifier = Modifier.clickable { onForgotPassword() })
         }
         AuthField(
             value = password, onValueChange = { password = it; localError = null },
@@ -552,7 +561,7 @@ private fun SignInScreen(
             enabled = !isLoading,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(50.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Yellow),
+            colors = ButtonDefaults.buttonColors(containerColor = Yellow, contentColor = Color(0xFF1A1A1A)),
         ) {
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color(0xFF1A1A1A))
@@ -633,7 +642,7 @@ private fun SignUpScreen(
             enabled = !isLoading,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(50.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Yellow),
+            colors = ButtonDefaults.buttonColors(containerColor = Yellow, contentColor = Color(0xFF1A1A1A)),
         ) {
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color(0xFF1A1A1A))
@@ -709,8 +718,8 @@ private fun ForgotPasswordScreen(
             enabled = !isLoading,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(50.dp),
-            border = BorderStroke(2.dp, Color.White),
-            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White, contentColor = Orange),
+            border = BorderStroke(2.dp, Orange),
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = Orange, contentColor = Color.White),
         ) {
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Orange)
@@ -752,7 +761,7 @@ private fun AuthField(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text(placeholder, color = Color(0xAAFFFFFF), fontSize = 14.sp) },
+        placeholder = { Text(placeholder, color = LabelColor.copy(alpha = 0.7f), fontSize = 14.sp) },
         leadingIcon = leadingIcon,
         trailingIcon = if (isPassword) ({
             IconButton(onClick = onTogglePassword) {

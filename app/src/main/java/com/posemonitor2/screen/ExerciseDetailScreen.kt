@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -51,6 +52,8 @@ fun ExerciseDetailScreen(
     workoutId: String? = null,
     exerciseIndex: Int = 0,
     exerciseList: String? = null,
+    category: String? = null,
+    difficulty: String? = null,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -62,6 +65,14 @@ fun ExerciseDetailScreen(
     var holdInputError by rememberSaveable(fileName) { mutableStateOf<String?>(null) }
     var defaultHoldDuration by remember(fileName) { mutableStateOf(2.0) }
     
+    // Theme-aware colors — derived from MaterialTheme so they match the app's chosen theme
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val bgColor = if (isDark) Color(0xFF000000) else Color(0xFF0F2628)
+    val onBgColor = Color.White
+    val surfaceColor = if (isDark) Color(0xFF1E1E1E) else Color(0x1AFFFFFF)
+    val dialogSurfaceColor = if (isDark) Color(0xFF121212) else Color.White
+    val dialogTextColor = if (isDark) Color.White else Color(0xFF0D3B34)
+
     val videoAssetPath = fileName.removeSuffix(".json") + ".mp4"
     val displayName = fileName.removeSuffix(".json").replace("-", " ").uppercase()
     val requiredOrientation = remember(fileName) {
@@ -82,7 +93,6 @@ fun ExerciseDetailScreen(
             HoldPreset.EIGHT -> 8.0
             HoldPreset.TEN -> 10.0
             HoldPreset.TWENTY_ONE -> 21.0
-            else -> null
         }
     }
 
@@ -128,7 +138,7 @@ fun ExerciseDetailScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F2628))
+            .background(bgColor)
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
             .navigationBarsPadding(),
@@ -139,9 +149,9 @@ fun ExerciseDetailScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = onBgColor)
             }
-            Text(stringResource(R.string.exercise_detail_title), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.exercise_detail_title), color = onBgColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
 
         Spacer(Modifier.height(48.dp))
@@ -220,11 +230,56 @@ fun ExerciseDetailScreen(
 
         Text(
             text = displayName,
-            color = Color.White,
+            color = onBgColor,
             fontSize = 32.sp,
             fontWeight = FontWeight.ExtraBold,
             letterSpacing = 2.sp
         )
+
+        Spacer(Modifier.height(12.dp))
+
+        // ── Category & Difficulty chips ───────────────────────────────────────
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (!category.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0x33E8622E),
+                ) {
+                    Text(
+                        text = category.uppercase(),
+                        color = Color(0xFFFFB79E),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                    )
+                }
+            }
+            if (!difficulty.isNullOrBlank()) {
+                val diffColor = when (difficulty.trim()) {
+                    "Beginner"     -> Color(0xFF4CAF50)
+                    "Intermediate" -> Color(0xFFFFA726)
+                    "Advanced"     -> Color(0xFFEF5350)
+                    else           -> Color(0xFF78909C)
+                }
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = diffColor.copy(alpha = 0.20f),
+                ) {
+                    Text(
+                        text = difficulty.uppercase(),
+                        color = diffColor,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                    )
+                }
+            }
+        }
 
         Spacer(Modifier.height(16.dp))
 
@@ -241,7 +296,7 @@ fun ExerciseDetailScreen(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            color = Color(0x1AFFFFFF),
+            color = surfaceColor,
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -303,7 +358,7 @@ fun ExerciseDetailScreen(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            color = Color(0x1AFFFFFF),
+            color = surfaceColor,
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
@@ -337,7 +392,7 @@ fun ExerciseDetailScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.wrapContentWidth(Alignment.Start),
                 ) {
-                    HoldPreset.values().forEach { preset ->
+                    HoldPreset.entries.forEach { preset ->
                         val selected = holdPreset == preset
                         FilterChip(
                             selected = selected,
@@ -404,7 +459,7 @@ fun ExerciseDetailScreen(
 
     if (!placementConfirmed) {
         Dialog(onDismissRequest = {}) {
-            Surface(shape = RoundedCornerShape(16.dp), color = Color(0xFF1B2628)) {
+            Surface(shape = RoundedCornerShape(16.dp), color = if (isDark) Color(0xFF121212) else Color(0xFF1B2628)) {
                 Column(
                     modifier = Modifier.padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -449,7 +504,9 @@ fun ExerciseDetailScreen(
                     selectedHoldDuration?.let { putExtra("EXTRA_HOLD_DURATION_SECONDS", it) }
                 }
                 context.startActivity(intent)
-            }
+            },
+            surfaceColor = dialogSurfaceColor,
+            textColor = dialogTextColor
         )
     }
 }
@@ -458,6 +515,8 @@ fun ExerciseDetailScreen(
 private fun RepCountDialog(
     onDismiss: () -> Unit,
     onConfirm: (Int) -> Unit,
+    surfaceColor: Color,
+    textColor: Color
 ) {
     var repCount by remember { mutableStateOf("10") }
     var isError by remember { mutableStateOf(false) }
@@ -465,7 +524,7 @@ private fun RepCountDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = Color.White,
+            color = surfaceColor,
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
@@ -475,7 +534,7 @@ private fun RepCountDialog(
                     text = "Set Rep Count",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0D3B34)
+                    color = textColor
                 )
 
                 Spacer(Modifier.height(16.dp))
@@ -483,7 +542,7 @@ private fun RepCountDialog(
                 Text(
                     text = "How many reps do you want to do?",
                     fontSize = 14.sp,
-                    color = Color(0xFF888888)
+                    color = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFFB0B0B0) else Color(0xFF888888)
                 )
 
                 Spacer(Modifier.height(20.dp))
@@ -499,7 +558,12 @@ private fun RepCountDialog(
                     singleLine = true,
                     isError = isError,
                     supportingText = if (isError) {{ Text("Please enter a valid number") }} else null,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color.White else Color.Black,
+                        unfocusedTextColor = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color.White else Color.Black,
+                        focusedLabelColor = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF80CBC4) else Color(0xFF0D3B34)
+                    )
                 )
 
                 Spacer(Modifier.height(24.dp))

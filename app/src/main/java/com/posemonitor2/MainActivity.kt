@@ -340,18 +340,20 @@ private fun MainNavigation(
                     workoutId = workoutId,
                     exerciseIndex = exerciseIndex,
                     exerciseList = exerciseList,
-                    onQuit = { 
+                    onQuit = {
                         viewModel.saveCurrentSessionPartial()
                         viewModel.stopPipeline()
-                        val intent = Intent(context, UserFlowActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                        context.startActivity(intent)
+                        // Simply finish this activity — UserFlowActivity is already
+                        // underneath with ExerciseDetailScreen in its back stack,
+                        // so the user lands exactly where they left off.
                         (context as? Activity)?.finish()
                     },
                     onFinish = { 
                         viewModel.stopPipeline()
-                        val intent = Intent(context, UserFlowActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                        val intent = Intent(context, UserFlowActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                            putExtra("TARGET_ROUTE", "exercises")
+                        }
                         context.startActivity(intent)
                         (context as? Activity)?.finish()
                     },
@@ -375,8 +377,10 @@ private fun MainNavigation(
                 if (showSummary) {
                     BackHandler {
                         viewModel.stopPipeline()
-                        val intent = Intent(context, UserFlowActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                        val intent = Intent(context, UserFlowActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                            putExtra("TARGET_ROUTE", "exercises")
+                        }
                         context.startActivity(intent)
                         (context as? Activity)?.finish()
                     }
@@ -385,8 +389,10 @@ private fun MainNavigation(
                         results = sessionResults,
                         onFinish = {
                             viewModel.stopPipeline()
-                            val intent = Intent(context, UserFlowActivity::class.java)
-                            intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                            val intent = Intent(context, UserFlowActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                                putExtra("TARGET_ROUTE", "exercises")
+                            }
                             context.startActivity(intent)
                             (context as? Activity)?.finish()
                         }
@@ -780,7 +786,7 @@ fun MonitorScreen(
             ) {
                 Surface(
                     shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.surface,
                     modifier = Modifier.widthIn(max = 500.dp).wrapContentHeight()
                 ) {
                     Column(
@@ -793,7 +799,7 @@ fun MonitorScreen(
                             if (exerciseList.size > 1) "Workout Accomplished!" else "Exercise Completed!",
                             fontSize = 28.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF0D3B34)
+                            color = MaterialTheme.colorScheme.primary
                         )
                         
                         Spacer(Modifier.height(8.dp))
@@ -801,7 +807,7 @@ fun MonitorScreen(
                         Text(
                             exerciseName,
                             fontSize = 16.sp,
-                            color = Color(0xFF888888)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         
                         Spacer(Modifier.height(24.dp))
@@ -905,8 +911,8 @@ fun MonitorScreen(
 @Composable
 private fun ResultStatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0D3B34))
-        Text(label, fontSize = 14.sp, color = Color(0xFF888888))
+        Text(value, fontSize = 32.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Text(label, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -928,7 +934,7 @@ fun CustomWorkoutSummaryOverlay(
     ) {
         Surface(
             shape = RoundedCornerShape(28.dp),
-            color = Color.White,
+            color = MaterialTheme.colorScheme.surface,
             modifier = Modifier.widthIn(max = 500.dp).fillMaxHeight()
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -942,7 +948,7 @@ fun CustomWorkoutSummaryOverlay(
                     Icon(
                         imageVector = androidx.compose.material.icons.Icons.Default.Close,
                         contentDescription = "Close Summary",
-                        tint = Color.Gray
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -956,13 +962,13 @@ fun CustomWorkoutSummaryOverlay(
                         "Workout Accomplished!",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF0D3B34)
+                        color = MaterialTheme.colorScheme.primary
                     )
                     
                     Text(
                         "Great job! You've finished all exercises.",
                         fontSize = 14.sp,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
                     )
 
@@ -995,7 +1001,7 @@ fun CustomWorkoutSummaryOverlay(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 6.dp)
-                            .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1003,12 +1009,13 @@ fun CustomWorkoutSummaryOverlay(
                             Text(
                                 result.name.removeSuffix(".json").replace("-", " ").uppercase(),
                                 fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 "${result.repsDone}/${result.targetReps} reps • ${result.accuracy}% accuracy",
                                 fontSize = 12.sp,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Text("✅", fontSize = 18.sp)
@@ -1046,6 +1053,6 @@ private fun SummaryStatCircle(label: String, value: String, color: Color) {
             Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = color)
         }
         Spacer(Modifier.height(4.dp))
-        Text(label, fontSize = 12.sp, color = Color.Gray)
+        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

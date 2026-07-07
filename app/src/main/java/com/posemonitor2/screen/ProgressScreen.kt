@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -33,12 +34,8 @@ import java.util.Date
 import java.util.Locale
 
 // ΓöÇΓöÇ Design tokens ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-private val BgCream   = Color(0xFFF2EEE4)
-private val TealDark  = Color(0xFF0A3D3F)
 private val Orange    = Color(0xFFE85A2E)
 private val Yellow    = Color(0xFFE8B840)
-private val TextGray  = Color(0xFF888888)
-private val CardWhite = Color.White
 private val GreenOk   = Color(0xFF4CAF82)
 private val TealBar   = Color(0xFF0A3D3F)
 private val TealLight = Color(0xFF4AADAA)
@@ -56,17 +53,25 @@ fun ProgressScreen(
         uiState.weeklyActivity
     }
 
+    // Theme-aware colors
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val bgColor = MaterialTheme.colorScheme.background
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val tealColor = MaterialTheme.colorScheme.primary
+    val textGrayColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgCream)
+            .background(bgColor)
             .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .padding(horizontal = 20.dp),
     ) {
         Spacer(Modifier.height(20.dp))
 
-        // ΓöÇΓöÇ Header ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // ── Header ───────────────────────────────────────────────────────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -76,19 +81,19 @@ fun ProgressScreen(
                     stringResource(R.string.progress_title),
                     fontSize = 32.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = TealDark,
+                    color = tealColor,
                     fontFamily = FontFamily.Serif,
                 )
                 Text(
                     stringResource(R.string.progress_subtitle),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TealDark,
+                    color = tealColor,
                 )
                 Text(
                     stringResource(R.string.progress_description),
                     fontSize = 13.sp,
-                    color = TextGray,
+                    color = textGrayColor,
                     lineHeight = 18.sp,
                 )
             }
@@ -97,11 +102,11 @@ fun ProgressScreen(
                     .size(44.dp)
                     .shadow(2.dp, RoundedCornerShape(12.dp))
                     .clip(RoundedCornerShape(12.dp))
-                    .background(CardWhite)
+                    .background(surfaceColor)
                     .clickable { },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Default.ShowChart, contentDescription = stringResource(R.string.progress_chart_cd), tint = TealDark, modifier = Modifier.size(22.dp))
+                Icon(Icons.Default.ShowChart, contentDescription = stringResource(R.string.progress_chart_cd), tint = tealColor, modifier = Modifier.size(22.dp))
             }
         }
 
@@ -118,8 +123,8 @@ fun ProgressScreen(
                     onClick = { progressViewModel.selectRange(range) },
                     label = { Text(range.label) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = TealDark,
-                        selectedLabelColor = Color.White,
+                        selectedContainerColor = tealColor,
+                        selectedLabelColor = if (isDark) Color.Black else Color.White,
                     ),
                 )
             }
@@ -127,11 +132,11 @@ fun ProgressScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // ΓöÇΓöÇ Stats summary card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // ── Stats summary card ─────────────────────────────────────────────────────────
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = CardWhite),
+            colors = CardDefaults.cardColors(containerColor = surfaceColor),
             elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -142,13 +147,17 @@ fun ProgressScreen(
                         sub = sessionsDeltaLabel(uiState.sessionsDeltaVsLastWeek, uiState.selectedRange),
                         subColor = if (uiState.sessionsDeltaVsLastWeek >= 0) GreenOk else Orange,
                         modifier = Modifier.weight(1f),
+                        tealColor = tealColor,
+                        textGrayColor = textGrayColor
                     )
                     StatCell(
                         label = stringResource(R.string.progress_total_time_label),
                         value = "${uiState.totalTimeMinutes} m",
                         sub = null,
-                        subColor = TextGray,
+                        subColor = textGrayColor,
                         modifier = Modifier.weight(1f),
+                        tealColor = tealColor,
+                        textGrayColor = textGrayColor
                     )
                 }
                 Spacer(Modifier.height(16.dp))
@@ -157,15 +166,19 @@ fun ProgressScreen(
                         label = stringResource(R.string.progress_avg_duration_label),
                         value = "${uiState.avgDurationMinutes} m",
                         sub = null,
-                        subColor = TextGray,
+                        subColor = textGrayColor,
                         modifier = Modifier.weight(1f),
+                        tealColor = tealColor,
+                        textGrayColor = textGrayColor
                     )
                     StatCell(
                         label = stringResource(R.string.progress_consistency_label),
                         value = "${uiState.consistencyPercent}%",
                         sub = null,
-                        subColor = TextGray,
+                        subColor = textGrayColor,
                         modifier = Modifier.weight(1f),
+                        tealColor = tealColor,
+                        textGrayColor = textGrayColor,
                         valueSuffix = { // orange dot after value
                             Spacer(Modifier.width(4.dp))
                             Box(
@@ -191,21 +204,27 @@ fun ProgressScreen(
                 title = stringResource(R.string.progress_reps_label),
                 value = uiState.totalReps.toString(),
                 modifier = Modifier.weight(1f),
+                surfaceColor = surfaceColor,
+                tealColor = tealColor,
+                textGrayColor = textGrayColor
             )
             MetricPill(
                 title = stringResource(R.string.progress_accuracy_label),
                 value = "${uiState.avgAccuracyPercent}%",
                 modifier = Modifier.weight(1f),
+                surfaceColor = surfaceColor,
+                tealColor = tealColor,
+                textGrayColor = textGrayColor
             )
         }
 
         Spacer(Modifier.height(16.dp))
 
-        // ΓöÇΓöÇ Weekly activity card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // ── Weekly activity card ───────────────────────────────────────────────────────
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = CardWhite),
+            colors = CardDefaults.cardColors(containerColor = surfaceColor),
             elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -217,10 +236,10 @@ fun ProgressScreen(
                         stringResource(R.string.progress_weekly_activity_title),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TealDark,
+                        color = tealColor,
                         modifier = Modifier.weight(1f),
                     )
-                    Text(stringResource(R.string.progress_last_7_days), fontSize = 12.sp, color = TextGray)
+                    Text(stringResource(R.string.progress_last_7_days), fontSize = 12.sp, color = textGrayColor)
                 }
 
                 Spacer(Modifier.height(20.dp))
@@ -243,7 +262,7 @@ fun ProgressScreen(
                         ) {
                             // Bar
                             val barHeight = if (level > 0f) (level * 72).dp else 4.dp
-                            val barColor  = if (level > 0f) TealDark else Color(0xFFE0E0E0)
+                            val barColor  = if (level > 0f) tealColor else MaterialTheme.colorScheme.surfaceVariant
                             Box(
                                 modifier = Modifier
                                     .width(18.dp)
@@ -252,7 +271,7 @@ fun ProgressScreen(
                                     .background(barColor),
                             )
                             Spacer(Modifier.height(8.dp))
-                            Text(day, fontSize = 11.sp, color = TextGray)
+                            Text(day, fontSize = 11.sp, color = textGrayColor)
                         }
                     }
                 }
@@ -261,11 +280,11 @@ fun ProgressScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ΓöÇΓöÇ Workout distribution card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // ── Workout distribution card ──────────────────────────────────────────────────
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = CardWhite),
+            colors = CardDefaults.cardColors(containerColor = surfaceColor),
             elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -273,22 +292,22 @@ fun ProgressScreen(
                     stringResource(R.string.progress_workout_distribution_title),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TealDark,
+                    color = tealColor,
                 )
                 Spacer(Modifier.height(16.dp))
                 uiState.distribution.forEach { item ->
-                    DistributionRow(item)
+                    DistributionRow(item, tealColor)
                     Spacer(Modifier.height(14.dp))
                 }
                 if (uiState.distribution.isEmpty()) {
-                    Text(stringResource(R.string.progress_no_workout_data), fontSize = 13.sp, color = TextGray)
+                    Text(stringResource(R.string.progress_no_workout_data), fontSize = 13.sp, color = textGrayColor)
                 }
             }
         }
 
         Spacer(Modifier.height(16.dp))
 
-        // ΓöÇΓöÇ Daily streak banner ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // ── Daily streak banner ────────────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -313,7 +332,7 @@ fun ProgressScreen(
 
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("≡ƒöÑ", fontSize = 20.sp)
+                    Text("🔥", fontSize = 20.sp)
                     Spacer(Modifier.width(6.dp))
                     Text(
                         stringResource(R.string.progress_daily_streak_title),
@@ -337,7 +356,7 @@ fun ProgressScreen(
                 )
             }
 
-            // Best badge ΓÇö top right
+            // Best badge — top right
             Column(
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -360,7 +379,7 @@ fun ProgressScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        // ΓöÇΓöÇ Recent sessions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // ── Recent sessions ────────────────────────────────────────────────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -369,7 +388,7 @@ fun ProgressScreen(
                 stringResource(R.string.progress_recent_sessions_title),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = TealDark,
+                color = tealColor,
                 fontFamily = FontFamily.Serif,
                 modifier = Modifier.weight(1f),
             )
@@ -385,15 +404,15 @@ fun ProgressScreen(
         Spacer(Modifier.height(12.dp))
 
         uiState.recentSessions.forEach { session ->
-            RecentSessionRow(session)
-            HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
+            RecentSessionRow(session, tealColor, textGrayColor)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), thickness = 1.dp)
         }
 
         if (uiState.recentSessions.isEmpty()) {
             Text(
                 text = if (uiState.isLoading) stringResource(R.string.progress_loading_stats) else stringResource(R.string.progress_no_sessions_yet),
                 fontSize = 13.sp,
-                color = TextGray,
+                color = textGrayColor,
             )
         }
 
@@ -408,7 +427,7 @@ private fun sessionsDeltaLabel(delta: Int, range: StatsRange): String = when {
     else -> stringResource(R.string.progress_delta_none, range.label)
 }
 
-// ΓöÇΓöÇ Stat cell ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── Stat cell ──────────────────────────────────────────────────────────────────
 @Composable
 private fun StatCell(
     label: String,
@@ -416,13 +435,15 @@ private fun StatCell(
     sub: String?,
     subColor: Color,
     modifier: Modifier = Modifier,
+    tealColor: Color,
+    textGrayColor: Color,
     valueSuffix: (@Composable RowScope.() -> Unit)? = null,
 ) {
     Column(modifier = modifier) {
-        Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextGray, letterSpacing = 0.8.sp)
+        Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textGrayColor, letterSpacing = 0.8.sp)
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(value, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = TealDark)
+            Text(value, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = tealColor)
             valueSuffix?.invoke(this)
         }
         if (sub != null) {
@@ -432,9 +453,9 @@ private fun StatCell(
     }
 }
 
-// ΓöÇΓöÇ Distribution row ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── Distribution row ───────────────────────────────────────────────────────────
 @Composable
-private fun DistributionRow(item: DistributionUiItem) {
+private fun DistributionRow(item: DistributionUiItem, tealColor: Color) {
     val color = when (item.colorIndex % 4) {
         0 -> TealBar
         1 -> Orange
@@ -450,14 +471,14 @@ private fun DistributionRow(item: DistributionUiItem) {
             Text(
                 item.label,
                 fontSize = 13.sp,
-                color = TealDark,
+                color = tealColor,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 "${item.percent}%",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                color = TealDark,
+                color = tealColor,
             )
         }
         Spacer(Modifier.height(6.dp))
@@ -466,7 +487,7 @@ private fun DistributionRow(item: DistributionUiItem) {
                 .fillMaxWidth()
                 .height(6.dp)
                 .clip(RoundedCornerShape(3.dp))
-                .background(Color(0xFFEEEEEE)),
+                .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
             Box(
                 modifier = Modifier
@@ -479,9 +500,9 @@ private fun DistributionRow(item: DistributionUiItem) {
     }
 }
 
-// ΓöÇΓöÇ Recent session row ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── Recent session row ──────────────────────────────────────────────────────────
 @Composable
-private fun RecentSessionRow(session: RecentSessionUiItem) {
+private fun RecentSessionRow(session: RecentSessionUiItem, tealColor: Color, textGrayColor: Color) {
     val title = session.title ?: stringResource(R.string.progress_pose_session_fallback)
     val subtitle = remember(session.startedAtEpochMs, session.durationMinutes) {
         val todayStart = startOfDayMillis(System.currentTimeMillis())
@@ -511,18 +532,18 @@ private fun RecentSessionRow(session: RecentSessionUiItem) {
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFFDE8E8)),
+                .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Default.Check, contentDescription = null, tint = TealDark, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.Check, contentDescription = null, tint = tealColor, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TealDark)
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = tealColor)
             Text(
                 stringResource(R.string.progress_session_subtitle, resolvedDayLabel, session.durationMinutes),
                 fontSize = 12.sp,
-                color = TextGray,
+                color = textGrayColor,
             )
         }
         Icon(Icons.Default.Check, contentDescription = stringResource(R.string.progress_done_cd), tint = GreenOk, modifier = Modifier.size(20.dp))
@@ -534,17 +555,20 @@ private fun MetricPill(
     title: String,
     value: String,
     modifier: Modifier = Modifier,
+    surfaceColor: Color,
+    tealColor: Color,
+    textGrayColor: Color
 ) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
-        color = CardWhite,
+        color = surfaceColor,
         tonalElevation = 2.dp,
     ) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-            Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextGray, letterSpacing = 0.8.sp)
+            Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textGrayColor, letterSpacing = 0.8.sp)
             Spacer(Modifier.height(4.dp))
-            Text(value, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TealDark)
+            Text(value, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = tealColor)
         }
     }
 }

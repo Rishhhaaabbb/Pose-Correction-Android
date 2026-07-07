@@ -27,6 +27,9 @@ interface ExerciseDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(exercise: ExerciseEntity)
 
+    @Query("DELETE FROM exercises WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Query("SELECT COUNT(*) FROM exercises")
     suspend fun getCount(): Int
 

@@ -1,5 +1,6 @@
 package com.posemonitor2.component
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,9 +24,17 @@ fun TutorialDialog(
     videoAssetPath: String,
     onDismiss: () -> Unit
 ) {
+    // Explicitly intercept the system back button — PlayerView (an AndroidView)
+    // consumes key events and prevents Dialog's built-in back-press handling.
+    BackHandler(onBack = onDismiss)
+
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+        )
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -52,7 +61,7 @@ fun TutorialDialog(
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    
+
                     IconButton(
                         onClick = onDismiss,
                         modifier = Modifier.background(Color.DarkGray.copy(alpha = 0.5f), RoundedCornerShape(50))

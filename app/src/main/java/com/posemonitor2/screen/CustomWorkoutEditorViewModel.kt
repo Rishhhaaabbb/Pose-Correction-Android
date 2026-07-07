@@ -166,8 +166,10 @@ class CustomWorkoutEditorViewModel @Inject constructor(
         return state.allExercises.filter { exercise ->
             if (exercise.id in selectedIds) return@filter false
 
+            val normalizedQuery = searchQuery.trim().replace("-", " ")
+            val normalizedName  = exercise.name.replace("-", " ")
             val matchesSearch = searchQuery.isBlank() ||
-                exercise.name.contains(searchQuery, ignoreCase = true)
+                normalizedName.contains(normalizedQuery, ignoreCase = true)
             val matchesDifficulty = selectedDifficulty == null ||
                 exercise.difficulty == selectedDifficulty
             val matchesCategory = selectedCategory == null ||

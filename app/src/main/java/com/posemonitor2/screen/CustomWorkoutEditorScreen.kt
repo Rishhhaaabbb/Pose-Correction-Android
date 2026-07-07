@@ -1,6 +1,7 @@
 package com.posemonitor2.screen
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -102,6 +103,15 @@ fun CustomWorkoutEditorScreen(
     val context = LocalContext.current
     val graphs = remember { loadAvailableGraphs(context) }
 
+    // Theme-aware colors — derived from MaterialTheme so they match the app's chosen theme
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val bgColor = MaterialTheme.colorScheme.background
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val tealColor = if (isDark) Color(0xFF80CBC4) else EditorDark
+    val mutedColor = if (isDark) Color(0xFFB0B0B0) else EditorMuted
+    val borderColor = if (isDark) Color(0xFF444444) else EditorChipBorder
+
     LaunchedEffect(uiState.errorMessage) {
         val message = uiState.errorMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(message)
@@ -130,7 +140,7 @@ fun CustomWorkoutEditorScreen(
     }
 
     Scaffold(
-        containerColor = EditorBg,
+        containerColor = bgColor,
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { innerPadding ->
         Column(
@@ -158,7 +168,7 @@ fun CustomWorkoutEditorScreen(
                         stringResource(R.string.CustomWorkout_editor_title_edit)
                     },
                     style = MaterialTheme.typography.headlineSmall,
-                    color = EditorDark,
+                    color = tealColor,
                     fontWeight = FontWeight.ExtraBold,
                     modifier = Modifier.weight(1f),
                 )
@@ -177,7 +187,7 @@ fun CustomWorkoutEditorScreen(
                 onValueChange = viewModel::updateTitle,
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = MaterialTheme.typography.titleMedium.copy(
-                    color = EditorDark,
+                    color = onSurfaceColor,
                     fontWeight = FontWeight.SemiBold,
                 ),
                 label = {
@@ -195,17 +205,17 @@ fun CustomWorkoutEditorScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    disabledContainerColor = Color.White,
+                    focusedContainerColor = surfaceColor,
+                    unfocusedContainerColor = surfaceColor,
+                    disabledContainerColor = surfaceColor,
                     focusedBorderColor = EditorOrange,
-                    unfocusedBorderColor = Color(0xFF928B98),
-                    focusedLabelColor = EditorDark,
-                    unfocusedLabelColor = EditorDark,
-                    focusedPlaceholderColor = EditorMuted,
-                    unfocusedPlaceholderColor = EditorMuted,
-                    focusedTextColor = EditorDark,
-                    unfocusedTextColor = EditorDark,
+                    unfocusedBorderColor = borderColor,
+                    focusedLabelColor = tealColor,
+                    unfocusedLabelColor = mutedColor,
+                    focusedPlaceholderColor = mutedColor,
+                    unfocusedPlaceholderColor = mutedColor,
+                    focusedTextColor = onSurfaceColor,
+                    unfocusedTextColor = onSurfaceColor,
                     cursorColor = EditorOrange,
                 ),
             )
@@ -237,7 +247,11 @@ fun CustomWorkoutEditorScreen(
                 }
 
                 uiState.selectedExercises.isEmpty() -> {
-                    EditorEmptyState(onAddExercise = { showAddSheet = true })
+                    EditorEmptyState(
+                        onAddExercise = { showAddSheet = true },
+                        surfaceColor = surfaceColor,
+                        mutedColor = mutedColor
+                    )
                 }
 
                 else -> {
@@ -256,6 +270,12 @@ fun CustomWorkoutEditorScreen(
                                 viewModel.updateTargetRepsFromInput(exercise.id, it)
                             },
                             onRemove = { viewModel.removeExercise(exercise.id) },
+                            surfaceColor = surfaceColor,
+                            onSurfaceColor = onSurfaceColor,
+                            tealColor = tealColor,
+                            mutedColor = mutedColor,
+                            borderColor = borderColor,
+                            isDark = isDark
                         )
                         Spacer(Modifier.height(10.dp))
                     }
@@ -277,11 +297,11 @@ fun CustomWorkoutEditorScreen(
                     .fillMaxWidth()
                     .height(50.dp),
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = EditorDark),
+                colors = ButtonDefaults.buttonColors(containerColor = tealColor),
             ) {
                 Text(
                     text = stringResource(R.string.CustomWorkout_save_button),
-                    color = Color.White,
+                    color = if (isDark) Color.Black else Color.White,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -339,7 +359,7 @@ fun CustomWorkoutEditorScreen(
     if (showAddSheet) {
         ModalBottomSheet(
             onDismissRequest = { showAddSheet = false },
-            containerColor = Color.White,
+            containerColor = surfaceColor,
         ) {
             EditorAddExerciseSheet(
                 addableExercises = addableExercises,
@@ -353,17 +373,23 @@ fun CustomWorkoutEditorScreen(
                 onSelectCategory = { selectedCategory = it },
                 onAddExercise = viewModel::addExercise,
                 onClose = { showAddSheet = false },
+                tealColor = tealColor,
+                mutedColor = mutedColor,
+                surfaceColor = surfaceColor,
+                onSurfaceColor = onSurfaceColor,
+                borderColor = borderColor,
+                isDark = isDark
             )
         }
     }
 }
 
 @Composable
-private fun EditorEmptyState(onAddExercise: () -> Unit) {
+private fun EditorEmptyState(onAddExercise: () -> Unit, surfaceColor: Color, mutedColor: Color) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = surfaceColor),
     ) {
         Column(
             modifier = Modifier
@@ -375,7 +401,7 @@ private fun EditorEmptyState(onAddExercise: () -> Unit) {
             Text(
                 text = stringResource(R.string.CustomWorkout_empty),
                 style = MaterialTheme.typography.bodyMedium,
-                color = EditorMuted,
+                color = mutedColor,
             )
             TextButton(onClick = onAddExercise) {
                 Icon(Icons.Default.Add, contentDescription = null)
@@ -399,11 +425,17 @@ private fun EditorSelectedExerciseCard(
     onDecreaseTarget: () -> Unit,
     onTargetInputChange: (String) -> Unit,
     onRemove: () -> Unit,
+    surfaceColor: Color,
+    onSurfaceColor: Color,
+    tealColor: Color,
+    mutedColor: Color,
+    borderColor: Color,
+    isDark: Boolean
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = surfaceColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Row(
@@ -417,7 +449,7 @@ private fun EditorSelectedExerciseCard(
                 modifier = Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFFAE3DC)),
+                    .background(if (isDark) Color(0xFF424242) else Color(0xFFFAE3DC)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -432,13 +464,13 @@ private fun EditorSelectedExerciseCard(
                 Text(
                     text = formatExerciseName(exercise.name),
                     style = MaterialTheme.typography.titleMedium,
-                    color = EditorDark,
+                    color = tealColor,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
                     text = buildExerciseMeta(exercise),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = EditorMuted,
+                    color = mutedColor,
                 )
 
                 Spacer(Modifier.height(8.dp))
@@ -453,7 +485,7 @@ private fun EditorSelectedExerciseCard(
                         Text(
                             text = stringResource(R.string.CustomWorkout_target_input_label),
                             style = MaterialTheme.typography.labelSmall,
-                            color = EditorMuted,
+                            color = mutedColor,
                         )
 
                         Row(
@@ -462,8 +494,8 @@ private fun EditorSelectedExerciseCard(
                         ) {
                             Surface(
                                 shape = CircleShape,
-                                color = Color(0xFFF4F4F4),
-                                border = BorderStroke(1.dp, EditorChipBorder),
+                                color = if (isDark) Color(0xFF1E1E1E) else Color(0xFFF4F4F4),
+                                border = BorderStroke(1.dp, borderColor),
                             ) {
                                 IconButton(
                                     onClick = onDecreaseTarget,
@@ -487,7 +519,7 @@ private fun EditorSelectedExerciseCard(
                                 modifier = Modifier.width(92.dp),
                                 singleLine = true,
                                 textStyle = MaterialTheme.typography.titleSmall.copy(
-                                    color = EditorDark,
+                                    color = onSurfaceColor,
                                     fontWeight = FontWeight.Bold,
                                     textAlign = TextAlign.Center,
                                 ),
@@ -496,12 +528,12 @@ private fun EditorSelectedExerciseCard(
                                 ),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = Color.White,
-                                    unfocusedContainerColor = Color.White,
+                                    focusedContainerColor = surfaceColor,
+                                    unfocusedContainerColor = surfaceColor,
                                     focusedBorderColor = EditorOrange,
-                                    unfocusedBorderColor = Color(0xFFB3AEB8),
-                                    focusedTextColor = EditorDark,
-                                    unfocusedTextColor = EditorDark,
+                                    unfocusedBorderColor = borderColor,
+                                    focusedTextColor = onSurfaceColor,
+                                    unfocusedTextColor = onSurfaceColor,
                                     cursorColor = EditorOrange,
                                 ),
                             )
@@ -509,14 +541,14 @@ private fun EditorSelectedExerciseCard(
                             Text(
                                 text = stringResource(R.string.CustomWorkout_target_input_suffix),
                                 style = MaterialTheme.typography.labelLarge,
-                                color = EditorDark,
+                                color = onSurfaceColor,
                                 fontWeight = FontWeight.SemiBold,
                             )
 
                             Surface(
                                 shape = CircleShape,
-                                color = Color(0xFFF4F4F4),
-                                border = BorderStroke(1.dp, EditorChipBorder),
+                                color = if (isDark) Color(0xFF1E1E1E) else Color(0xFFF4F4F4),
+                                border = BorderStroke(1.dp, borderColor),
                             ) {
                                 IconButton(
                                     onClick = onIncreaseTarget,
@@ -557,7 +589,7 @@ private fun EditorSelectedExerciseCard(
                             R.string.CustomWorkout_remove_exercise,
                             formatExerciseName(exercise.name),
                         ),
-                        tint = Color(0xFF8A8A8A),
+                        tint = mutedColor,
                     )
                 }
             }
@@ -578,6 +610,12 @@ private fun EditorAddExerciseSheet(
     onSelectCategory: (String?) -> Unit,
     onAddExercise: (String) -> Unit,
     onClose: () -> Unit,
+    tealColor: Color,
+    mutedColor: Color,
+    surfaceColor: Color,
+    onSurfaceColor: Color,
+    borderColor: Color,
+    isDark: Boolean
 ) {
     Column(
         modifier = Modifier
@@ -591,7 +629,7 @@ private fun EditorAddExerciseSheet(
             Text(
                 text = stringResource(R.string.CustomWorkout_add_sheet_title),
                 style = MaterialTheme.typography.titleLarge,
-                color = EditorDark,
+                color = tealColor,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
@@ -604,20 +642,20 @@ private fun EditorAddExerciseSheet(
 
         Surface(
             shape = RoundedCornerShape(50.dp),
-            color = Color(0xFFF7F7F7),
-            border = BorderStroke(1.dp, EditorChipBorder),
+            color = if (isDark) Color(0xFF1E1E1E) else Color(0xFFF7F7F7),
+            border = BorderStroke(1.dp, borderColor),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Default.Search, contentDescription = null, tint = EditorMuted)
+                Icon(Icons.Default.Search, contentDescription = null, tint = mutedColor)
                 Spacer(Modifier.size(8.dp))
                 if (searchQuery.isBlank()) {
                     Text(
                         text = stringResource(R.string.CustomWorkout_search_hint),
-                        color = EditorMuted,
+                        color = mutedColor,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -626,7 +664,8 @@ private fun EditorAddExerciseSheet(
                     onValueChange = onSearchChange,
                     singleLine = true,
                     modifier = Modifier.weight(1f),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = EditorDark),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = onSurfaceColor),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(onSurfaceColor)
                 )
             }
         }
@@ -637,7 +676,7 @@ private fun EditorAddExerciseSheet(
             Text(
                 text = stringResource(R.string.CustomWorkout_filter_difficulty),
                 style = MaterialTheme.typography.labelMedium,
-                color = EditorMuted,
+                color = mutedColor,
             )
             Spacer(Modifier.height(8.dp))
             Row(
@@ -648,12 +687,18 @@ private fun EditorAddExerciseSheet(
                     label = stringResource(R.string.CustomWorkout_filter_all),
                     selected = selectedDifficulty == null,
                     onClick = { onSelectDifficulty(null) },
+                    tealColor = tealColor,
+                    surfaceColor = surfaceColor,
+                    borderColor = borderColor
                 )
                 difficulties.forEach { difficulty ->
                     EditorFilterChip(
                         label = difficulty,
                         selected = selectedDifficulty == difficulty,
                         onClick = { onSelectDifficulty(difficulty) },
+                        tealColor = tealColor,
+                        surfaceColor = surfaceColor,
+                        borderColor = borderColor
                     )
                 }
             }
@@ -664,7 +709,7 @@ private fun EditorAddExerciseSheet(
             Text(
                 text = stringResource(R.string.CustomWorkout_filter_category),
                 style = MaterialTheme.typography.labelMedium,
-                color = EditorMuted,
+                color = mutedColor,
             )
             Spacer(Modifier.height(8.dp))
             Row(
@@ -675,12 +720,18 @@ private fun EditorAddExerciseSheet(
                     label = stringResource(R.string.CustomWorkout_filter_all),
                     selected = selectedCategory == null,
                     onClick = { onSelectCategory(null) },
+                    tealColor = tealColor,
+                    surfaceColor = surfaceColor,
+                    borderColor = borderColor
                 )
                 categories.forEach { category ->
                     EditorFilterChip(
                         label = category,
                         selected = selectedCategory == category,
                         onClick = { onSelectCategory(category) },
+                        tealColor = tealColor,
+                        surfaceColor = surfaceColor,
+                        borderColor = borderColor
                     )
                 }
             }
@@ -696,7 +747,7 @@ private fun EditorAddExerciseSheet(
             ) {
                 Text(
                     text = stringResource(R.string.CustomWorkout_no_more_exercises),
-                    color = EditorMuted,
+                    color = mutedColor,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -711,6 +762,9 @@ private fun EditorAddExerciseSheet(
                     EditorAddableExerciseCard(
                         exercise = exercise,
                         onAdd = { onAddExercise(exercise.id) },
+                        surfaceColor = surfaceColor,
+                        tealColor = tealColor,
+                        mutedColor = mutedColor
                     )
                 }
             }
@@ -725,17 +779,20 @@ private fun EditorFilterChip(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    tealColor: Color,
+    surfaceColor: Color,
+    borderColor: Color
 ) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(50.dp),
-        color = if (selected) EditorDark else Color.White,
-        border = if (selected) null else BorderStroke(1.dp, EditorChipBorder),
+        color = if (selected) tealColor else surfaceColor,
+        border = if (selected) null else BorderStroke(1.dp, borderColor),
     ) {
         Text(
             text = label,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            color = if (selected) Color.White else EditorDark,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            color = if (selected) (if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color.Black else Color.White) else tealColor,
             style = MaterialTheme.typography.labelLarge,
         )
     }
@@ -745,11 +802,14 @@ private fun EditorFilterChip(
 private fun EditorAddableExerciseCard(
     exercise: Exercise,
     onAdd: () -> Unit,
+    surfaceColor: Color,
+    tealColor: Color,
+    mutedColor: Color
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF9F9F9)),
+        colors = CardDefaults.cardColors(containerColor = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF1E1E1E) else Color(0xFFF9F9F9)),
     ) {
         Row(
             modifier = Modifier
@@ -761,13 +821,13 @@ private fun EditorAddableExerciseCard(
                 Text(
                     text = formatExerciseName(exercise.name),
                     style = MaterialTheme.typography.titleSmall,
-                    color = EditorDark,
+                    color = tealColor,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text = buildExerciseMeta(exercise),
                     style = MaterialTheme.typography.bodySmall,
-                    color = EditorMuted,
+                    color = mutedColor,
                 )
             }
 

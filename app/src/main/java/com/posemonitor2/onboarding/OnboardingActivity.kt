@@ -33,6 +33,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -54,6 +55,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.posemonitor2.component.ZoomableVideoPlayer
+import com.posemonitor2.ui.theme.PoseMonitor2Theme
 import com.posemonitor2.ui.theme.PoseMonitorAppTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -65,7 +67,8 @@ class OnboardingActivity : ComponentActivity() {
         val mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_INTRO
 
         setContent {
-            PoseMonitorAppTheme {
+            // Onboarding is a pre-login screen — always light theme
+            PoseMonitor2Theme(darkTheme = false, dynamicColor = false) {
                 when (mode) {
                     MODE_FULL_TOUR -> FullTourScreen(onClose = { finish() })
                     else -> IntroOnboardingEntry(
@@ -206,6 +209,7 @@ private fun OnboardingCarouselScreen(
     onSkipped: () -> Unit,
     onLearnMore: () -> Unit,
 ) {
+    // ... slides ...
     val slides = remember {
         listOf(
             IntroSlide(
@@ -270,7 +274,7 @@ private fun OnboardingCarouselScreen(
     val isLastPage = pagerState.currentPage == slides.lastIndex
     var dontShowAgain by rememberSaveable { mutableStateOf(false) }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF0E1F20)) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Button(
@@ -367,24 +371,24 @@ private fun OnboardingCarouselScreen(
 private fun IntroSlideCard(slide: IntroSlide) {
     Card(
         modifier = Modifier.fillMaxSize(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF173436)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(20.dp),
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
-            Text(slide.title, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+            Text(slide.title, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(10.dp))
-            Text(slide.subtitle, fontSize = 15.sp, color = Color(0xFFCEE7E9), lineHeight = 22.sp)
+            Text(slide.subtitle, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 22.sp)
             Spacer(Modifier.height(18.dp))
             slide.bullets.forEach { bullet ->
                 Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(bottom = 10.dp)) {
                     Icon(
                         Icons.Default.CheckCircle,
                         contentDescription = null,
-                        tint = Color(0xFFE8622E),
+                        tint = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.padding(top = 2.dp),
                     )
                     Spacer(Modifier.width(10.dp))
-                    Text(text = bullet, color = Color.White, lineHeight = 20.sp)
+                    Text(text = bullet, color = MaterialTheme.colorScheme.onSurface, lineHeight = 20.sp)
                 }
             }
         }
@@ -463,18 +467,22 @@ private fun FullTourScreen(onClose: () -> Unit) {
     val isFirst = pagerState.currentPage == 0
     val isLast = pagerState.currentPage == slides.lastIndex
 
-    Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFFF4F5F5)) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF123133))
+                    .background(MaterialTheme.colorScheme.primary)
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Full App Tour", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Button(onClick = onClose, shape = RoundedCornerShape(10.dp)) { Text("Close") }
+                Text("Full App Tour", color = MaterialTheme.colorScheme.onPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Button(
+                    onClick = onClose,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                ) { Text("Close", color = MaterialTheme.colorScheme.onSecondary) }
             }
 
             HorizontalPager(
@@ -486,7 +494,7 @@ private fun FullTourScreen(onClose: () -> Unit) {
                 Card(
                     modifier = Modifier.fillMaxSize(),
                     shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 ) {
                     Column(
                         modifier = Modifier
@@ -498,13 +506,13 @@ private fun FullTourScreen(onClose: () -> Unit) {
                             text = slides[page].title,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF123133),
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
                             text = slides[page].subtitle,
                             fontSize = 14.sp,
-                            color = Color(0xFF4A5D5F),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 21.sp,
                         )
 
@@ -518,13 +526,13 @@ private fun FullTourScreen(onClose: () -> Unit) {
                                 Icon(
                                     imageVector = Icons.Default.CheckCircle,
                                     contentDescription = null,
-                                    tint = Color(0xFFE8622E),
+                                    tint = MaterialTheme.colorScheme.secondary,
                                     modifier = Modifier.padding(top = 2.dp),
                                 )
                                 Spacer(Modifier.width(10.dp))
                                 Text(
                                     text = bullet,
-                                    color = Color(0xFF223638),
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 14.sp,
                                     lineHeight = 20.sp,
                                 )
