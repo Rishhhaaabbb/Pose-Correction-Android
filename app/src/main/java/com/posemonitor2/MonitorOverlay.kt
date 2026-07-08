@@ -9,8 +9,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FlipCameraAndroid
 import androidx.compose.material.icons.rounded.VolumeOff
@@ -22,12 +24,13 @@ import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.material.icons.rounded.ScreenRotation
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.ZoomIn
-import androidx.compose.material.icons.rounded.ZoomOut
 import androidx.compose.material.icons.rounded.Help
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.TextButton
@@ -39,7 +42,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
@@ -66,6 +68,7 @@ import com.core.poseengine.model.SkeletonConnections
 import com.core.poseengine.monitor.FrameStatus
 import com.core.poseengine.monitor.MonitorPhase
 import com.posemonitor2.component.ZoomableVideoPlayer
+import com.posemonitor2.VoiceManager
 import com.presentation.graphviz.SkeletonNormalizer
 import com.presentation.graphviz.drawAnatomicalFigure
 import com.core.poseengine.model.KeypointIndex
@@ -86,54 +89,6 @@ private val COLOR_ERROR_RED    = Color(0xFFFF0000)
 private val COLOR_ERROR_YELLOW = Color(0xFFFFFF00)
 private val COLOR_ERROR_GREEN  = Color(0xFF00FF00)
 private val COLOR_PANEL_TEXT   = Color(0xFF282828)
-
-// ── Gradient Brush Cache for Performance ──────────────────────────────────────
-// Pre-computed radial gradient brushes to avoid creating new Color objects every frame
-// This eliminates ~170 Color allocations per frame (85 per skeleton × 2 skeletons)
-
-private class GradientBrushCache {
-    // Cache for ghost skeleton gradients
-    private val ghostGradients = mutableMapOf<Pair<Color, Float>, androidx.compose.ui.graphics.Brush>()
-    
-    // Cache for live skeleton gradients
-    private val liveGradients = mutableMapOf<Pair<Color, Float>, androidx.compose.ui.graphics.Brush>()
-    
-    fun getGhostGradient(baseColor: Color, alpha: Float, center: Offset, radius: Float): androidx.compose.ui.graphics.Brush {
-        val key = baseColor to alpha
-        return ghostGradients.getOrPut(key) {
-            androidx.compose.ui.graphics.Brush.radialGradient(
-                colors = listOf(
-                    baseColor.copy(alpha = alpha * 0.3f),  // Outer glow
-                    baseColor.copy(alpha = alpha),          // Mid ring
-                    baseColor.copy(alpha = alpha),          // Inner body
-                    Color.White.copy(alpha = alpha * 0.8f), // Bright core
-                )
-            )
-        }
-    }
-    
-    fun getLiveGradient(statusColor: Color, center: Offset, radius: Float): androidx.compose.ui.graphics.Brush {
-        // For live skeleton, we use statusColor directly (already varies by joint)
-        // We cache by color to avoid repeated gradient creation
-        return liveGradients.getOrPut(statusColor to radius) {
-            androidx.compose.ui.graphics.Brush.radialGradient(
-                colors = listOf(
-                    statusColor.copy(alpha = 0.3f),  // Outer glow
-                    statusColor.copy(alpha = 0.6f),  // Mid ring  
-                    statusColor,                      // Main body
-                    Color.White.copy(alpha = 0.9f),  // Bright core
-                )
-            )
-        }
-    }
-    
-    fun clear() {
-        ghostGradients.clear()
-        liveGradients.clear()
-    }
-}
-
-private val gradientCache = GradientBrushCache()
 
 // ── Joint → FeatureKey mapping ────────────────────────────────────────────────
 
@@ -191,12 +146,16 @@ fun MonitorOverlay(
     guidancePreviewState: PoseState?,
     deviations: Map<FeatureKey, Double>,
     repHistory: List<Double> = emptyList(),
+    liveAccuracy: Float = 0f,
+    liveFps: Double = 0.0,
+    liveFeatureCount: Int = 0,
     cameraFrameSize: Size = Size.Zero,
     frameRotationDegrees: Int = 0,
     isFrontCamera: Boolean = true,
     onToggleCamera: () -> Unit = {},
     isMuted: Boolean = false,
     onToggleMute: () -> Unit = {},
+    voiceManager: VoiceManager? = null,
     zoomLevel: Float = 0f,
     onZoomChange: (Float) -> Unit = {},
     currentZoomRatio: Float = 1.0f,
@@ -215,31 +174,21 @@ fun MonitorOverlay(
     val displayState = if (isGuidance) guidancePreviewState else targetState
     var panelExpanded by rememberSaveable { mutableStateOf(false) }
     var settingsExpanded by rememberSaveable { mutableStateOf(false) }
-    var zoomExpanded by rememberSaveable { mutableStateOf(false) }
     var tutorialMode by rememberSaveable { mutableStateOf(TutorialDisplayMode.OFF) }
     var showTargetPanel by rememberSaveable { mutableStateOf(true) }
     val context = LocalContext.current
     var showHelpDialog by rememberSaveable { mutableStateOf(false) }
 
     var debugEnabled by rememberSaveable { mutableStateOf(false) }
-    val debugTapTimes = remember { mutableStateListOf<Long>() }
+    // Plain MutableList — not a SnapshotStateList — to avoid concurrent-modification
+    // issues that caused removeAll to silently fail and the count to never reach 5.
+    val debugTapTimes = remember { mutableListOf<Long>() }
     val debugEvents = remember { mutableStateListOf<String>() }
     var lastLoggedStateId by remember { mutableStateOf(frameStatus.stateId) }
     var lastLoggedPhase by remember { mutableStateOf(frameStatus.phase) }
 
     val holdTarget = targetHoldDurationSeconds ?: displayState?.minHoldDuration
     val holdElapsed = holdTarget?.times(frameStatus.holdProgress.coerceIn(0.0, 1.0))
-    val minDisplayZoomRatio = 0.5f
-    var requestedZoomRatio by rememberSaveable { mutableFloatStateOf(currentZoomRatio.coerceIn(minDisplayZoomRatio, maxZoomRatio)) }
-    var isZoomDragging by remember { mutableStateOf(false) }
-
-    LaunchedEffect(currentZoomRatio, minZoomRatio, maxZoomRatio, minDisplayZoomRatio, isZoomDragging) {
-        if (isZoomDragging) return@LaunchedEffect
-        val coercedCurrent = currentZoomRatio.coerceIn(minDisplayZoomRatio, maxZoomRatio)
-        if (requestedZoomRatio >= minZoomRatio || kotlin.math.abs(requestedZoomRatio - coercedCurrent) < 0.01f) {
-            requestedZoomRatio = coercedCurrent
-        }
-    }
 
     fun appendDebugEvent(message: String) {
         val stamped = "${SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())}  $message"
@@ -266,10 +215,47 @@ fun MonitorOverlay(
 
     val videoAssetPath = exerciseName?.removeSuffix(".json")?.let { "$it.mp4" }
 
+    // Stop any in-progress speech immediately when the user mutes
+    LaunchedEffect(isMuted) {
+        if (isMuted) voiceManager?.stop()
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
 
-        // ── Video Tutorial Panel (Top Center / Center) ──────────────────────
-        // ... (existing code for Video Tutorial Panel)
+        // ── Video Tutorial Panel ──────────────────────────────────────────────
+        // Shown when the user taps the demo video button in settings.
+        // COMPACT = small overlay (top-left), WIDESPREAD = larger overlay.
+        // Hidden (tutorialMode == OFF) by default.
+        if (tutorialMode != TutorialDisplayMode.OFF && videoAssetPath != null) {
+            val videoWidth  = if (tutorialMode == TutorialDisplayMode.WIDESPREAD) 300.dp else 160.dp
+            val videoHeight = if (tutorialMode == TutorialDisplayMode.WIDESPREAD) 170.dp else 90.dp
+
+            AnimatedVisibility(
+                visible = tutorialMode != TutorialDisplayMode.OFF,
+                enter = fadeIn() + expandIn(expandFrom = Alignment.TopStart),
+                exit  = fadeOut() + shrinkOut(shrinkTowards = Alignment.TopStart),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(start = 12.dp, top = 56.dp), // below the quit button
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.Transparent,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x44FFFFFF)),
+                    modifier = Modifier
+                        .width(videoWidth)
+                        .height(videoHeight)
+                        .clip(RoundedCornerShape(12.dp)),
+                ) {
+                    ZoomableVideoPlayer(
+                        videoAssetPath = videoAssetPath,
+                        useController = false,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
 
         val isBodyMissing = skeleton == null || frameStatus.feedback.contains("only one person")
 
@@ -383,7 +369,11 @@ fun MonitorOverlay(
                             enter   = fadeIn() + expandVertically(expandFrom = Alignment.Top),
                             exit    = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
                         ) {
+                            // Height-constrained scroll so buttons don't collide in landscape
                             Column(
+                                modifier = Modifier
+                                    .heightIn(max = 320.dp)
+                                    .verticalScroll(rememberScrollState()),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                                 horizontalAlignment = Alignment.End
                             ) {
@@ -453,7 +443,7 @@ fun MonitorOverlay(
                                     )
                                 }
 
-                                // ── Nested Zoom Toggle ────────────────────────
+                                // ── Help ──────────────────────────────────────
                                 IconButton(
                                     onClick = { showHelpDialog = true },
                                     modifier = Modifier
@@ -468,46 +458,61 @@ fun MonitorOverlay(
                                     )
                                 }
 
+                                // ── Zoom hint ────────────────────────────────
                                 IconButton(
-                                    onClick = { zoomExpanded = !zoomExpanded },
+                                    onClick = {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "Pinch to zoom in or out",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    },
                                     modifier = Modifier
-                                        .background(
-                                            if (zoomExpanded) Color(0x99000000) else Color(0x66000000),
-                                            RoundedCornerShape(50)
-                                        )
+                                        .background(Color(0x66000000), RoundedCornerShape(50))
                                         .size(40.dp)
                                 ) {
                                     Icon(
-                                        imageVector = if (zoomExpanded) Icons.Rounded.ZoomOut else Icons.Rounded.ZoomIn,
+                                        imageVector = Icons.Rounded.ZoomIn,
                                         contentDescription = stringResource(R.string.monitor_toggle_zoom_slider),
-                                        tint = if (zoomExpanded) Color(0xFFE8622E) else Color.White,
+                                        tint = Color.White,
                                         modifier = Modifier.size(24.dp)
                                     )
                                 }
-                                // Manual rotate control: user can explicitly rotate the UI.
-                                TextButton(
+
+                                // ── Manual Rotate ─────────────────────────────
+                                // Lets the user flip between portrait and landscape
+                                // independently of the auto-rotate setting.
+                                var orientationIsLandscape by remember {
+                                    mutableStateOf(
+                                        (context as? android.app.Activity)?.requestedOrientation ==
+                                                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                    )
+                                }
+                                IconButton(
                                     onClick = {
-                                        // Toggle between portrait and landscape on user request.
-                                        val act = context as? android.app.Activity ?: return@TextButton
+                                        val act = context as? android.app.Activity ?: return@IconButton
                                         try {
-                                            val current = act.requestedOrientation
-                                            val newOrient = when (current) {
-                                                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                                                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                                ActivityInfo.SCREEN_ORIENTATION_NOSENSOR -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                                else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                            }
+                                            val newOrient = if (orientationIsLandscape)
+                                                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                            else
+                                                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                                             act.requestedOrientation = newOrient
+                                            orientationIsLandscape = !orientationIsLandscape
                                             appendDebugEvent("User requested rotate -> $newOrient")
                                         } catch (e: Exception) {
                                             appendDebugEvent("Rotate failed: ${e.message}")
                                         }
                                     },
                                     modifier = Modifier
-                                        .background(Color(0x66000000), RoundedCornerShape(8.dp))
-                                        .height(36.dp)
+                                        .background(Color(0x66000000), RoundedCornerShape(50))
+                                        .size(40.dp)
                                 ) {
-                                    Text(text = "Rotate", color = Color.White, fontSize = 12.sp)
+                                    Icon(
+                                        imageVector = Icons.Rounded.ScreenRotation,
+                                        contentDescription = "Rotate screen",
+                                        tint = if (orientationIsLandscape) Color(0xFFE8622E) else Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
                                 }
                             }
                         }
@@ -565,33 +570,89 @@ fun MonitorOverlay(
                 shape = RoundedCornerShape(12.dp),
                 color = Color(0xCC111111),
             ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Debug Transition Overlay", color = Color(0xFFFFB79E), fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text("State: ${frameStatus.stateId}   Phase: ${frameStatus.phase.name}", color = Color.White, fontSize = 12.sp)
+                Column(
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    // ── Header ────────────────────────────────────────────────
                     Text(
-                        "Hold elapsed: ${holdElapsed?.let { "%.2f".format(it) } ?: "--"}s / ${holdTarget?.let { "%.2f".format(it) } ?: "--"}s",
-                        color = Color.White,
-                        fontSize = 12.sp,
+                        "⚙ Debug Overlay",
+                        color = Color(0xFFFFB79E),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
                     )
 
+                    HorizontalDivider(color = Color(0x44FFFFFF), thickness = 0.5.dp)
+
+                    // ── Performance ───────────────────────────────────────────
+                    Text("PERFORMANCE", color = Color(0xFF9BD2D8), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        DebugStatItem(
+                            label = "FPS",
+                            value = "%.1f".format(liveFps),
+                            color = when {
+                                liveFps >= 25.0 -> Color(0xFF66FF99)
+                                liveFps >= 15.0 -> Color(0xFFFFDD55)
+                                else -> Color(0xFFFF6666)
+                            }
+                        )
+                        DebugStatItem(label = "Features", value = liveFeatureCount.toString(), color = Color.White)
+                        DebugStatItem(label = "Reps", value = frameStatus.repsCompleted.toString(), color = Color.White)
+                        DebugStatItem(label = "Streak", value = frameStatus.streak.toString(), color = Color.White)
+                    }
+
+                    HorizontalDivider(color = Color(0x33FFFFFF), thickness = 0.5.dp)
+
+                    // ── State ─────────────────────────────────────────────────
+                    Text("STATE", color = Color(0xFF9BD2D8), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "ID: ${frameStatus.stateId}   Phase: ${frameStatus.phase.name}   Seq: ${frameStatus.sequenceIndex}",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                    )
+                    Text(
+                        "Correct: ${frameStatus.isCorrect}   InGrace: ${frameStatus.inGrace}",
+                        color = if (frameStatus.isCorrect) Color(0xFF66FF99) else Color(0xFFFF8866),
+                        fontSize = 11.sp,
+                    )
+                    Text(
+                        "Hold: ${holdElapsed?.let { "%.2f".format(it) } ?: "--"}s / ${holdTarget?.let { "%.2f".format(it) } ?: "--"}s   Progress: ${"%.0f".format(frameStatus.holdProgress * 100)}%",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                    )
+
+                    HorizontalDivider(color = Color(0x33FFFFFF), thickness = 0.5.dp)
+
+                    // ── Top deviations ────────────────────────────────────────
                     val topDeviations = deviations.entries
                         .sortedByDescending { abs(it.value) }
                         .take(5)
 
                     if (topDeviations.isNotEmpty()) {
-                        Text("Top deviations:", color = Color(0xFF9BD2D8), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        topDeviations.forEach {
-                            Text(
-                                "${it.key.name}: ${"%.3f".format(it.value)}",
-                                color = Color(0xFFD9E8E9),
-                                fontSize = 11.sp,
-                            )
+                        Text("TOP DEVIATIONS", color = Color(0xFF9BD2D8), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                        topDeviations.forEach { (key, value) ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(key.name, color = Color(0xFFD9E8E9), fontSize = 11.sp)
+                                Text(
+                                    "%.3f".format(value),
+                                    color = if (abs(value) > 0.5) Color(0xFFFF8866) else Color(0xFFD9E8E9),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
                         }
                     }
 
+                    // ── Recent events ─────────────────────────────────────────
                     if (debugEvents.isNotEmpty()) {
-                        Text("Recent logs:", color = Color(0xFF9BD2D8), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        debugEvents.take(7).forEach {
+                        HorizontalDivider(color = Color(0x33FFFFFF), thickness = 0.5.dp)
+                        Text("EVENTS", color = Color(0xFF9BD2D8), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                        debugEvents.take(6).forEach {
                             Text(it, color = Color(0xFFD9E8E9), fontSize = 10.sp, lineHeight = 14.sp)
                         }
                     }
@@ -669,6 +730,7 @@ fun MonitorOverlay(
             isCorrect = frameStatus.isCorrect,
             inGrace = frameStatus.inGrace,
             holdProgress = frameStatus.holdProgress.toFloat(),
+            liveAccuracy = liveAccuracy,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(end = 24.dp)
@@ -676,119 +738,6 @@ fun MonitorOverlay(
                 .height(200.dp)
         )
 
-        // ── Hardware Zoom Slider (Toggled) ────────────────────────────────────
-        AnimatedVisibility(
-            visible = zoomExpanded,
-            enter = fadeIn() + expandHorizontally(expandFrom = Alignment.End),
-            exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.End),
-            modifier = Modifier.align(Alignment.CenterEnd)
-        ) {
-            Box(
-                modifier = Modifier
-                    .padding(end = 48.dp)
-                    .width(60.dp)
-                    .height(260.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                val ratioRange = (maxZoomRatio - minDisplayZoomRatio).takeIf { it > 0f } ?: 1f
-                val requestedNormalized = ((requestedZoomRatio - minDisplayZoomRatio) / ratioRange).coerceIn(0f, 1f)
-                val actualNormalized = ((currentZoomRatio - minDisplayZoomRatio) / ratioRange).coerceIn(0f, 1f)
-                val sliderValue = requestedZoomRatio.coerceIn(minDisplayZoomRatio, maxZoomRatio)
-
-                // Track Area height is 200dp
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxHeight()
-                ) {
-                    // Max Zoom Label (Fixed at Top)
-                    Text(
-                        text = "${"%.1f".format(maxZoomRatio)}x",
-                        color = Color.White.copy(alpha = 0.5f),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(bottom = 6.dp)
-                    )
-                    
-                    // The Track + Flowing Indicator
-                    Box(
-                        modifier = Modifier
-                            .height(200.dp)
-                            .width(60.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // 1. Vertical Track (More Contrast)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .width(6.dp)
-                                .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(3.dp))
-                        ) {
-                            // Progress Fill (from bottom up)
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .fillMaxHeight(requestedNormalized.coerceIn(0.01f, 1f))
-                                    .align(Alignment.BottomCenter)
-                                    .background(Color(0xFFE8622E), RoundedCornerShape(3.dp))
-                            )
-                        }
-
-                        // 2. Floating "Flowing" Indicator
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = BiasAlignment(0f, 1f - 2f * actualNormalized.coerceIn(0f, 1f))
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .offset(x = (-34).dp)
-                                    .background(Color(0xAA1A1A1A), RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = "${"%.1f".format(currentZoomRatio)}x",
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
-                                Spacer(Modifier.width(2.dp))
-                                Box(modifier = Modifier.size(4.dp).background(Color.White, CircleShape))
-                            }
-                        }
-
-                        // 3. Invisible Slider for interactions
-                        androidx.compose.material3.Slider(
-                            value = sliderValue,
-                            onValueChange = {
-                                isZoomDragging = true
-                                requestedZoomRatio = it
-                                onZoomRatioChange(it)
-                            },
-                            onValueChangeFinished = { isZoomDragging = false },
-                            valueRange = minDisplayZoomRatio..maxZoomRatio,
-                            modifier = Modifier
-                                .graphicsLayer { rotationZ = -90f }
-                                .width(200.dp)
-                                .height(60.dp),
-                            colors = androidx.compose.material3.SliderDefaults.colors(
-                                thumbColor = Color.Transparent,
-                                activeTrackColor = Color.Transparent,
-                                inactiveTrackColor = Color.Transparent
-                            )
-                        )
-                    }
-
-                    // Min Zoom Label (Fixed at Bottom)
-                    Text(
-                        text = "${"%.1f".format(minDisplayZoomRatio)}x",
-                        color = Color.White.copy(alpha = 0.5f),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(top = 6.dp)
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -970,63 +919,51 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGhostStickFigur
         !(kpt.x == 0f && kpt.y == 0f) && !kpt.x.isNaN() && !kpt.y.isNaN()
     }
 
-    // ── OPTIMIZATION: Pre-compute joint alphas in a single pass ──────────────
-    // Original: O(features × joints) forEach loop per joint during draw
-    // Optimized: O(joints) single pass, then O(1) array lookup per joint
-    val jointAlphas = FloatArray(keypoints.size)
     for (idx in pts.indices) {
-        if (!valid[idx]) {
-            jointAlphas[idx] = 0f
-            continue
-        }
+        if (!valid[idx]) continue
         
         val features = JOINT_TO_FEATURES[idx]
-        if (features == null) {
-            jointAlphas[idx] = 0.2f * blinkAlpha
-            continue
-        }
-        
-        var maxRatio = 0f
-        var hasInfo = false
-        for (key in features) {
-            val dev = deviations[key]
-            if (dev != null) {
-                hasInfo = true
-                val tol = tolerances[key] ?: 1.0
-                val ratio = (abs(dev) / tol).toFloat()
-                if (ratio > maxRatio) maxRatio = ratio
+        val alpha = if (features == null) {
+            0.2f * blinkAlpha
+        } else {
+            var maxRatio = 0f
+            var hasInfo = false
+            for (key in features) {
+                val dev = deviations[key]
+                if (dev != null) {
+                    hasInfo = true
+                    val tol = tolerances[key] ?: 1.0
+                    val ratio = (abs(dev) / tol).toFloat()
+                    if (ratio > maxRatio) maxRatio = ratio
+                }
+            }
+            if (!hasInfo || maxRatio > 1.0f) {
+                blinkAlpha
+            } else {
+                0.1f * blinkAlpha 
             }
         }
-        
-        jointAlphas[idx] = if (!hasInfo || maxRatio > 1.0f) {
-            blinkAlpha
-        } else {
-            0.1f * blinkAlpha 
-        }
-    }
 
-    // Helper to get bone alpha from pre-computed joint alphas
-    fun getBoneAlpha(bone: Int?): Float {
-        if (bone == null) return blinkAlpha
-        val features = BONE_TO_FEATURES[bone] ?: return blinkAlpha
+        if (alpha <= 0.01f) continue
         
-        var maxRatio = 0f
-        var hasInfo = false
-        for (key in features) {
-            val dev = deviations[key]
-            if (dev != null) {
-                hasInfo = true
-                val tol = tolerances[key] ?: 1.0
-                val ratio = (abs(dev) / tol).toFloat()
-                if (ratio > maxRatio) maxRatio = ratio
-            }
-        }
+        val pt = pts[idx]
+        val radius = 6f * (scale / 400f).coerceIn(0.8f, 2.0f)
         
-        return if (!hasInfo || maxRatio > 1.0f) {
-            blinkAlpha
-        } else {
-            0.1f * blinkAlpha 
-        }
+        drawCircle(
+            color = color.copy(alpha = alpha * 0.3f),
+            radius = radius * 2.2f,
+            center = pt
+        )
+        drawCircle(
+            color = color.copy(alpha = alpha),
+            radius = radius * 1.2f,
+            center = pt
+        )
+        drawCircle(
+            color = Color.White.copy(alpha = alpha * 0.8f),
+            radius = radius * 0.5f,
+            center = pt
+        )
     }
 
     // 1. Draw Bones as Diamonds (Matching the live skeleton style)
@@ -1034,7 +971,28 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGhostStickFigur
         val aIdx = SkeletonConnections.boneIndices[i * 2]
         val bIdx = SkeletonConnections.boneIndices[i * 2 + 1]
         if (valid[aIdx] && valid[bIdx]) {
-            val alpha = getBoneAlpha(i)
+            val features = BONE_TO_FEATURES[i]
+            val alpha = if (features == null) {
+                blinkAlpha
+            } else {
+                var maxRatio = 0f
+                var hasInfo = false
+                for (key in features) {
+                    val dev = deviations[key]
+                    if (dev != null) {
+                        hasInfo = true
+                        val tol = tolerances[key] ?: 1.0
+                        val ratio = (abs(dev) / tol).toFloat()
+                        if (ratio > maxRatio) maxRatio = ratio
+                    }
+                }
+                if (!hasInfo || maxRatio > 1.0f) {
+                    blinkAlpha
+                } else {
+                    0.1f * blinkAlpha 
+                }
+            }
+
             if (alpha <= 0.01f) continue
             
             val start = pts[aIdx]
@@ -1048,31 +1006,6 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGhostStickFigur
                 maxWidth = 16f * (scale / 400f).coerceIn(0.5f, 2.5f)
             )
         }
-    }
-
-    // 2. Draw Joints as Glowing Spheres with Radial Gradient
-    // ── OPTIMIZATION: Single drawCircle with radial gradient brush ───────────
-    // Original: 3 drawCircle calls per joint = 51 calls for 17 joints
-    // Optimized: 1 drawCircle per joint = 17 calls (66% reduction)
-    val scaleFactor = (scale / 400f).coerceIn(0.8f, 2.0f)
-    
-    for (idx in pts.indices) {
-        if (!valid[idx]) continue
-        
-        val alpha = jointAlphas[idx]
-        if (alpha <= 0.01f) continue
-        
-        val pt = pts[idx]
-        val radius = 6f * scaleFactor
-        
-        // Single drawCircle with cached radial gradient (replaces 3 separate calls)
-        // OPTIMIZATION: Uses pre-computed gradient from cache to avoid Color.copy() allocations
-        val gradient = gradientCache.getGhostGradient(color, alpha, pt, radius * 2.2f)
-        drawCircle(
-            brush = gradient,
-            radius = radius * 2.2f,
-            center = pt
-        )
     }
 }
 
@@ -1188,9 +1121,6 @@ private fun LiveSkeletonOverlay(
         }
 
         // Draw joints as glowing spheres with radial gradient
-        // ── OPTIMIZATION: Single drawCircle with radial gradient brush ───────────
-        // Original: 3 drawCircle calls per joint = 51 calls for 17 joints
-        // Optimized: 1 drawCircle per joint = 17 calls (66% reduction)
         skeleton.keypoints.forEachIndexed { idx, kpt ->
             if (kpt.confidence < 0.2f) return@forEachIndexed
             val center     = kptToScreen(kpt.x.toFloat(), kpt.y.toFloat())
@@ -1210,13 +1140,24 @@ private fun LiveSkeletonOverlay(
                 else -> COLOR_JOINT_WHITE to 6f
             }
 
-            // Single drawCircle with cached radial gradient (replaces 3 separate calls)
-            // This reduces from 51 to 17 draw calls per frame
-            // OPTIMIZATION: Uses pre-computed gradient from cache to avoid Color.copy() allocations
-            val gradient = gradientCache.getLiveGradient(statusColor, center, radius * 2.2f)
             drawCircle(
-                brush = gradient,
+                color = statusColor.copy(alpha = 0.3f),
                 radius = radius * 2.2f,
+                center = center
+            )
+            drawCircle(
+                color = statusColor.copy(alpha = 0.6f),
+                radius = radius * 1.2f,
+                center = center
+            )
+            drawCircle(
+                color = statusColor,
+                radius = radius * 0.8f,
+                center = center
+            )
+            drawCircle(
+                color = Color.White.copy(alpha = 0.9f),
+                radius = radius * 0.3f,
                 center = center
             )
         }
@@ -1516,14 +1457,43 @@ private fun appendTransitionDebugLog(context: Context, message: String) {
     }
 }
 
+// ── Debug stat item ───────────────────────────────────────────────────────────
+
+@Composable
+private fun DebugStatItem(label: String, value: String, color: Color = Color.White) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            color = color,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = label,
+            color = Color(0xFF888888),
+            fontSize = 9.sp,
+        )
+    }
+}
+
 @Composable
 fun PerformanceAccuracyBar(
     isCorrect: Boolean,
     inGrace: Boolean,
     holdProgress: Float,
+    liveAccuracy: Float = 0f,
     modifier: Modifier = Modifier
 ) {
-    if (holdProgress <= 0.01f) return
+    // Don't show the bar before the first HOLDING frame
+    if (holdProgress <= 0.01f && liveAccuracy <= 0.01f) return
+
+    // Animate the accuracy fill smoothly so rapid form fluctuations
+    // don't cause the bar to jump around distractingly.
+    val animatedAccuracy by animateFloatAsState(
+        targetValue = liveAccuracy.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 300),
+        label = "accuracy_fill"
+    )
 
     val barColor = when {
         inGrace   -> COLOR_GRACE
@@ -1536,13 +1506,31 @@ fun PerformanceAccuracyBar(
             .clip(RoundedCornerShape(10.dp))
             .background(Color.Gray.copy(alpha = 0.2f))
     ) {
+        // ── Fill: height driven by rolling accuracy ───────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(holdProgress.coerceIn(0f, 1f))
+                .fillMaxHeight(animatedAccuracy)
                 .align(Alignment.BottomCenter)
                 .background(barColor)
         )
+
+        // ── Tick mark: shows hold-progress position on the bar ────────────────
+        // A thin white line travels up the bar as the hold timer fills.
+        // This keeps the hold-timer feedback visible even though it no longer
+        // controls the bar height.
+        if (holdProgress in 0.01f..0.99f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .align(Alignment.BottomCenter)
+                    .graphicsLayer {
+                        translationY = -size.height * holdProgress.coerceIn(0f, 1f)
+                    }
+                    .background(Color.White.copy(alpha = 0.8f))
+            )
+        }
     }
 }
 

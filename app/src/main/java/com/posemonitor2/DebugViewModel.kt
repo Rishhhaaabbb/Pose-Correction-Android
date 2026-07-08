@@ -26,6 +26,7 @@ import com.domain.model.SessionStatus
 import com.domain.model.WorkoutSession
 import com.domain.repository.AuthRepository
 import com.domain.repository.ExerciseRepository
+import com.domain.usecase.DeleteWorkoutSessionUseCase
 import com.domain.usecase.ObserveAuthSessionUseCase
 import com.domain.usecase.ObserveDailyStatsUseCase
 import com.domain.usecase.SavePoseGraphUseCase
@@ -53,6 +54,7 @@ class DebugViewModel @Inject constructor(
     private val observeAuthSessionUseCase: ObserveAuthSessionUseCase,
     private val observeDailyStatsUseCase: ObserveDailyStatsUseCase,
     private val saveWorkoutSessionUseCase: SaveWorkoutSessionUseCase,
+    private val deleteWorkoutSessionUseCase: DeleteWorkoutSessionUseCase,
     private val saveSessionMetricUseCase: SaveSessionMetricUseCase,
     private val upsertDailyStatUseCase: com.domain.usecase.UpsertDailyStatUseCase,
     private val savePoseGraphUseCase: SavePoseGraphUseCase,
@@ -64,8 +66,15 @@ class DebugViewModel @Inject constructor(
 
     // ── Public StateFlows ─────────────────────────────────────────────────────
 
-    val isFrontCamera       = MutableStateFlow(true)
-    val isMuted             = MutableStateFlow(false)
+    /** Tracks whether we have ever launched the camera permission request dialog. */
+    var cameraPermissionEverRequested: Boolean = false
+
+    val isFrontCamera             = MutableStateFlow(true)
+    val isMuted                   = MutableStateFlow(false)
+    /** Flipped to true once the user grants CAMERA permission. */
+    val cameraPermissionGranted   = MutableStateFlow(false)
+    /** Flipped to true when the user selects "Don't ask again" (permanent denial). */
+    val cameraPermissionPermanentlyDenied = MutableStateFlow(false)
     val currentSkeleton      = MutableStateFlow<Skeleton2d?>(null)
     val cameraFrameSize      = MutableStateFlow<Size?>(null)
     val frameStatus          = MutableStateFlow<FrameStatus?>(null)
@@ -106,6 +115,14 @@ class DebugViewModel @Inject constructor(
     // Tracks the historical accuracy of each completed rep [0.0 - 1.0]
     val completedRepAccuracies = MutableStateFlow<List<Double>>(emptyList())
 
+    // Live rolling accuracy for the current rep [0.0 - 1.0], updated every frame.
+    // Drives the PerformanceAccuracyBar height so the bar reflects real-time form.
+    val liveRepAccuracy = MutableStateFlow(0f)
+
+    // Debug stats updated every frame — only consumed when debug overlay is visible.
+    val liveFps          = MutableStateFlow(0.0)
+    val liveFeatureCount = MutableStateFlow(0)
+
     // Target rep count for current session
     val targetReps = MutableStateFlow(10)
     val currentRepCount = MutableStateFlow(0)
@@ -118,6 +135,8 @@ class DebugViewModel @Inject constructor(
     private var currentGraphEntry: GraphEntry? = null
     private var sessionStartEpochMs: Long = 0L
     private var completionPersisted: Boolean = false
+    /** ID of the most recently auto-saved completed session. Used by discardLastSession(). */
+    private var lastSavedSessionId: String? = null
 
     // Shared auth state - updated from repository
     private val authUserId: String?
@@ -180,6 +199,7 @@ class DebugViewModel @Inject constructor(
         lastRepsCompleted = 0
         skipUsedInCurrentRep = false
         completedRepAccuracies.value = emptyList()
+        liveRepAccuracy.value = 0f
     }
 
     fun resetSessionState() {
@@ -194,6 +214,20 @@ class DebugViewModel @Inject constructor(
         useCase = null
         pipelineJob?.cancel()
         pipelineJob = null
+    }
+
+    /**
+     * Deletes the most recently auto-saved session from Room (and best-effort from Firestore).
+     * Call this when the user taps "Discard" on the session summary screen.
+     */
+    fun discardLastSession() {
+        val id = lastSavedSessionId ?: return
+        viewModelScope.launch {
+            deleteWorkoutSessionUseCase(id)
+                .onSuccess { Log.d(TAG, "Session discarded: id=$id") }
+                .onFailure { Log.e(TAG, "Failed to discard session: id=$id", it) }
+            lastSavedSessionId = null
+        }
     }
 
     fun startPipeline(
@@ -261,26 +295,22 @@ class DebugViewModel @Inject constructor(
                     // ── Track Rep History & Diagnostic Logs ───────────────────
                     updateRepHistory(result.frameStatus)
                     persistSessionIfComplete(result.frameStatus)
+
+                    // ── Live rolling accuracy (drives the accuracy bar) ────────
+                    liveRepAccuracy.value = if (currentRepFrameCount > 0)
+                        (currentRepCorrectCount.toFloat() / currentRepFrameCount).coerceIn(0f, 1f)
+                    else 0f
+
+                    // ── Debug stats ────────────────────────────────────────────
+                    liveFps.value          = activeUseCase.engine.currentFps
+                    liveFeatureCount.value = result.features?.map?.size ?: 0
                     
+                    // Force show results when target reps reached.
+                    // updateRepHistory already maintains currentRepCount, so we just check it here.
                     val repsDone = result.frameStatus.repsCompleted
-                    
-                    // Force show results when target reps reached
                     if (!sessionCompleted.value && targetReps.value > 0 && repsDone >= targetReps.value) {
-                        Log.d("RepTracker", "Setting sessionCompleted = true, repsDone=$repsDone, target=${targetReps.value}")
+                        Log.d("RepTracker", "Target reached: $repsDone reps completed")
                         sessionCompleted.value = true
-                    }
-                    
-                    if (repsDone != lastRepsCompleted && !sessionCompleted.value) {
-                        Log.d("RepTracker", "Rep Incremented: $repsDone (last was $lastRepsCompleted)")
-                        
-                        val cappedReps = repsDone.coerceAtMost(targetReps.value)
-                        currentRepCount.value = cappedReps
-                        lastRepsCompleted = repsDone
-                        
-                        if (cappedReps >= targetReps.value) {
-                            sessionCompleted.value = true
-                            Log.d("RepTracker", "Target reps reached: ${targetReps.value}")
-                        }
                     }
 
                     // ── Performance: per-frame log gated behind DEBUG_LOG ──────
@@ -440,8 +470,9 @@ class DebugViewModel @Inject constructor(
             skipUsedInCurrentRep = false
         }
 
-        // If it's a new rep, save the previous rep's accuracy (if any)
-        if (status.repsCompleted > lastRepsCompleted) {
+        // Process all missed reps (handles frame drops where repsCompleted jumps by >1).
+        // Uses a while loop instead of if so multi-rep jumps don't lose intermediate accuracy records.
+        while (status.repsCompleted > lastRepsCompleted) {
             val accuracy = when {
                 skipUsedInCurrentRep -> 0.0
                 currentRepFrameCount > 0 -> {
@@ -450,14 +481,19 @@ class DebugViewModel @Inject constructor(
                 else -> 0.0
             }
             
-            Log.d("RepTracker", "Storing Accuracy for Rep $lastRepsCompleted: ${"%.2f".format(accuracy * 100)}%")
+            Log.d("RepTracker", "Rep completed: #$lastRepsCompleted → accuracy=${"%.2f".format(accuracy * 100)}%")
             completedRepAccuracies.value = completedRepAccuracies.value + accuracy
             
-            // Reset for next rep
+            // Advance counter and reset for next rep
+            lastRepsCompleted++
             currentRepFrameCount = 0
             currentRepCorrectCount = 0
             skipUsedInCurrentRep = false
-            lastRepsCompleted = status.repsCompleted
+            liveRepAccuracy.value = 0f
+
+            // Update the live UI counter (capped at target so it doesn't overflow)
+            val cappedReps = lastRepsCompleted.coerceAtMost(targetReps.value)
+            currentRepCount.value = cappedReps
         }
 
         // Accumulate accuracy for THE CURRENT ACTIVE REP
@@ -527,6 +563,7 @@ class DebugViewModel @Inject constructor(
         val defaultCalories = totalReps * 2.5
         
         completionPersisted = true
+        lastSavedSessionId = sessionId
 
         try {
             // Get exercise data for calorie calculation

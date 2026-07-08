@@ -34,6 +34,7 @@ object ProfileSettingsPreferences {
     private val goalAchievementsKey = booleanPreferencesKey("goal_achievements")
     private val languageKey = stringPreferencesKey("profile_language")
     private val unitSystemKey = stringPreferencesKey("unit_system")
+    private val autoRotateScreenKey = booleanPreferencesKey("auto_rotate_screen")
 
     fun observeDailyReminders(context: Context): Flow<Boolean> =
         context.profileSettingsStore.data.map { it[dailyRemindersKey] ?: true }
@@ -76,6 +77,21 @@ object ProfileSettingsPreferences {
     suspend fun setUnitSystem(context: Context, system: UnitSystem) {
         context.profileSettingsStore.edit { prefs ->
             prefs[unitSystemKey] = system.storageValue
+        }
+    }
+
+    /**
+     * Auto-rotate: when true, orientation is locked to the value required by each
+     * exercise (portrait or landscape) as soon as a session starts.
+     * When false the device keeps its current orientation throughout.
+     * Defaults to true so existing behaviour is preserved.
+     */
+    fun observeAutoRotateScreen(context: Context): Flow<Boolean> =
+        context.profileSettingsStore.data.map { it[autoRotateScreenKey] ?: true }
+
+    suspend fun setAutoRotateScreen(context: Context, enabled: Boolean) {
+        context.profileSettingsStore.edit { prefs ->
+            prefs[autoRotateScreenKey] = enabled
         }
     }
 

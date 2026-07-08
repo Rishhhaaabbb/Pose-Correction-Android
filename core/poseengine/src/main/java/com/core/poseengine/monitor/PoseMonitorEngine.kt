@@ -273,8 +273,8 @@ class PoseMonitorEngine(
         if (features == null || features.isEmpty) {
             // Only clear if it wasn't already set to the multiple-people warning.
             // This preserves the message when notifyMultiplePeople() is called just before.
-            if (!currentFeedback.contains("only one person")) {
-                currentFeedback = ""
+            if (!currentFeedback.contains("one person")) {
+                currentFeedback = "Step into the camera frame"
             }
             lastWasCorrect = false
             currentStreak = 0
@@ -322,7 +322,7 @@ class PoseMonitorEngine(
     val guidancePreviewState: PoseState? get() = nextStateForGuidance
 
     fun notifyMultiplePeople() {
-        currentFeedback = "make sure that only one person should be there in frame"
+        currentFeedback = "Please make sure only one person is in the frame"
         lastWasCorrect = false
         currentStreak = 0
     }
