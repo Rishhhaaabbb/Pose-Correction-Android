@@ -134,4 +134,26 @@ object DatabaseMigrations {
             db.execSQL("ALTER TABLE profiles ADD COLUMN camera_permission_granted INTEGER")
         }
     }
+
+    val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Create custom_workouts table for persistence
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS custom_workouts (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    exercise_ids TEXT NOT NULL,
+                    exercise_target_reps TEXT NOT NULL,
+                    is_default INTEGER NOT NULL DEFAULT 0,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+
+            // Create index for efficient queries
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_custom_workouts_is_default_created_at ON custom_workouts(is_default DESC, created_at DESC)")
+        }
+    }
 }

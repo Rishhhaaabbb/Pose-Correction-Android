@@ -55,6 +55,7 @@ sealed class UserRoute(val route: String, val labelResId: Int, val icon: ImageVe
 private val userBottomNavItems = listOf(
     UserRoute.Home,
     UserRoute.Exercises,
+    UserRoute.CustomWorkout,
     UserRoute.Progress,
     UserRoute.Profile,
 )
@@ -62,6 +63,7 @@ private val userBottomNavItems = listOf(
 private val adminBottomNavItems = listOf(
     UserRoute.Home,
     UserRoute.Exercises,
+    UserRoute.CustomWorkout,
     UserRoute.Progress,
     UserRoute.Graphs,
     UserRoute.Profile,
@@ -149,7 +151,10 @@ fun UserFlowNavigation() {
     Scaffold(
         containerColor = Color(0xFFF2EEE4),
         bottomBar = {
-            UserBottomNavBar(navController, if (isAdmin) adminBottomNavItems else userBottomNavItems)
+            // Hide bottom nav on exercise detail screen
+            if (currentRoute?.startsWith("exercise_detail/") != true) {
+                UserBottomNavBar(navController, if (isAdmin) adminBottomNavItems else userBottomNavItems)
+            }
         },
     ) { innerPadding ->
 
@@ -226,7 +231,7 @@ fun UserFlowNavigation() {
             }
             // ... remainder same
             composable(
-                "exercise_detail/{fileName}/{isAsset}?workoutId={workoutId}&index={index}&exerciseList={exerciseList}",
+                "exercise_detail/{fileName}/{isAsset}?workoutId={workoutId}&index={index}&exerciseList={exerciseList}&targetReps={targetReps}&targetRepsMap={targetRepsMap}",
                 enterTransition = { fadeIn(animationSpec = tween(200)) },
                 exitTransition = { fadeOut(animationSpec = tween(200)) },
             ) { backStack ->
@@ -235,6 +240,8 @@ fun UserFlowNavigation() {
                 val workoutId = backStack.arguments?.getString("workoutId")
                 val index = backStack.arguments?.getString("index")?.toIntOrNull() ?: 0
                 val exerciseList = backStack.arguments?.getString("exerciseList")
+                val targetReps = backStack.arguments?.getString("targetReps")?.toIntOrNull()
+                val targetRepsMap = backStack.arguments?.getString("targetRepsMap")
                 
                 ExerciseDetailScreen(
                     fileName = fileName,
@@ -242,6 +249,8 @@ fun UserFlowNavigation() {
                     workoutId = workoutId,
                     exerciseIndex = index,
                     exerciseList = exerciseList,
+                    targetReps = targetReps,
+                    targetRepsMap = targetRepsMap,
                     onBack   = { navController.popBackStack() },
                 )
             }
@@ -261,29 +270,42 @@ private fun UserBottomNavBar(navController: NavController, items: List<UserRoute
 
     NavigationBar(containerColor = Color.White) {
         items.forEach { item ->
-            val selected = currentRoute == item.route
+            // Check if we're on this route or any of its child routes
+            val isOnRoute = when {
+                currentRoute == item.route -> true
+                // Custom workout editor is a child of custom workout
+                item.route == UserRoute.CustomWorkout.route && 
+                    currentRoute?.startsWith("custom_workout") == true -> true
+                else -> false
+            }
+            
             NavigationBarItem(
-                selected = selected,
+                selected = isOnRoute,
                 onClick  = {
                     val currentTime = System.currentTimeMillis()
                     if (currentTime - lastClickTime < debounceMs) return@NavigationBarItem
                     lastClickTime = currentTime
                     
-                    if (currentRoute != item.route) {
-                        navController.navigate(item.route) {
-                            popUpTo(navController.graph.startDestinationId) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
+                    // Always navigate, clearing the back stack appropriately
+                    navController.navigate(item.route) {
+                        // Pop everything up to and including the start destination,
+                        // then navigate to the selected destination
+                        popUpTo(navController.graph.startDestinationId) {
+                            inclusive = false
+                            saveState = true
                         }
+                        // Avoid multiple copies of the same destination
+                        launchSingleTop = true
+                        // Restore state when re-selecting a previously selected item
+                        restoreState = true
                     }
                 },
                 icon  = {
                     Icon(
-                        if (selected) when (item) {
+                        if (isOnRoute) when (item) {
                             UserRoute.Home      -> Icons.Filled.Home
                             UserRoute.Exercises -> Icons.Filled.FitnessCenter
+                            UserRoute.CustomWorkout -> Icons.Filled.EmojiEvents
                             UserRoute.Progress  -> Icons.Filled.BarChart
                             UserRoute.Profile   -> Icons.Filled.Person
                             UserRoute.Library   -> Icons.Filled.VideoLibrary

@@ -51,6 +51,8 @@ fun ExerciseDetailScreen(
     workoutId: String? = null,
     exerciseIndex: Int = 0,
     exerciseList: String? = null,
+    targetReps: Int? = null,
+    targetRepsMap: String? = null,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -61,6 +63,10 @@ fun ExerciseDetailScreen(
     var holdPreset by rememberSaveable(fileName) { mutableStateOf(HoldPreset.DEFAULT) }
     var holdInputError by rememberSaveable(fileName) { mutableStateOf<String?>(null) }
     var defaultHoldDuration by remember(fileName) { mutableStateOf(2.0) }
+    
+    // Auto-start flag for custom workout mode
+    val isCustomWorkoutMode = targetReps != null
+    var hasAutoStarted by rememberSaveable(fileName, targetReps) { mutableStateOf(false) }
     
     val videoAssetPath = fileName.removeSuffix(".json") + ".mp4"
     val displayName = fileName.removeSuffix(".json").replace("-", " ").uppercase()
@@ -380,15 +386,41 @@ fun ExerciseDetailScreen(
                     holdInputError = null
                     return@Button
                 }
-                // For Default/manual flow, show rep dialog
-                showRepDialog = true
+                if (isCustomWorkoutMode) {
+                    // Custom workout mode: auto-start with target reps
+                    startExerciseSession(
+                        context = context,
+                        fileName = fileName,
+                        isAsset = isAsset,
+                        repCount = targetReps!!,
+                        workoutId = workoutId,
+                        exerciseIndex = exerciseIndex,
+                        exerciseList = exerciseList,
+                        selectedHoldDuration = selectedHoldDuration,
+                        placementConfirmed = placementConfirmed,
+                        targetRepsMap = targetRepsMap,
+                    )
+                } else {
+                    // Default/manual flow: show rep dialog
+                    showRepDialog = true
+                }
             },
             modifier = Modifier.fillMaxWidth().height(64.dp),
             shape = RoundedCornerShape(16.dp),
             enabled = placementConfirmed,
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8622E), contentColor = Color.White),
         ) {
-            Text(stringResource(R.string.exercise_detail_start_session), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = Color.White)
+            Text(
+                text = if (isCustomWorkoutMode) {
+                    "START SESSION ($targetReps REPS)"
+                } else {
+                    stringResource(R.string.exercise_detail_start_session)
+                },
+                fontSize = 18.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.sp,
+                color = Color.White
+            )
         }
 
         Spacer(Modifier.height(16.dp))
@@ -438,20 +470,47 @@ fun ExerciseDetailScreen(
             onDismiss = { showRepDialog = false },
             onConfirm = { repCount ->
                 showRepDialog = false
-                val intent = Intent(context, MainActivity::class.java).apply {
-                    putExtra("EXTRA_FILE_NAME", fileName)
-                    putExtra("EXTRA_IS_ASSET", isAsset)
-                    putExtra("EXTRA_TARGET_REPS", repCount)
-                    putExtra("EXTRA_LOCK_ORIENTATION", placementConfirmed)
-                    putExtra("EXTRA_WORKOUT_ID", workoutId)
-                    putExtra("EXTRA_CURRENT_INDEX", exerciseIndex)
-                    putExtra("EXTRA_EXERCISE_LIST", exerciseList)
-                    selectedHoldDuration?.let { putExtra("EXTRA_HOLD_DURATION_SECONDS", it) }
-                }
-                context.startActivity(intent)
+                startExerciseSession(
+                    context = context,
+                    fileName = fileName,
+                    isAsset = isAsset,
+                    repCount = repCount,
+                    workoutId = workoutId,
+                    exerciseIndex = exerciseIndex,
+                    exerciseList = exerciseList,
+                    selectedHoldDuration = selectedHoldDuration,
+                    placementConfirmed = placementConfirmed,
+                    targetRepsMap = targetRepsMap,
+                )
             }
         )
     }
+}
+
+private fun startExerciseSession(
+    context: android.content.Context,
+    fileName: String,
+    isAsset: Boolean,
+    repCount: Int,
+    workoutId: String?,
+    exerciseIndex: Int,
+    exerciseList: String?,
+    selectedHoldDuration: Double?,
+    placementConfirmed: Boolean,
+    targetRepsMap: String? = null,
+) {
+    val intent = Intent(context, MainActivity::class.java).apply {
+        putExtra("EXTRA_FILE_NAME", fileName)
+        putExtra("EXTRA_IS_ASSET", isAsset)
+        putExtra("EXTRA_TARGET_REPS", repCount)
+        putExtra("EXTRA_LOCK_ORIENTATION", placementConfirmed)
+        putExtra("EXTRA_WORKOUT_ID", workoutId)
+        putExtra("EXTRA_CURRENT_INDEX", exerciseIndex)
+        putExtra("EXTRA_EXERCISE_LIST", exerciseList)
+        putExtra("EXTRA_TARGET_REPS_MAP", targetRepsMap)
+        selectedHoldDuration?.let { putExtra("EXTRA_HOLD_DURATION_SECONDS", it) }
+    }
+    context.startActivity(intent)
 }
 
 @Composable

@@ -19,7 +19,7 @@ class CustomWorkoutEditorViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    private val CustomWorkoutIdArg: String = savedStateHandle.get<String>("CustomWorkoutId") ?: NEW_WORKOUT_ID
+    private val CustomWorkoutIdArg: String = savedStateHandle.get<String>("workoutId") ?: NEW_WORKOUT_ID
 
     private val _uiState = MutableStateFlow(CustomWorkoutEditorUiState(isLoading = true))
     val uiState: StateFlow<CustomWorkoutEditorUiState> = _uiState.asStateFlow()
@@ -51,8 +51,10 @@ class CustomWorkoutEditorViewModel @Inject constructor(
                     ?.mapNotNull { id -> exerciseMap[id] }
                     .orEmpty()
 
+                // Load target reps for selected exercises, ensuring we use saved values
                 val selectedTargets = selectedExercises.associate { exercise ->
-                    exercise.id to (existingCustomWorkout?.exerciseTargetReps?.get(exercise.id) ?: DEFAULT_TARGET_REPS)
+                    val savedReps = existingCustomWorkout?.exerciseTargetReps?.get(exercise.id)
+                    exercise.id to (savedReps ?: DEFAULT_TARGET_REPS)
                 }
 
                 val title = existingCustomWorkout?.title ?: CustomWorkoutStore.nextCustomWorkoutTitle()
@@ -179,37 +181,41 @@ class CustomWorkoutEditorViewModel @Inject constructor(
 
     fun saveCustomWorkout(): String {
         val state = _uiState.value
-        val normalizedTitle = state.title.trim().ifBlank { CustomWorkoutStore.nextCustomWorkoutTitle() }
-        val exerciseIds = state.selectedExercises.map { it.id }
-        val targetMap = exerciseIds.associateWith { exerciseId ->
-            (state.selectedExerciseTargetReps[exerciseId] ?: DEFAULT_TARGET_REPS)
-                .coerceIn(MIN_TARGET_REPS, MAX_TARGET_REPS)
-        }
+        viewModelScope.launch {
+            val normalizedTitle = state.title.trim().ifBlank { CustomWorkoutStore.nextCustomWorkoutTitle() }
+            val exerciseIds = state.selectedExercises.map { it.id }
+            
+            // Ensure all selected exercises have target reps persisted
+            val targetMap = exerciseIds.associateWith { exerciseId ->
+                val currentReps = state.selectedExerciseTargetReps[exerciseId] ?: DEFAULT_TARGET_REPS
+                currentReps.coerceIn(MIN_TARGET_REPS, MAX_TARGET_REPS)
+            }
 
-        val CustomWorkoutId = activeCustomWorkoutId
-        val savedId = if (CustomWorkoutId == null) {
-            CustomWorkoutStore.createCustomWorkout(
-                title = normalizedTitle,
-                exerciseIds = exerciseIds,
-                exerciseTargetReps = targetMap,
-            )
-        } else {
-            CustomWorkoutStore.updateCustomWorkout(
-                id = CustomWorkoutId,
-                title = normalizedTitle,
-                exerciseIds = exerciseIds,
-                exerciseTargetReps = targetMap,
-            )
-            CustomWorkoutId
-        }
+            val CustomWorkoutId = activeCustomWorkoutId
+            val savedId = if (CustomWorkoutId == null) {
+                CustomWorkoutStore.createCustomWorkout(
+                    title = normalizedTitle,
+                    exerciseIds = exerciseIds,
+                    exerciseTargetReps = targetMap,
+                )
+            } else {
+                CustomWorkoutStore.updateCustomWorkout(
+                    id = CustomWorkoutId,
+                    title = normalizedTitle,
+                    exerciseIds = exerciseIds,
+                    exerciseTargetReps = targetMap,
+                )
+                CustomWorkoutId
+            }
 
-        activeCustomWorkoutId = savedId
-        _uiState.value = state.copy(
-            CustomWorkoutId = savedId,
-            title = normalizedTitle,
-            isNewCustomWorkout = false,
-        )
-        return savedId
+            activeCustomWorkoutId = savedId
+            _uiState.value = state.copy(
+                CustomWorkoutId = savedId,
+                title = normalizedTitle,
+                isNewCustomWorkout = false,
+            )
+        }
+        return activeCustomWorkoutId ?: ""
     }
 
     fun getStartExerciseName(): String? {
@@ -226,7 +232,7 @@ class CustomWorkoutEditorViewModel @Inject constructor(
         val DEFAULT_CustomWorkout_EXERCISE_IDS = listOf("squat", "pushup", "plank")
         const val DEFAULT_CustomWorkout_FALLBACK_SIZE = 3
         const val DEFAULT_TARGET_REPS = 12
-        const val MIN_TARGET_REPS = 4
+        const val MIN_TARGET_REPS = 1
         const val MAX_TARGET_REPS = 60
         const val TARGET_REPS_STEP = 1
     }

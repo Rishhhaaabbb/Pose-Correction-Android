@@ -266,7 +266,16 @@ fun CustomWorkoutEditorScreen(
 
             Button(
                 onClick = {
-                    viewModel.saveCustomWorkout()
+                    val savedId = viewModel.saveCustomWorkout()
+                    
+                    // If this was a new workout, navigate to the editor with the actual workout ID
+                    // This ensures the URL reflects the real workout and reloading will work correctly
+                    if (uiState.isNewCustomWorkout) {
+                        navController.navigate(customWorkoutEditorRoute(savedId)) {
+                            popUpTo(customWorkoutEditorRoute(NEW_WORKOUT_ID)) { inclusive = true }
+                        }
+                    }
+                    
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar(
                             context.getString(R.string.CustomWorkout_saved_message)
@@ -308,9 +317,15 @@ fun CustomWorkoutEditorScreen(
                             )
                         }
                     } else {
-                        viewModel.saveCustomWorkout()
+                        // Save the workout and get its ID
+                        val workoutId = viewModel.saveCustomWorkout()
+                        
+                        // Get all exercise names for the sequence
+                        val exerciseNames = uiState.selectedExercises.map { it.name }
+                        val exerciseListStr = exerciseNames.joinToString(",")
+                        
                         navController.navigate(
-                            "exercise_detail/${graphEntry.fileName}/${graphEntry.isAsset}"
+                            "exercise_detail/${graphEntry.fileName}/${graphEntry.isAsset}?workoutId=$workoutId&index=0&exerciseList=$exerciseListStr"
                         )
                     }
                 },

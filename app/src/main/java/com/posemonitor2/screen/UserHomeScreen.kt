@@ -161,10 +161,47 @@ fun UserHomeScreen(
         Spacer(Modifier.height(10.dp))
         QuickActionsGrid(
             modifier = Modifier.padding(horizontal = 16.dp),
-            onStartSession = { navController.navigate(UserRoute.Exercises.route) },
-            onMyProgress = { navController.navigate(UserRoute.Progress.route) },
-            onCustomWorkout = { navController.navigate(UserRoute.CustomWorkout.route) },
-            onMyProfile = { navController.navigate(UserRoute.Profile.route) },
+            onStartSession = { 
+                navController.navigate(UserRoute.Exercises.route) {
+                    popUpTo(UserRoute.Home.route) {
+                        inclusive = false
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            },
+            onMyProgress = { 
+                navController.navigate(UserRoute.Progress.route) {
+                    popUpTo(UserRoute.Home.route) {
+                        inclusive = false
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            },
+            onCustomWorkout = { 
+                // Since Custom Workout is now a bottom nav item, navigate with proper back stack management
+                navController.navigate(UserRoute.CustomWorkout.route) {
+                    popUpTo(UserRoute.Home.route) {
+                        inclusive = false
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            },
+            onMyProfile = { 
+                navController.navigate(UserRoute.Profile.route) {
+                    popUpTo(UserRoute.Home.route) {
+                        inclusive = false
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            },
         )
         Spacer(Modifier.height(20.dp))
 
@@ -185,8 +222,14 @@ fun UserHomeScreen(
         CustomWorkoutQuickCard(
             modifier = Modifier.padding(horizontal = 16.dp),
             onOpenCustomWorkout = {
+                // Navigate to Custom Workout with proper stack management
                 navController.navigate(UserRoute.CustomWorkout.route) {
+                    popUpTo(UserRoute.Home.route) {
+                        inclusive = false
+                        saveState = true
+                    }
                     launchSingleTop = true
+                    restoreState = true
                 }
             },
         )
