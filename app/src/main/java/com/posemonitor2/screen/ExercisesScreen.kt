@@ -2,6 +2,7 @@ package com.posemonitor2.screen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -23,8 +24,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -33,6 +36,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,13 +46,9 @@ import kotlinx.coroutines.delay
 import com.posemonitor2.R
 import com.posemonitor2.UserRoute
 
-private val BgColor    = Color(0xFFF4F6F4)
-private val TealDark   = Color(0xFF0D3B34)
-private val Orange     = Color(0xFFE8622E)
-private val Yellow     = Color(0xFFE8B840)
-private val GrayText   = Color(0xFF888888)
-private val ChipBorder = Color(0xFFDDDDDD)
-private val CardBg     = Color.White
+// Accent colors — fixed regardless of theme
+private val Orange = Color(0xFFE8622E)
+private val Yellow = Color(0xFFE8B840)
 
 @Composable
 fun ExercisesScreen(
@@ -57,7 +59,14 @@ fun ExercisesScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     var selectedDifficulty  by remember { mutableStateOf<String?>(null) }
     var selectedCategory    by remember { mutableStateOf<String?>(null) }
-    
+
+    // Theme-aware colors derived from MaterialTheme — react to dark/light mode
+    val isDark     = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val bgColor    = MaterialTheme.colorScheme.background
+    val onBg       = MaterialTheme.colorScheme.onBackground
+    val grayText   = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+    val chipBorder = MaterialTheme.colorScheme.outline
+
     val greeting = getGreeting()
     val userProfile = uiState.userProfile
 
@@ -66,6 +75,19 @@ fun ExercisesScreen(
     val drawableByExerciseId = uiState.drawableByExerciseId
     val preloadedThumbnails = uiState.preloadedThumbnails
     val filteredExercises by viewModel.filteredExercises.collectAsState()
+
+    // Refresh graph file list whenever this screen becomes visible (e.g. after
+    // returning from the Library tab where a new graph may have been generated)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshGraphs()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(selectedDifficulty, selectedCategory) {
         viewModel.updateFilters(searchQuery, selectedDifficulty, selectedCategory)
@@ -77,10 +99,41 @@ fun ExercisesScreen(
         showSkeleton = uiState.isLoading
     }
 
+    // Delete confirmation state — only populated for generated/uploaded exercises
+    var deleteTarget by remember { mutableStateOf<com.domain.model.Exercise?>(null) }
+
+    deleteTarget?.let { exercise ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("Delete Exercise") },
+            text = {
+                Text(
+                    "Delete \"${exercise.name.replace("-", " ")}\"? " +
+                    "This will remove it from your library and delete its graph file."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteExercise(exercise)
+                        deleteTarget = null
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgColor)
+            .background(bgColor)
             .statusBarsPadding()
             .padding(horizontal = 20.dp),
         contentPadding = PaddingValues(bottom = 8.dp),
@@ -97,14 +150,14 @@ fun ExercisesScreen(
                     stringResource(R.string.exercises_title),
                     fontSize = 30.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = TealDark,
+                    color = onBg,
                 )
 
                 if (userProfile.isAdmin) {
                     Surface(
                         onClick = { navController.navigate(UserRoute.Library.route) },
                         shape = CircleShape,
-                        color = Color(0xFF0A3D3F), // Dark green / TealDark
+                        color = Color(0xFF0A3D3F),
                         shadowElevation = 6.dp
                     ) {
                         Box(
@@ -125,20 +178,20 @@ fun ExercisesScreen(
 
         item { Spacer(Modifier.height(20.dp)) }
 
-        // ΓöÇΓöÇ Search bar ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // ── Search bar ────────────────────────────────────────────────────────
         item {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { viewModel.onSearchQueryChanged(it) },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = {
-                    Text("Search exercises...", color = GrayText, fontSize = 14.sp)
+                    Text("Search exercises...", color = grayText, fontSize = 14.sp)
                 },
                 leadingIcon = {
                     Icon(
                         Icons.Default.Search,
                         contentDescription = null,
-                        tint = TealDark,
+                        tint = onBg,
                         modifier = Modifier.size(20.dp),
                     )
                 },
@@ -148,7 +201,7 @@ fun ExercisesScreen(
                             Icon(
                                 Icons.Default.Clear,
                                 contentDescription = "Clear search",
-                                tint = GrayText,
+                                tint = grayText,
                             )
                         }
                     }
@@ -156,13 +209,13 @@ fun ExercisesScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(28.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    focusedBorderColor = TealDark,
-                    unfocusedBorderColor = ChipBorder,
-                    cursorColor = TealDark,
-                    focusedTextColor = TealDark,
-                    unfocusedTextColor = TealDark,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedBorderColor = onBg,
+                    unfocusedBorderColor = chipBorder,
+                    cursorColor = onBg,
+                    focusedTextColor = onBg,
+                    unfocusedTextColor = onBg,
                 ),
             )
         }
@@ -171,7 +224,7 @@ fun ExercisesScreen(
 
         if (uiState.difficulties.isNotEmpty()) {
             item {
-                Text("Difficulty", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrayText, letterSpacing = 1.sp)
+                Text("Difficulty", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = grayText, letterSpacing = 1.sp)
                 Spacer(Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -197,7 +250,7 @@ fun ExercisesScreen(
 
         if (uiState.categories.isNotEmpty()) {
             item {
-                Text("Category", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrayText, letterSpacing = 1.sp)
+                Text("Category", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = grayText, letterSpacing = 1.sp)
                 Spacer(Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -227,7 +280,7 @@ fun ExercisesScreen(
                 Spacer(Modifier.height(12.dp))
             }
         } else if (filteredExercises.isEmpty() && searchQuery.isNotEmpty()) {
-            // ΓöÇΓöÇ Empty state ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+            // ── Empty state ───────────────────────────────────────────────────
             item {
                 Column(
                     modifier = Modifier
@@ -239,31 +292,43 @@ fun ExercisesScreen(
                     Icon(
                         imageVector = Icons.Default.SearchOff,
                         contentDescription = null,
-                        tint = GrayText,
+                        tint = grayText,
                         modifier = Modifier.size(48.dp),
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
                         text = "No exercises found for \"$searchQuery\"",
                         fontSize = 14.sp,
-                        color = GrayText,
+                        color = grayText,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )
                 }
             }
         } else {
             items(filteredExercises, key = { it.id }) { exercise ->
+                // Try multiple filename keys: exact name, normalised name with hyphens,
+                // and the exercise id — generated exercises may use any of these forms
                 val graphEntry = graphsByFileName["${exercise.name}.json"]
+                    ?: graphsByFileName["${exercise.name.trim().replace(" ", "-").lowercase()}.json"]
+                    ?: graphsByFileName["${exercise.id}.json"]
+                // Only generated exercises (category == "Generated" or no drawable) can be deleted
+                val isDeletable = exercise.category == "Generated" ||
+                    (drawableByExerciseId[exercise.id] ?: 0) == 0
                 WorkoutCard(
                     exerciseId = exercise.id,
                     name = exercise.name.replace("-", " ").uppercase(),
                     category = exercise.category ?: "Other",
                     difficulty = exercise.difficulty ?: "Beginner",
                     thumbBitmap = preloadedThumbnails[exercise.id],
+                    hasGraph = graphEntry != null,
+                    isDeletable = isDeletable,
+                    onLongPress = { deleteTarget = exercise },
                     onClick = {
                         if (graphEntry != null) {
+                            val cat = exercise.category?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
+                            val diff = exercise.difficulty?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
                             navController.navigate(
-                                "exercise_detail/${graphEntry.fileName}/${graphEntry.isAsset}?index=0&exerciseList=${exercise.name}"
+                                "exercise_detail/${graphEntry.fileName}/${graphEntry.isAsset}?index=0&exerciseList=${exercise.name}&category=$cat&difficulty=$diff"
                             )
                         }
                     }
@@ -278,16 +343,19 @@ fun ExercisesScreen(
 
 @Composable
 private fun FilterChipItem(label: String, selected: Boolean, onClick: () -> Unit) {
+    val selectedBg  = MaterialTheme.colorScheme.onBackground
+    val unselectedBg = MaterialTheme.colorScheme.surface
+    val border      = MaterialTheme.colorScheme.outline
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(50.dp),
-        color = if (selected) TealDark else Color.White,
-        border = if (selected) null else androidx.compose.foundation.BorderStroke(1.dp, ChipBorder),
+        color = if (selected) selectedBg else unselectedBg,
+        border = if (selected) null else androidx.compose.foundation.BorderStroke(1.dp, border),
     ) {
         Text(
             label,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            color = if (selected) Color.White else TealDark,
+            color = if (selected) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.onBackground,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
         )
@@ -301,22 +369,38 @@ private fun WorkoutCard(
     category: String,
     difficulty: String,
     thumbBitmap: ImageBitmap?,
+    hasGraph: Boolean,
+    isDeletable: Boolean = false,
+    onLongPress: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     val thumbBg = when (category) {
-        "Legs" -> Color(0xFFB8D4B8)
-        "Chest" -> Color(0xFFD4B8B8)
-        "Core" -> Color(0xFFB8C8D4)
-        "Cardio" -> Color(0xFFD4D4B8)
+        "Legs"    -> Color(0xFFB8D4B8)
+        "Chest"   -> Color(0xFFD4B8B8)
+        "Core"    -> Color(0xFFB8C8D4)
+        "Cardio"  -> Color(0xFFD4D4B8)
         "Stretch" -> Color(0xFFD4B8D4)
-        else -> Color(0xFFB0C8C0)
+        else      -> Color(0xFFB0C8C0)
     }
+    val cardBg       = MaterialTheme.colorScheme.surface
+    val onCard       = MaterialTheme.colorScheme.onSurface
+    val subText      = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+    val disabledAlpha = if (hasGraph) 1f else 0.5f
 
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = CardBg,
-        shadowElevation = 3.dp,
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        color = cardBg,
+        shadowElevation = if (hasGraph) 3.dp else 1.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (hasGraph || isDeletable) {
+                    Modifier.combinedClickable(
+                        onClick = onClick,
+                        onLongClick = if (isDeletable) onLongPress else null,
+                    )
+                } else Modifier
+            ),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -326,16 +410,18 @@ private fun WorkoutCard(
                 modifier = Modifier
                     .size(80.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(thumbBg),
+                    .background(thumbBg.copy(alpha = disabledAlpha)),
                 contentAlignment = Alignment.Center
             ) {
                 if (thumbBitmap != null) {
                     androidx.compose.foundation.Image(
                         bitmap = thumbBitmap,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .alpha(disabledAlpha),
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                        alignment = androidx.compose.ui.Alignment.BottomCenter
+                        alignment = androidx.compose.ui.Alignment.BottomCenter,
                     )
                 }
             }
@@ -347,7 +433,7 @@ private fun WorkoutCard(
                     category,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Orange,
+                    color = Orange.copy(alpha = disabledAlpha),
                     letterSpacing = 0.8.sp,
                 )
                 Spacer(Modifier.height(2.dp))
@@ -355,27 +441,46 @@ private fun WorkoutCard(
                     name,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TealDark,
+                    color = onCard.copy(alpha = disabledAlpha),
                 )
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    "$difficulty ΓÇó AI Session",
-                    fontSize = 12.sp,
-                    color = GrayText,
-                )
+                if (hasGraph) {
+                    Text(
+                        text = buildString {
+                            append("$difficulty • AI Session")
+                            if (isDeletable) append(" • Hold to delete")
+                        },
+                        fontSize = 12.sp,
+                        color = subText,
+                    )
+                } else {
+                    Text(
+                        "Graph file not available",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    if (isDeletable) {
+                        Text(
+                            "Hold to delete",
+                            fontSize = 11.sp,
+                            color = subText,
+                        )
+                    }
+                }
             }
 
             Box(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(Yellow),
+                    .background(if (hasGraph) Yellow else MaterialTheme.colorScheme.outline),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     Icons.Default.PlayArrow,
-                    contentDescription = stringResource(R.string.exercises_play_cd),
-                    tint = Color.White,
+                    contentDescription = if (hasGraph) stringResource(R.string.exercises_play_cd) else "Not available",
+                    tint = Color.White.copy(alpha = disabledAlpha),
                     modifier = Modifier.size(24.dp),
                 )
             }
@@ -385,9 +490,10 @@ private fun WorkoutCard(
 
 @Composable
 private fun WorkoutCardSkeleton() {
+    val shimmer = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = CardBg,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 3.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -399,7 +505,7 @@ private fun WorkoutCardSkeleton() {
                 modifier = Modifier
                     .size(80.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFFE0E0E0)),
+                    .background(shimmer),
             )
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -408,7 +514,7 @@ private fun WorkoutCardSkeleton() {
                         .width(40.dp)
                         .height(12.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xFFE0E0E0))
+                        .background(shimmer)
                 )
                 Spacer(Modifier.height(8.dp))
                 Box(
@@ -416,7 +522,7 @@ private fun WorkoutCardSkeleton() {
                         .width(160.dp)
                         .height(22.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xFFE0E0E0))
+                        .background(shimmer)
                 )
                 Spacer(Modifier.height(8.dp))
                 Box(
@@ -424,7 +530,7 @@ private fun WorkoutCardSkeleton() {
                         .width(100.dp)
                         .height(14.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xFFE0E0E0))
+                        .background(shimmer)
                 )
             }
             Spacer(Modifier.width(14.dp))
@@ -432,7 +538,7 @@ private fun WorkoutCardSkeleton() {
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFE0E0E0)),
+                    .background(shimmer),
             )
         }
     }

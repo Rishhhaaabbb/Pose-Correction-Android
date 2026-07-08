@@ -71,7 +71,7 @@ fun GraphSelectorScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Spacer(Modifier.height(32.dp))
@@ -134,7 +134,16 @@ fun GraphSelectorScreen(
                     }
                 }
             }
+        }
 
+        // Start Monitoring button — always pinned at the bottom
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(Color(0xFF0F0F0F))
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+        ) {
             Button(
                 onClick = { selected?.let { onGraphSelected(it) } },
                 enabled = selected != null,
@@ -154,8 +163,6 @@ fun GraphSelectorScreen(
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-
-            Spacer(Modifier.height(8.dp))
         }
     }
 }

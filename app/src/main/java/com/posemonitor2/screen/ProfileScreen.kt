@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -259,34 +260,39 @@ fun ProfileScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ΓöÇΓöÇ Fitness goals card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // ── Fitness goals card ────────────────────────────────────────────────
+        val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+        val goalsCardBg = if (isDark) Color(0xFF1A3A3C) else Color.White
+        val goalsOnCard = if (isDark) Color(0xFFB2DFDB) else primary
+        val goalsChipBg = if (isDark) Color(0xFF0D2426) else primary.copy(alpha = 0.12f)
         Box(
-            modifier = Modifier.fillMaxWidth().shadow(4.dp, RoundedCornerShape(20.dp)).clip(RoundedCornerShape(20.dp)).background(primary).padding(20.dp),
+            modifier = Modifier.fillMaxWidth().shadow(4.dp, RoundedCornerShape(20.dp)).clip(RoundedCornerShape(20.dp)).background(goalsCardBg).padding(20.dp),
         ) {
             Column {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.profile_fitness_goals_title), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onPrimary, fontFamily = FontFamily.Serif, modifier = Modifier.weight(1f))
-                    Surface(shape = RoundedCornerShape(50.dp), color = primary.copy(alpha = 0.2f)) {
-                        Text(stringResource(R.string.profile_primary_chip), fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp))
+                    Text(stringResource(R.string.profile_fitness_goals_title), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = goalsOnCard, fontFamily = FontFamily.Serif, modifier = Modifier.weight(1f))
+                    Surface(shape = RoundedCornerShape(50.dp), color = goalsChipBg) {
+                        Text(stringResource(R.string.profile_primary_chip), fontSize = 11.sp, color = goalsOnCard, modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp))
                     }
                 }
                 Spacer(Modifier.height(16.dp))
-                GoalRow(label = stringResource(R.string.profile_focus_area_label), value = uiState.focusArea, valueColor = secondary)
+                GoalRow(label = stringResource(R.string.profile_focus_area_label), value = uiState.focusArea, labelColor = goalsOnCard, valueColor = secondary)
                 GoalRow(
                     label = stringResource(R.string.profile_target_weight_label),
                     value = convertWeightForDisplay(uiState.targetWeightKg, unitSystem).let { (value, unit) ->
                         if (value == "--") stringResource(R.string.profile_not_set) else "$value $unit"
                     },
-                    valueColor = Color.White,
+                    labelColor = goalsOnCard,
+                    valueColor = goalsOnCard,
                 )
-                GoalRow(label = stringResource(R.string.profile_weekly_goal_label), value = stringResource(R.string.profile_sessions_value, uiState.weeklyGoalSessions), valueColor = Color.White)
+                GoalRow(label = stringResource(R.string.profile_weekly_goal_label), value = stringResource(R.string.profile_sessions_value, uiState.weeklyGoalSessions), labelColor = goalsOnCard, valueColor = goalsOnCard)
                 Spacer(Modifier.height(14.dp))
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.profile_progress_label), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f), letterSpacing = 1.sp, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.profile_progress_label), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = goalsOnCard.copy(alpha = 0.7f), letterSpacing = 1.sp, modifier = Modifier.weight(1f))
                     Text("${uiState.goalProgressPercent}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = secondary)
                 }
                 Spacer(Modifier.height(8.dp))
-                Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(primary.copy(alpha = 0.15f))) {
+                Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(goalsOnCard.copy(alpha = 0.15f))) {
                     Box(modifier = Modifier.fillMaxWidth(uiState.goalProgressPercent / 100f).fillMaxHeight().clip(RoundedCornerShape(4.dp)).background(secondary))
                 }
             }
@@ -442,12 +448,12 @@ private fun BodyMetric(label: String, value: String, unit: String) {
 
 // ΓöÇΓöÇ Goal row ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 @Composable
-private fun GoalRow(label: String, value: String, valueColor: Color) {
+private fun GoalRow(label: String, value: String, labelColor: Color, valueColor: Color) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f), modifier = Modifier.weight(1f))
+        Text(label, fontSize = 14.sp, color = labelColor.copy(alpha = 0.8f), modifier = Modifier.weight(1f))
         Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = valueColor)
     }
-    HorizontalDivider(color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.18f))
+    HorizontalDivider(color = labelColor.copy(alpha = 0.18f))
 }
 
 // ΓöÇΓöÇ Pref detail box ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
@@ -742,7 +748,7 @@ private fun convertHeightForDisplay(heightCm: Int?, unitSystem: UnitSystem): Pai
 private fun ThemeSettingsRow(navController: NavController) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val themeMode by ThemePreferences.observeThemeMode(context).collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
+    val themeMode by ThemePreferences.observeThemeMode(context).collectAsStateWithLifecycle(initialValue = ThemeMode.LIGHT)
 
     var expanded by remember { mutableStateOf(false) }
 
@@ -786,9 +792,8 @@ private fun ThemeSettingsRow(navController: NavController) {
 
 @Composable
 private fun themeModeDisplayLabel(themeMode: ThemeMode): String = when (themeMode) {
-    ThemeMode.SYSTEM -> stringResource(R.string.profile_theme_system)
     ThemeMode.LIGHT -> stringResource(R.string.profile_theme_light)
-    ThemeMode.DARK -> stringResource(R.string.profile_theme_dark)
+    ThemeMode.DARK  -> stringResource(R.string.profile_theme_dark)
 }
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {

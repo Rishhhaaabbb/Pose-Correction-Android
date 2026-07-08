@@ -55,7 +55,6 @@ sealed class UserRoute(val route: String, val labelResId: Int, val icon: ImageVe
 private val userBottomNavItems = listOf(
     UserRoute.Home,
     UserRoute.Exercises,
-    UserRoute.CustomWorkout,
     UserRoute.Progress,
     UserRoute.Profile,
 )
@@ -63,7 +62,6 @@ private val userBottomNavItems = listOf(
 private val adminBottomNavItems = listOf(
     UserRoute.Home,
     UserRoute.Exercises,
-    UserRoute.CustomWorkout,
     UserRoute.Progress,
     UserRoute.Graphs,
     UserRoute.Profile,
@@ -143,18 +141,19 @@ fun UserFlowNavigation() {
         if (targetRoute != null) {
             activity.intent.removeExtra("TARGET_ROUTE")
             navController.navigate(targetRoute) {
-                popUpTo(UserRoute.Home.route)
+                popUpTo(UserRoute.Home.route) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
             }
         }
     }
 
     Scaffold(
-        containerColor = Color(0xFFF2EEE4),
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            // Hide bottom nav on exercise detail screen
-            if (currentRoute?.startsWith("exercise_detail/") != true) {
-                UserBottomNavBar(navController, if (isAdmin) adminBottomNavItems else userBottomNavItems)
-            }
+            UserBottomNavBar(navController, if (isAdmin) adminBottomNavItems else userBottomNavItems)
         },
     ) { innerPadding ->
 
@@ -231,26 +230,26 @@ fun UserFlowNavigation() {
             }
             // ... remainder same
             composable(
-                "exercise_detail/{fileName}/{isAsset}?workoutId={workoutId}&index={index}&exerciseList={exerciseList}&targetReps={targetReps}&targetRepsMap={targetRepsMap}",
+                "exercise_detail/{fileName}/{isAsset}?workoutId={workoutId}&index={index}&exerciseList={exerciseList}&category={category}&difficulty={difficulty}",
                 enterTransition = { fadeIn(animationSpec = tween(200)) },
                 exitTransition = { fadeOut(animationSpec = tween(200)) },
             ) { backStack ->
-                val fileName = backStack.arguments?.getString("fileName") ?: ""
-                val isAsset  = backStack.arguments?.getString("isAsset")?.toBoolean() ?: false
-                val workoutId = backStack.arguments?.getString("workoutId")
-                val index = backStack.arguments?.getString("index")?.toIntOrNull() ?: 0
+                val fileName     = backStack.arguments?.getString("fileName") ?: ""
+                val isAsset      = backStack.arguments?.getString("isAsset")?.toBoolean() ?: false
+                val workoutId    = backStack.arguments?.getString("workoutId")
+                val index        = backStack.arguments?.getString("index")?.toIntOrNull() ?: 0
                 val exerciseList = backStack.arguments?.getString("exerciseList")
-                val targetReps = backStack.arguments?.getString("targetReps")?.toIntOrNull()
-                val targetRepsMap = backStack.arguments?.getString("targetRepsMap")
-                
+                val category     = backStack.arguments?.getString("category")
+                val difficulty   = backStack.arguments?.getString("difficulty")
+
                 ExerciseDetailScreen(
                     fileName = fileName,
                     isAsset  = isAsset,
                     workoutId = workoutId,
                     exerciseIndex = index,
                     exerciseList = exerciseList,
-                    targetReps = targetReps,
-                    targetRepsMap = targetRepsMap,
+                    category = category,
+                    difficulty = difficulty,
                     onBack   = { navController.popBackStack() },
                 )
             }
@@ -258,59 +257,88 @@ fun UserFlowNavigation() {
     }
 }
 
-// ΓöÇΓöÇ Bottom nav bar ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── Bottom nav bar ────────────────────────────────────────────────────────────
+
+/**
+ * Maps every route (including deep routes) back to the tab root that owns it.
+ * Used for: (1) highlighting the correct tab when deep inside a screen,
+ * (2) knowing which route to popUpTo when switching tabs.
+ */
+private fun routeToTabRoot(route: String?): String = when {
+    route == null -> UserRoute.Home.route
+    route == UserRoute.Home.route -> UserRoute.Home.route
+    route == UserRoute.Exercises.route -> UserRoute.Exercises.route
+    route.startsWith("exercise_detail") -> UserRoute.Exercises.route
+    route == UserRoute.CustomWorkout.route -> UserRoute.CustomWorkout.route
+    route.startsWith(CUSTOM_WORKOUT_EDITOR_ROUTE_PATTERN.substringBefore("{")) -> UserRoute.CustomWorkout.route
+    route == UserRoute.Progress.route -> UserRoute.Progress.route
+    route == UserRoute.Profile.route -> UserRoute.Profile.route
+    route == UserRoute.Library.route -> UserRoute.Library.route
+    route == UserRoute.Graphs.route -> UserRoute.Graphs.route
+    route == UserRoute.AdminStats.route -> UserRoute.AdminStats.route
+    else -> UserRoute.Home.route
+}
 
 @Composable
 private fun UserBottomNavBar(navController: NavController, items: List<UserRoute>) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute   = backStackEntry?.destination?.route
-    
+    // The tab that owns the current screen — stays highlighted even when deep
+    val activeTabRoot  = routeToTabRoot(currentRoute)
+
     var lastClickTime by remember { mutableLongStateOf(0L) }
     val debounceMs = 200L
 
-    NavigationBar(containerColor = Color.White) {
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
         items.forEach { item ->
-            // Check if we're on this route or any of its child routes
-            val isOnRoute = when {
-                currentRoute == item.route -> true
-                // Custom workout editor is a child of custom workout
-                item.route == UserRoute.CustomWorkout.route && 
-                    currentRoute?.startsWith("custom_workout") == true -> true
-                else -> false
-            }
-            
+            val selected = activeTabRoot == item.route
             NavigationBarItem(
-                selected = isOnRoute,
+                selected = selected,
                 onClick  = {
                     val currentTime = System.currentTimeMillis()
                     if (currentTime - lastClickTime < debounceMs) return@NavigationBarItem
                     lastClickTime = currentTime
-                    
-                    // Always navigate, clearing the back stack appropriately
-                    navController.navigate(item.route) {
-                        // Pop everything up to and including the start destination,
-                        // then navigate to the selected destination
-                        popUpTo(navController.graph.startDestinationId) {
-                            inclusive = false
-                            saveState = true
+
+                    if (activeTabRoot == item.route) {
+                        // Already on this tab — pop back to the tab root if deep
+                        if (currentRoute != item.route) {
+                            navController.popBackStack(item.route, inclusive = false)
                         }
-                        // Avoid multiple copies of the same destination
-                        launchSingleTop = true
-                        // Restore state when re-selecting a previously selected item
-                        restoreState = true
+                    } else if (item.route == UserRoute.Home.route) {
+                        // Going to Home — pop everything off the back stack back to
+                        // Home (inclusive) and navigate fresh so it's never "restored"
+                        // from a stale saved state
+                        navController.navigate(UserRoute.Home.route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                inclusive = true
+                                saveState = false
+                            }
+                            launchSingleTop = true
+                            restoreState = false
+                        }
+                    } else {
+                        // Switch to any other tab — save/restore state so each tab
+                        // remembers its scroll position and back stack
+                        navController.navigate(item.route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 },
                 icon  = {
                     Icon(
-                        if (isOnRoute) when (item) {
-                            UserRoute.Home      -> Icons.Filled.Home
-                            UserRoute.Exercises -> Icons.Filled.FitnessCenter
-                            UserRoute.CustomWorkout -> Icons.Filled.EmojiEvents
-                            UserRoute.Progress  -> Icons.Filled.BarChart
-                            UserRoute.Profile   -> Icons.Filled.Person
-                            UserRoute.Library   -> Icons.Filled.VideoLibrary
-                            UserRoute.Graphs    -> Icons.Filled.AutoGraph
-                            else                -> item.icon
+                        if (selected) when (item) {
+                            UserRoute.Home        -> Icons.Filled.Home
+                            UserRoute.Exercises   -> Icons.Filled.FitnessCenter
+                            UserRoute.Progress    -> Icons.Filled.BarChart
+                            UserRoute.Profile     -> Icons.Filled.Person
+                            UserRoute.Library     -> Icons.Filled.VideoLibrary
+                            UserRoute.Graphs      -> Icons.Filled.AutoGraph
+                            UserRoute.AdminStats  -> Icons.Filled.Analytics
+                            else                  -> item.icon
                         } else item.icon,
                         contentDescription = stringResource(item.labelResId),
                     )
@@ -319,9 +347,9 @@ private fun UserBottomNavBar(navController: NavController, items: List<UserRoute
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor   = Color(0xFFE85A2E),
                     selectedTextColor   = Color(0xFFE85A2E),
-                    indicatorColor      = Color(0xFFF2EEE4),
-                    unselectedIconColor = Color(0xFF888888),
-                    unselectedTextColor = Color(0xFF888888),
+                    indicatorColor      = MaterialTheme.colorScheme.secondaryContainer,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 ),
             )
         }

@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontWeight
@@ -41,18 +42,48 @@ import com.presentation.graphviz.PoseGraphLayout.Algorithm
 import com.presentation.graphviz.SkeletonNormalizer.isValidForDrawing
 import kotlin.math.*
 
-private val COLOR_BACKGROUND  = Color(0xFFFDF7F2) // BgCream
-private val COLOR_NODE_FILL   = Color.White
-private val COLOR_NODE_BORDER = Color(0xFF2D5A5E) // TealDark
-private val COLOR_EDGE        = Color(0xFF2D5A5E) // TealDark
-private val COLOR_LABEL_BG    = Color.White
-private val COLOR_ORANGE      = Color(0xFFE8622E)
-private val COLOR_TEAL_DARK   = Color(0xFF2D5A5E)
+// Brand accent — fixed regardless of theme
+private val COLOR_ORANGE = Color(0xFFE8622E)
+
+// ── Theme-aware color bundle ──────────────────────────────────────────────────
+
+private data class GraphColors(
+    val background: Color,
+    val canvasBg:   Color,   // white card area behind the graph
+    val nodeFill:   Color,
+    val nodeBorder: Color,
+    val edge:       Color,
+    val labelBg:    Color,
+    val labelText:  Color,
+    val teal:       Color,
+    val surface:    Color,
+    val onSurface:  Color,
+)
+
+@Composable
+private fun graphColors(): GraphColors {
+    val scheme = MaterialTheme.colorScheme
+    val isDark  = scheme.background.luminance() < 0.5f
+    return GraphColors(
+        background = scheme.background,
+        canvasBg   = if (isDark) Color(0xFF1A2B2C) else Color.White,
+        nodeFill   = if (isDark) Color(0xFF263636) else Color.White,
+        nodeBorder = if (isDark) Color(0xFFB2DFDB) else Color(0xFF2D5A5E),
+        edge       = if (isDark) Color(0xFFB2DFDB) else Color(0xFF2D5A5E),
+        labelBg    = if (isDark) Color(0xFF2E4444) else Color.White,
+        labelText  = Color.White,   // always white — visible on both dark bg and light bg with border
+        teal       = if (isDark) Color(0xFF80CBC4) else Color(0xFF2D5A5E),
+        surface    = scheme.surface,
+        onSurface  = scheme.onSurface,
+    )
+}
 
 private const val NODE_RADIUS_FRACTION  = 0.18f
 private const val LABEL_OFFSET_FRACTION = 1.5f
 private const val ZOOM_MIN = 0.5f
 private const val ZOOM_MAX = 5.0f
+
+// ── Entry composable ──────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -66,44 +97,59 @@ fun PoseGraphVisualizationScreen(graph: PoseGraph) {
     var isFullScreen        by remember { mutableStateOf(false) }
 
     val scrollState = rememberScrollState()
+    val gc = graphColors()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize().background(COLOR_BACKGROUND)) {
+        Column(modifier = Modifier.fillMaxSize().background(gc.background)) {
 
-            // ── Fixed Top Header ─────────────────────────────────────────────────
-            Surface(shadowElevation = 1.dp, color = COLOR_BACKGROUND) {
+            // ── Fixed Top Header ──────────────────────────────────────────────
+            Surface(shadowElevation = 1.dp, color = gc.background) {
                 Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                     Text(
                         text = "Pose State Transition Graph",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = COLOR_TEAL_DARK
+                        color = gc.teal
                     )
                     Text(
                         text = "States: ${graph.states.size}  •  Transitions: ${graph.transitions.values.sumOf { it.size }}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = COLOR_TEAL_DARK.copy(alpha = 0.7f),
+                        color = gc.teal.copy(alpha = 0.7f),
                     )
-                    
+
                     Spacer(Modifier.height(12.dp))
-                    
-                    // Layout Algorithm Chips - Scrollable Single Line
-                    Text("Algorithm:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = COLOR_TEAL_DARK)
+
+                    Text(
+                        "Algorithm:",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = gc.teal
+                    )
                     Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Algorithm.entries.forEach { algo ->
                             FilterChip(
                                 selected = selectedLayout == algo,
-                                onClick  = { selectedLayout = algo; scale = 1f; offsetX = 0f; offsetY = 0f },
-                                label    = { Text(algo.name.lowercase().replaceFirstChar { it.uppercase() }, fontSize = 12.sp) },
+                                onClick  = {
+                                    selectedLayout = algo
+                                    scale = 1f; offsetX = 0f; offsetY = 0f
+                                },
+                                label = {
+                                    Text(
+                                        algo.name.lowercase().replaceFirstChar { it.uppercase() },
+                                        fontSize = 12.sp
+                                    )
+                                },
                                 modifier = Modifier.height(32.dp),
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = COLOR_ORANGE,
                                     selectedLabelColor = Color.White,
-                                    labelColor = COLOR_TEAL_DARK
+                                    labelColor = gc.teal
                                 )
                             )
                         }
@@ -111,15 +157,14 @@ fun PoseGraphVisualizationScreen(graph: PoseGraph) {
                 }
             }
 
-            // ── Scrollable Content Area ──────────────────────────────────────────
+            // ── Scrollable Content ────────────────────────────────────────────
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(scrollState)
                     .padding(vertical = 16.dp)
             ) {
-
-                // ── Fixed Graph Canvas (Non-interactive) ──────────────────────────
+                // Non-interactive graph thumbnail
                 Box(
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
@@ -130,28 +175,28 @@ fun PoseGraphVisualizationScreen(graph: PoseGraph) {
                         graph = graph,
                         selectedLayout = selectedLayout,
                         scale = 1f,
-                        onScaleChange = { },
+                        onScaleChange = {},
                         offsetX = 0f,
-                        onOffsetXChange = { },
+                        onOffsetXChange = {},
                         offsetY = 0f,
-                        onOffsetYChange = { },
+                        onOffsetYChange = {},
                         isInteractive = false,
+                        gc = gc,
                         modifier = Modifier.fillMaxSize()
                     )
 
-                    // ── Small Full Screen Icon (Top Right) ───────────────────────
                     IconButton(
                         onClick = { isFullScreen = true },
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(8.dp)
                             .size(32.dp)
-                            .background(Color.White.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+                            .background(gc.surface.copy(alpha = 0.85f), RoundedCornerShape(8.dp))
                     ) {
                         Icon(
                             imageVector = Icons.Default.Fullscreen,
                             contentDescription = "Full Screen",
-                            tint = COLOR_TEAL_DARK,
+                            tint = gc.teal,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -159,26 +204,39 @@ fun PoseGraphVisualizationScreen(graph: PoseGraph) {
 
                 Spacer(Modifier.height(20.dp))
 
-                // ── Information Sections ──────────────────────────────────────────
-                CollapsibleCard("Transition Sequence", transitionsExpanded, { transitionsExpanded = !transitionsExpanded }, Modifier.padding(horizontal = 16.dp)) {
+                CollapsibleCard(
+                    title = "Transition Sequence",
+                    expanded = transitionsExpanded,
+                    onToggle = { transitionsExpanded = !transitionsExpanded },
+                    gc = gc,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                ) {
                     TransitionSequenceContent(graph)
                 }
+
                 Spacer(Modifier.height(12.dp))
-                CollapsibleCard("Graph Statistics", statsExpanded, { statsExpanded = !statsExpanded }, Modifier.padding(horizontal = 16.dp)) {
+
+                CollapsibleCard(
+                    title = "Graph Statistics",
+                    expanded = statsExpanded,
+                    onToggle = { statsExpanded = !statsExpanded },
+                    gc = gc,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                ) {
                     GraphStatsContent(graph)
                 }
-                
+
                 Spacer(Modifier.height(32.dp))
             }
         }
 
-        // ── Full Screen Interactive Dialog ──────────────────────────────────
+        // ── Full-screen interactive dialog ────────────────────────────────────
         if (isFullScreen) {
             Dialog(
                 onDismissRequest = { isFullScreen = false },
                 properties = DialogProperties(usePlatformDefaultWidth = false)
             ) {
-                Surface(modifier = Modifier.fillMaxSize(), color = COLOR_BACKGROUND) {
+                Surface(modifier = Modifier.fillMaxSize(), color = gc.background) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         GraphDrawingArea(
                             graph = graph,
@@ -190,13 +248,15 @@ fun PoseGraphVisualizationScreen(graph: PoseGraph) {
                             offsetY = offsetY,
                             onOffsetYChange = { offsetY = it },
                             isInteractive = true,
+                            gc = gc,
                             modifier = Modifier.fillMaxSize()
                         )
 
-                        // ── Overlay Controls (Scrollable) ───────────────────────────
                         Surface(
-                            modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
-                            color = Color.White.copy(alpha = 0.92f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.TopCenter),
+                            color = gc.surface.copy(alpha = 0.92f),
                             shadowElevation = 4.dp
                         ) {
                             Row(
@@ -207,23 +267,30 @@ fun PoseGraphVisualizationScreen(graph: PoseGraph) {
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Zoom controls
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Text("Zoom: ${"%.1f".format(scale)}×", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = COLOR_TEAL_DARK)
+                                    Text(
+                                        "Zoom: ${"%.1f".format(scale)}×",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = gc.teal
+                                    )
                                     OutlinedIconButton(
                                         onClick = { scale = (scale * 1.2f).coerceAtMost(ZOOM_MAX) },
                                         modifier = Modifier.size(28.dp),
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, COLOR_TEAL_DARK)
-                                    ) { Icon(Icons.Default.Add, null, modifier = Modifier.size(14.dp), tint = COLOR_TEAL_DARK) }
-                                    
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, gc.teal)
+                                    ) {
+                                        Icon(Icons.Default.Add, null, modifier = Modifier.size(14.dp), tint = gc.teal)
+                                    }
                                     OutlinedIconButton(
                                         onClick = { scale = (scale / 1.2f).coerceAtLeast(ZOOM_MIN) },
                                         modifier = Modifier.size(28.dp),
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, COLOR_TEAL_DARK)
-                                    ) { Icon(Icons.Default.Remove, null, modifier = Modifier.size(14.dp), tint = COLOR_TEAL_DARK) }
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, gc.teal)
+                                    ) {
+                                        Icon(Icons.Default.Remove, null, modifier = Modifier.size(14.dp), tint = gc.teal)
+                                    }
                                 }
 
                                 Button(
@@ -241,12 +308,12 @@ fun PoseGraphVisualizationScreen(graph: PoseGraph) {
                                     onClick = { isFullScreen = false },
                                     modifier = Modifier
                                         .size(32.dp)
-                                        .background(Color.White.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
+                                        .background(gc.surface.copy(alpha = 0.85f), RoundedCornerShape(8.dp))
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.FullscreenExit,
                                         contentDescription = "Exit Full Screen",
-                                        tint = COLOR_TEAL_DARK,
+                                        tint = gc.teal,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -259,6 +326,8 @@ fun PoseGraphVisualizationScreen(graph: PoseGraph) {
     }
 }
 
+// ── Graph drawing area ────────────────────────────────────────────────────────
+
 @Composable
 private fun GraphDrawingArea(
     graph: PoseGraph,
@@ -270,20 +339,20 @@ private fun GraphDrawingArea(
     offsetY: Float,
     onOffsetYChange: (Float) -> Unit,
     isInteractive: Boolean,
+    gc: GraphColors,
     modifier: Modifier = Modifier
 ) {
-    // ── GESTURE FIX: Use rememberUpdatedState to avoid capturing stale values ──
-    val currentScale by rememberUpdatedState(scale)
-    val currentOffsetX by rememberUpdatedState(offsetX)
-    val currentOffsetY by rememberUpdatedState(offsetY)
-    val currentOnScaleChange by rememberUpdatedState(onScaleChange)
+    val currentScale          by rememberUpdatedState(scale)
+    val currentOffsetX        by rememberUpdatedState(offsetX)
+    val currentOffsetY        by rememberUpdatedState(offsetY)
+    val currentOnScaleChange  by rememberUpdatedState(onScaleChange)
     val currentOnOffsetXChange by rememberUpdatedState(onOffsetXChange)
     val currentOnOffsetYChange by rememberUpdatedState(onOffsetYChange)
 
     BoxWithConstraints(
         modifier = modifier
-            .background(Color.White, RoundedCornerShape(16.dp))
-            .border(1.dp, COLOR_TEAL_DARK.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .background(gc.canvasBg, RoundedCornerShape(16.dp))
+            .border(1.dp, gc.nodeBorder.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
             .pointerInput(isInteractive) {
                 if (isInteractive) {
                     detectTransformGestures { _, pan, zoom, _ ->
@@ -314,6 +383,13 @@ private fun GraphDrawingArea(
 
         val textMeasurer = rememberTextMeasurer()
 
+        // Capture colors into local vals for use inside Canvas lambda
+        val edgeColor      = gc.edge
+        val nodeFill       = gc.nodeFill
+        val nodeBorder     = gc.nodeBorder
+        val labelBg        = gc.labelBg
+        val labelTextColor = gc.labelText
+
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
@@ -324,43 +400,82 @@ private fun GraphDrawingArea(
                     translationY = offsetY
                 },
         ) {
-            val centerX = size.width  / 2f
-            val centerY = size.height / 2f
+            val centerX     = size.width  / 2f
+            val centerY     = size.height / 2f
             val scaleFactor = minOf(size.width, size.height) * 0.35f
 
-            fun normalizedToCanvas(pos: Offset) = Offset(centerX + pos.x * scaleFactor, centerY + pos.y * scaleFactor)
+            fun normalizedToCanvas(pos: Offset) =
+                Offset(centerX + pos.x * scaleFactor, centerY + pos.y * scaleFactor)
 
+            // Draw edges
             for ((fromId, toIds) in graph.transitions) {
                 for (toId in toIds) {
                     val fromPos = positions[fromId] ?: continue
                     val toPos   = positions[toId]   ?: continue
-                    drawDirectedEdge(normalizedToCanvas(fromPos), normalizedToCanvas(toPos), nodeRadius)
+                    drawDirectedEdge(
+                        from       = normalizedToCanvas(fromPos),
+                        to         = normalizedToCanvas(toPos),
+                        nodeRadius = nodeRadius,
+                        edgeColor  = edgeColor,
+                    )
                 }
             }
 
+            // Draw nodes + labels
             for (state in graph.states) {
                 val normPos   = positions[state.stateId] ?: continue
                 val canvasPos = normalizedToCanvas(normPos)
                 val skeleton  = normalizedSkeletons[state.stateId]
 
-                drawCircle(COLOR_NODE_FILL,   nodeRadius, canvasPos)
-                drawCircle(COLOR_NODE_BORDER, nodeRadius, canvasPos, style = Stroke(2.5f))
+                drawCircle(nodeFill,   nodeRadius, canvasPos)
+                drawCircle(nodeBorder, nodeRadius, canvasPos, style = Stroke(2.5f))
 
                 if (skeleton != null) {
-                    drawAnatomicalFigure(keypoints = skeleton, center = canvasPos, nodeRadius = nodeRadius * 1.1f)
+                    drawAnatomicalFigure(
+                        keypoints  = skeleton,
+                        center     = canvasPos,
+                        nodeRadius = nodeRadius * 1.1f,
+                    )
                 } else {
-                    val label = textMeasurer.measure("S${state.stateId}", TextStyle(fontSize = (nodeRadius * 0.4f).sp, fontWeight = FontWeight.Bold))
-                    drawText(label, topLeft = Offset(canvasPos.x - label.size.width / 2f, canvasPos.y - label.size.height / 2f))
+                    val label = textMeasurer.measure(
+                        "S${state.stateId}",
+                        TextStyle(
+                            fontSize   = (nodeRadius * 0.4f).sp,
+                            fontWeight = FontWeight.Bold,
+                            color      = labelTextColor,
+                        )
+                    )
+                    drawText(
+                        label,
+                        topLeft = Offset(
+                            canvasPos.x - label.size.width  / 2f,
+                            canvasPos.y - label.size.height / 2f,
+                        )
+                    )
                 }
 
+                // State label pill: "State X\nY.Ys"
                 val labelText   = "State ${state.stateId}\n${"%.1f".format(state.minHoldDuration)}s"
-                val labelLayout = textMeasurer.measure(AnnotatedString(labelText), TextStyle(fontSize = (nodeRadius * 0.28f).sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center))
+                val labelLayout = textMeasurer.measure(
+                    AnnotatedString(labelText),
+                    TextStyle(
+                        fontSize   = (nodeRadius * 0.28f).sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign  = TextAlign.Center,
+                        color      = labelTextColor,
+                    )
+                )
+                val padding = 6f
                 val labelY  = canvasPos.y + nodeRadius * LABEL_OFFSET_FRACTION
                 val labelX  = canvasPos.x - labelLayout.size.width / 2f
-                val padding = 6f
+                val bgRect  = Offset(labelX - padding, labelY - padding)
+                val bgSize  = Size(
+                    labelLayout.size.width  + padding * 2,
+                    labelLayout.size.height + padding * 2,
+                )
 
-                drawRoundRect(COLOR_LABEL_BG, Offset(labelX - padding, labelY - padding), Size(labelLayout.size.width + padding * 2, labelLayout.size.height + padding * 2), CornerRadius(4f))
-                drawRoundRect(COLOR_NODE_BORDER, Offset(labelX - padding, labelY - padding), Size(labelLayout.size.width + padding * 2, labelLayout.size.height + padding * 2), CornerRadius(4f), style = Stroke(1.5f))
+                drawRoundRect(labelBg,    bgRect, bgSize, CornerRadius(4f))
+                drawRoundRect(nodeBorder, bgRect, bgSize, CornerRadius(4f), style = Stroke(1.5f))
                 drawText(labelLayout, topLeft = Offset(labelX, labelY))
             }
         }
@@ -370,11 +485,18 @@ private fun GraphDrawingArea(
 // ── Collapsible card ──────────────────────────────────────────────────────────
 
 @Composable
-private fun CollapsibleCard(title: String, expanded: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+private fun CollapsibleCard(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    gc: GraphColors,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = gc.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
@@ -389,18 +511,21 @@ private fun CollapsibleCard(title: String, expanded: Boolean, onToggle: () -> Un
                     title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = COLOR_TEAL_DARK
+                    color = gc.teal
                 )
                 IconButton(onClick = onToggle, modifier = Modifier.size(28.dp)) {
                     Icon(
                         if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                         contentDescription = null,
-                        tint = COLOR_TEAL_DARK
+                        tint = gc.teal
                     )
                 }
             }
             AnimatedVisibility(expanded, enter = expandVertically(), exit = shrinkVertically()) {
-                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), content = content)
+                Column(
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    content = content
+                )
             }
         }
     }
@@ -412,16 +537,29 @@ private fun CollapsibleCard(title: String, expanded: Boolean, onToggle: () -> Un
 private fun TransitionSequenceContent(graph: PoseGraph) {
     val sequence = graph.temporalSequence
     if (sequence.isEmpty()) {
-        Text("No temporal sequence stored in graph metadata.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "No temporal sequence stored in graph metadata.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         return
     }
     val chunks = sequence.chunked(8)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Temporal order (${sequence.size} steps, ${sequence.distinct().size} unique states):", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "Temporal order (${sequence.size} steps, ${sequence.distinct().size} unique states):",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         chunks.forEachIndexed { idx, chunk ->
             val prefix = if (idx > 0) "↳  " else ""
             val suffix = if (idx < chunks.lastIndex) " →" else ""
-            Text(prefix + chunk.joinToString(" → ") { "S$it" } + suffix, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(
+                prefix + chunk.joinToString(" → ") { "S$it" } + suffix,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
         Spacer(Modifier.height(8.dp))
         Text("Edges:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -444,36 +582,58 @@ private fun GraphStatsContent(graph: PoseGraph) {
         StatRow("Has cycles",  if (stats.hasCycles) "Yes" else "No")
         if (holdDurations.isNotEmpty()) {
             Spacer(Modifier.height(6.dp))
-            Text("Hold Durations", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Hold Durations",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             StatRow("Min",   "${"%.2f".format(holdDurations.min())}s")
             StatRow("Max",   "${"%.2f".format(holdDurations.max())}s")
             StatRow("Mean",  "${"%.2f".format(holdDurations.average())}s")
             StatRow("Total", "${"%.2f".format(holdDurations.sum())}s")
         }
         Spacer(Modifier.height(6.dp))
-        StatRow("States with keypoints", "${graph.states.count { it.meanKeypoints != null }} / ${graph.states.size}")
+        StatRow(
+            "States with keypoints",
+            "${graph.states.count { it.meanKeypoints != null }} / ${graph.states.size}"
+        )
     }
 }
 
 // ── Edge drawing ──────────────────────────────────────────────────────────────
 
-private fun DrawScope.drawDirectedEdge(from: Offset, to: Offset, nodeRadius: Float) {
+private fun DrawScope.drawDirectedEdge(
+    from: Offset,
+    to: Offset,
+    nodeRadius: Float,
+    edgeColor: Color,
+) {
     if (from == to) return
-    val dx = to.x - from.x; val dy = to.y - from.y
+    val dx  = to.x - from.x
+    val dy  = to.y - from.y
     val len = sqrt(dx * dx + dy * dy).coerceAtLeast(1e-6f)
-    val nx = dx / len; val ny = dy / len
+    val nx  = dx / len
+    val ny  = dy / len
 
-    val edgeStart = Offset(from.x + nx * nodeRadius, from.y + ny * nodeRadius)
-    val edgeEnd   = Offset(to.x   - nx * nodeRadius, to.y   - ny * nodeRadius)
+    val edgeStart   = Offset(from.x + nx * nodeRadius, from.y + ny * nodeRadius)
+    val edgeEnd     = Offset(to.x   - nx * nodeRadius, to.y   - ny * nodeRadius)
     val curveOffset = 0.08f * len
-    val control = Offset((edgeStart.x + edgeEnd.x) / 2f - ny * curveOffset, (edgeStart.y + edgeEnd.y) / 2f + nx * curveOffset)
+    val control     = Offset(
+        (edgeStart.x + edgeEnd.x) / 2f - ny * curveOffset,
+        (edgeStart.y + edgeEnd.y) / 2f + nx * curveOffset,
+    )
 
-    val path = Path().apply { moveTo(edgeStart.x, edgeStart.y); quadraticTo(control.x, control.y, edgeEnd.x, edgeEnd.y) }
-    drawPath(path, COLOR_EDGE.copy(alpha = 0.7f), style = Stroke(2.5f, cap = StrokeCap.Round))
+    val path = Path().apply {
+        moveTo(edgeStart.x, edgeStart.y)
+        quadraticTo(control.x, control.y, edgeEnd.x, edgeEnd.y)
+    }
+    drawPath(path, edgeColor.copy(alpha = 0.85f), style = Stroke(2.5f, cap = StrokeCap.Round))
 
-    val arrowLen = nodeRadius * 0.4f; val arrowWidth = nodeRadius * 0.2f
+    val arrowLen   = nodeRadius * 0.4f
+    val arrowWidth = nodeRadius * 0.2f
     val tLen = sqrt((edgeEnd.x - control.x).pow(2) + (edgeEnd.y - control.y).pow(2)).coerceAtLeast(1e-6f)
-    val tx = (edgeEnd.x - control.x) / tLen; val ty = (edgeEnd.y - control.y) / tLen
+    val tx   = (edgeEnd.x - control.x) / tLen
+    val ty   = (edgeEnd.y - control.y) / tLen
     val arrowBase = Offset(edgeEnd.x - tx * arrowLen, edgeEnd.y - ty * arrowLen)
     val arrowPath = Path().apply {
         moveTo(edgeEnd.x, edgeEnd.y)
@@ -481,15 +641,20 @@ private fun DrawScope.drawDirectedEdge(from: Offset, to: Offset, nodeRadius: Flo
         lineTo(arrowBase.x - ty * arrowWidth, arrowBase.y + tx * arrowWidth)
         close()
     }
-    drawPath(arrowPath, COLOR_EDGE)
+    drawPath(arrowPath, edgeColor)
 }
 
 // ── Stat row ──────────────────────────────────────────────────────────────────
 
 @Composable
 private fun StatRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
     }
 }

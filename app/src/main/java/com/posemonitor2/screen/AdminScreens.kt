@@ -17,14 +17,17 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
@@ -47,6 +50,16 @@ fun LibraryScreen(
     var pendingVideoUri by remember { mutableStateOf<Uri?>(null) }
     var capturedVideoFile by remember { mutableStateOf<File?>(null) }
 
+    // Theme-aware colors — use MaterialTheme, never isSystemInDarkTheme()
+    val isDark      = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val bgColor     = MaterialTheme.colorScheme.background
+    val surfaceColor  = MaterialTheme.colorScheme.surface
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val tealColor   = MaterialTheme.colorScheme.primary
+    val mutedColor  = MaterialTheme.colorScheme.onSurfaceVariant
+    val actionColor = if (isDark) Color(0xFF4DB6AC) else Color(0xFF0D4A4E)
+    val actionOnColor = if (isDark) Color.Black else Color.White
+
     val videoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -64,13 +77,14 @@ fun LibraryScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF2EEE4))
+            .background(bgColor)
             .padding(16.dp),
         contentAlignment = Alignment.Center
     ) {
         when (val state = uiState) {
             is GenerationUiState.Idle -> {
                 if (pendingVideoUri == null) {
+                    // ── Upload / record picker ────────────────────────────────
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -79,21 +93,24 @@ fun LibraryScreen(
                             text = "Admin Video Library",
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0A3D3F)
+                            color = tealColor
                         )
                         Text(
                             text = "Upload or record an exercise video to automatically generate a pose graph.",
                             fontSize = 14.sp,
-                            color = Color(0xFF888888),
+                            color = mutedColor,
                             modifier = Modifier.padding(horizontal = 32.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            textAlign = TextAlign.Center
                         )
-                        
+
                         Button(
                             onClick = { videoPicker.launch("video/*") },
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D4A4E))
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = actionColor,
+                                contentColor = actionOnColor,
+                            )
                         ) {
                             Icon(Icons.Default.FileUpload, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
@@ -102,7 +119,10 @@ fun LibraryScreen(
 
                         OutlinedButton(
                             onClick = {
-                                val file = File(context.cacheDir, "captured_video_${System.currentTimeMillis()}.mp4")
+                                val file = File(
+                                    context.cacheDir,
+                                    "captured_video_${System.currentTimeMillis()}.mp4"
+                                )
                                 capturedVideoFile = file
                                 val uri = FileProvider.getUriForFile(
                                     context,
@@ -113,28 +133,39 @@ fun LibraryScreen(
                             },
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(12.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0D4A4E)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF0D4A4E))
+                            border = androidx.compose.foundation.BorderStroke(1.dp, actionColor),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = actionColor)
                         ) {
                             Icon(Icons.Default.CameraAlt, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Choose Camera (Record)")
+                            Text("Record with Camera")
                         }
                     }
                 } else {
-                    // Automatically start generation with default config or show settings
-                    // For "automatic" requirement, we'll just use defaults or a simple name prompt
+                    // ── Confirm graph name before generating ──────────────────
                     var graphName by remember { mutableStateOf("") }
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text("Confirm Graph Details", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Confirm Graph Details",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = onSurfaceColor
+                        )
                         OutlinedTextField(
                             value = graphName,
                             onValueChange = { graphName = it },
-                            label = { Text("Graph Name (Optional)") },
-                            modifier = Modifier.fillMaxWidth()
+                            label = { Text("Exercise Name (Optional)") },
+                            placeholder = { Text("e.g. squat, bird-dog", color = mutedColor) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = onSurfaceColor,
+                                unfocusedTextColor = onSurfaceColor,
+                                focusedBorderColor = tealColor,
+                                unfocusedBorderColor = mutedColor
+                            )
                         )
                         Button(
                             onClick = {
@@ -145,41 +176,163 @@ fun LibraryScreen(
                                 )
                                 pendingVideoUri = null
                             },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = tealColor)
                         ) {
-                            Text("Generate Graph Automatically")
+                            Text("Generate Graph", color = MaterialTheme.colorScheme.onPrimary)
                         }
                         TextButton(onClick = { pendingVideoUri = null }) {
-                            Text("Cancel")
+                            Text("Cancel", color = mutedColor)
                         }
                     }
                 }
             }
+
             is GenerationUiState.Processing -> {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(progress = { state.progressFraction })
-                    Spacer(Modifier.height(16.dp))
-                    Text(state.message, fontWeight = FontWeight.Bold)
-                    Text(state.detail, fontSize = 12.sp, color = Color.Gray)
+                // ── Progress ──────────────────────────────────────────────────
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CircularProgressIndicator(
+                        progress = { state.progressFraction },
+                        color = tealColor,
+                        modifier = Modifier.size(72.dp),
+                        strokeWidth = 6.dp,
+                    )
+                    Text(
+                        state.message,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = onSurfaceColor
+                    )
+                    Text(
+                        state.detail,
+                        fontSize = 13.sp,
+                        color = mutedColor,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
                 }
             }
+
             is GenerationUiState.Success -> {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("✅ Success!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
-                    Text("Graph saved to library.", fontSize = 14.sp)
-                    Spacer(Modifier.height(24.dp))
-                    Button(onClick = { viewModel.reset() }) {
-                        Text("Done")
+                // ── Success — show name + direct navigation to exercise ───────
+                val exerciseName = remember(state.outputPath) {
+                    File(state.outputPath).nameWithoutExtension
+                        .replace("-", " ")
+                        .replaceFirstChar { it.uppercase() }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = surfaceColor,
+                    shadowElevation = 4.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("✅", fontSize = 48.sp)
+                        Text(
+                            "Graph Generated!",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF4CAF50)
+                        )
+                        Text(
+                            exerciseName,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = tealColor,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            "${state.numStates} states  •  ${state.numFrames} frames",
+                            fontSize = 13.sp,
+                            color = mutedColor
+                        )
+
+                        Spacer(Modifier.height(8.dp))
+
+                        // Primary: go straight to the Exercises tab to start working out
+                        Button(
+                            onClick = {
+                                viewModel.reset()
+                                navController.navigate(UserRoute.Exercises.route) {
+                                    popUpTo(UserRoute.Home.route)
+                                    launchSingleTop = true
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = tealColor)
+                        ) {
+                            Icon(
+                                Icons.Default.FitnessCenter,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Go to Exercise",
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        // Secondary: stay in the library and generate another
+                        OutlinedButton(
+                            onClick = { viewModel.reset() },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, mutedColor)
+                        ) {
+                            Text("Generate Another", color = mutedColor)
+                        }
                     }
                 }
             }
+
             is GenerationUiState.Error -> {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("❌ Error", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Red)
-                    Text(state.detail, fontSize = 14.sp)
-                    Spacer(Modifier.height(24.dp))
-                    Button(onClick = { viewModel.reset() }) {
-                        Text("Try Again")
+                // ── Error ─────────────────────────────────────────────────────
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = surfaceColor,
+                    shadowElevation = 4.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("❌", fontSize = 48.sp)
+                        Text(
+                            "Generation Failed",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            state.detail,
+                            fontSize = 13.sp,
+                            color = mutedColor,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { viewModel.reset() },
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = tealColor)
+                        ) {
+                            Text("Try Again", color = MaterialTheme.colorScheme.onPrimary)
+                        }
                     }
                 }
             }
@@ -196,6 +349,13 @@ fun GraphsScreen(
     var selectedGraph by remember { mutableStateOf<GraphEntry?>(null) }
     var graphPendingDelete by remember { mutableStateOf<GraphEntry?>(null) }
 
+    val isDark         = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val bgColor        = MaterialTheme.colorScheme.background
+    val surfaceColor   = MaterialTheme.colorScheme.surface
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val tealColor      = MaterialTheme.colorScheme.primary
+    val mutedColor     = MaterialTheme.colorScheme.onSurfaceVariant
+
     if (selectedGraph != null) {
         val entry = selectedGraph!!
         val graph = remember(entry) {
@@ -209,21 +369,26 @@ fun GraphsScreen(
             }.getOrNull()
         }
 
-        Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+        Column(modifier = Modifier.fillMaxSize().background(bgColor)) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = { selectedGraph = null }) {
-                    Text("← Back")
+                    Text("← Back", color = tealColor)
                 }
-                Text(entry.fileName.removeSuffix(".json"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(
+                    entry.fileName.removeSuffix(".json"),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = onSurfaceColor
+                )
             }
             if (graph != null) {
                 PoseGraphVisualizationScreen(graph = graph)
             } else {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Failed to load graph", color = Color.Red)
+                    Text("Failed to load graph", color = MaterialTheme.colorScheme.error)
                 }
             }
         }
@@ -231,7 +396,7 @@ fun GraphsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF2EEE4))
+                .background(bgColor)
                 .padding(16.dp)
         ) {
             Row(
@@ -243,7 +408,7 @@ fun GraphsScreen(
                     "Pose Graphs Library",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0A3D3F)
+                    color = tealColor
                 )
 
                 if (graphPendingDelete != null) {
@@ -260,7 +425,7 @@ fun GraphsScreen(
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Delete Graph",
-                            tint = Color(0xFFE85A2E) // Orange
+                            tint = Color(0xFFE85A2E)
                         )
                     }
                 }
@@ -268,7 +433,11 @@ fun GraphsScreen(
 
             if (graphs.isEmpty()) {
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    Text("No graphs yet. Generate some from the Library tab.", color = Color.Gray)
+                    Text(
+                        "No graphs yet. Generate some from the Library tab.",
+                        color = mutedColor,
+                        textAlign = TextAlign.Center
+                    )
                 }
             } else {
                 LazyColumn(
@@ -294,13 +463,14 @@ fun GraphsScreen(
                                         }
                                     },
                                     onLongClick = {
-                                        if (!entry.isAsset) {
-                                            graphPendingDelete = entry
-                                        }
+                                        if (!entry.isAsset) graphPendingDelete = entry
                                     }
                                 ),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isPendingDelete) Color(0xFFFFF3E0) else Color.White
+                                containerColor = if (isPendingDelete)
+                                    (if (isDark) Color(0xFF3E2723) else Color(0xFFFFF3E0))
+                                else
+                                    surfaceColor
                             )
                         ) {
                             Row(
@@ -310,8 +480,16 @@ fun GraphsScreen(
                                 Text(if (entry.isAsset) "📦" else "📊", fontSize = 24.sp)
                                 Spacer(Modifier.width(16.dp))
                                 Column {
-                                    Text(entry.fileName.removeSuffix(".json"), fontWeight = FontWeight.Bold)
-                                    Text(if (entry.isAsset) "System Provided" else "Generated", fontSize = 12.sp, color = Color.Gray)
+                                    Text(
+                                        entry.fileName.removeSuffix(".json"),
+                                        fontWeight = FontWeight.Bold,
+                                        color = onSurfaceColor
+                                    )
+                                    Text(
+                                        if (entry.isAsset) "System Provided" else "Generated",
+                                        fontSize = 12.sp,
+                                        color = mutedColor
+                                    )
                                 }
                             }
                         }

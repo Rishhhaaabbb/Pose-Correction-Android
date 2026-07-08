@@ -11,5 +11,6 @@ interface ExerciseRepository {
     suspend fun getByCategory(category: String): List<Exercise>
     suspend fun getByDifficulty(difficulty: String): List<Exercise>
     suspend fun save(exercises: List<Exercise>)
+    suspend fun deleteById(id: String)
     suspend fun getCount(): Int
 }

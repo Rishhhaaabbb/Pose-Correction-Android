@@ -5,37 +5,57 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Help
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.posemonitor2.component.ZoomableVideoPlayer
-import com.posemonitor2.questionnaire.QBgGradient
-import com.posemonitor2.questionnaire.QCardBg
-import com.posemonitor2.questionnaire.QDivider
-import com.posemonitor2.questionnaire.QPurple
-import com.posemonitor2.questionnaire.QPurpleLight
-import com.posemonitor2.questionnaire.QSubtext
-import com.posemonitor2.questionnaire.QText
+import com.posemonitor2.ui.theme.PoseMonitor2Theme
 import com.posemonitor2.ui.theme.PoseMonitorAppTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -43,9 +63,12 @@ import kotlinx.coroutines.launch
 class OnboardingActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         val mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_INTRO
+
         setContent {
-            PoseMonitorAppTheme {
+            // Onboarding is a pre-login screen — always light theme
+            PoseMonitor2Theme(darkTheme = false, dynamicColor = false) {
                 when (mode) {
                     MODE_FULL_TOUR -> FullTourScreen(onClose = { finish() })
                     else -> IntroOnboardingEntry(
@@ -67,9 +90,12 @@ class OnboardingActivity : ComponentActivity() {
         }
     }
 
-    private fun hasIntroVideoAsset(): Boolean = runCatching {
-        assets.openFd(INTRO_VIDEO_ASSET).close(); true
-    }.getOrElse { false }
+    private fun hasIntroVideoAsset(): Boolean {
+        return runCatching {
+            assets.openFd(INTRO_VIDEO_ASSET).close()
+            true
+        }.getOrElse { false }
+    }
 
     companion object {
         const val EXTRA_MODE = "extra_onboarding_mode"
@@ -77,8 +103,9 @@ class OnboardingActivity : ComponentActivity() {
         const val MODE_FULL_TOUR = "full_tour"
         private const val INTRO_VIDEO_ASSET = "videos/onboarding_intro_30s.mp4"
 
-        fun createIntent(context: Context, mode: String): Intent =
-            Intent(context, OnboardingActivity::class.java).putExtra(EXTRA_MODE, mode)
+        fun createIntent(context: Context, mode: String): Intent {
+            return Intent(context, OnboardingActivity::class.java).putExtra(EXTRA_MODE, mode)
+        }
     }
 }
 
@@ -90,9 +117,17 @@ private fun IntroOnboardingEntry(
     onLearnMore: () -> Unit,
 ) {
     if (hasVideoAsset) {
-        OnboardingIntroVideoScreen(onCompleted = onCompleted, onSkipped = onSkipped, onLearnMore = onLearnMore)
+        OnboardingIntroVideoScreen(
+            onCompleted = onCompleted,
+            onSkipped = onSkipped,
+            onLearnMore = onLearnMore,
+        )
     } else {
-        OnboardingCarouselScreen(onCompleted = onCompleted, onSkipped = onSkipped, onLearnMore = onLearnMore)
+        OnboardingCarouselScreen(
+            onCompleted = onCompleted,
+            onSkipped = onSkipped,
+            onLearnMore = onLearnMore,
+        )
     }
 }
 
@@ -103,7 +138,12 @@ private fun OnboardingIntroVideoScreen(
     onLearnMore: () -> Unit,
 ) {
     val context = LocalContext.current
-    LaunchedEffect(Unit) { delay(30_000); onCompleted() }
+
+    LaunchedEffect(Unit) {
+        delay(30_000)
+        onCompleted()
+    }
+
     Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
         Box(modifier = Modifier.fillMaxSize()) {
             ZoomableVideoPlayer(
@@ -112,30 +152,56 @@ private fun OnboardingIntroVideoScreen(
                 useController = false,
                 modifier = Modifier.fillMaxSize(),
             )
+
             Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Button(onClick = onSkipped, colors = ButtonDefaults.buttonColors(containerColor = Color(0x99333333)), shape = RoundedCornerShape(12.dp)) { Text("Skip") }
+                Button(
+                    onClick = onSkipped,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x99333333)),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text("Skip")
+                }
+
                 Button(
                     onClick = {
-                        context.startActivity(OnboardingActivity.createIntent(context, OnboardingActivity.MODE_INTRO))
+                        // Replay intro from the beginning.
+                        context.startActivity(
+                            OnboardingActivity.createIntent(context, OnboardingActivity.MODE_INTRO),
+                        )
                         (context as? android.app.Activity)?.finish()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = QPurple.copy(alpha = 0.7f)), shape = RoundedCornerShape(12.dp),
-                ) { Text("Learn More") }
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x99E8622E)),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text("Learn More")
+                }
             }
+
             Button(
                 onClick = onLearnMore,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0x99FFFFFF)), shape = RoundedCornerShape(12.dp),
-            ) { Text("View Full App Tour", color = Color.Black) }
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0x99FFFFFF)),
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Text("View Full App Tour", color = Color.Black)
+            }
         }
     }
 }
 
-private data class IntroSlide(val emoji: String, val title: String, val subtitle: String, val bullets: List<String>)
+private data class IntroSlide(
+    val title: String,
+    val subtitle: String,
+    val bullets: List<String>,
+)
 
 @Composable
 private fun OnboardingCarouselScreen(
@@ -143,37 +209,62 @@ private fun OnboardingCarouselScreen(
     onSkipped: () -> Unit,
     onLearnMore: () -> Unit,
 ) {
+    // ... slides ...
     val slides = remember {
         listOf(
             IntroSlide(
-                emoji = "🎯", title = "Welcome to PoseMonitor",
-                subtitle = "Choose an exercise and get live AI-powered form correction.",
-                bullets = listOf("Works offline after install", "Front & back camera supported", "Review past sessions in Progress tab"),
+                title = "Welcome",
+                subtitle = "Choose your exercise from the library and start guided correction.",
+                bullets = listOf(
+                    "Works offline after install",
+                    "Front and back camera supported",
+                    "Past sessions in Profile -> Progress",
+                ),
             ),
             IntroSlide(
-                emoji = "📱", title = "Phone Placement",
-                subtitle = "Place your phone 2m away, 10–20cm from the floor.",
-                bullets = listOf("Keep full body visible head to feet", "Portrait for front exercises", "Landscape for side exercises"),
+                title = "Phone Placement",
+                subtitle = "Place phone 2m away and 10-20cm from the floor.",
+                bullets = listOf(
+                    "Keep full body visible head to feet",
+                    "Too close cuts feet, too far lowers accuracy",
+                    "Use portrait for front exercises and landscape for side exercises",
+                ),
             ),
             IntroSlide(
-                emoji = "👗", title = "What to Wear",
-                subtitle = "Fitted or stretchable clothes help the AI detect your joints clearly.",
-                bullets = listOf("Avoid baggy clothing", "Use a non-slip mat", "Keep 2m of clear space around you"),
+                title = "Clothing and Safety",
+                subtitle = "Wear fitted or stretchable clothes for better detection.",
+                bullets = listOf(
+                    "Avoid baggy clothes",
+                    "Keep 2m clear space and use a non-slip mat",
+                    "Stop if you feel pain and consult a doctor if injured",
+                ),
             ),
             IntroSlide(
-                emoji = "🟢", title = "Skeleton Feedback",
-                subtitle = "Green skeleton = correct form. Red = adjust your posture.",
-                bullets = listOf("Hold pose until the timer completes", "Voice guidance tells you exactly what to adjust", "Auto-advance after a successful hold"),
+                title = "Skeleton Feedback",
+                subtitle = "Green means correct form. Red means adjust posture.",
+                bullets = listOf(
+                    "Hold pose until timer completes",
+                    "Auto-advance after successful hold",
+                    "Watch correction text and voice guidance",
+                ),
             ),
             IntroSlide(
-                emoji = "⚙️", title = "Session Controls",
-                subtitle = "Customise each session from the top-right settings panel.",
-                bullets = listOf("Flip camera front/back", "Mute voice feedback", "Adjust reps and hold duration"),
+                title = "Session Controls",
+                subtitle = "Use monitoring controls to personalize each session.",
+                bullets = listOf(
+                    "Settings gear on top-right",
+                    "Flip camera, mute feedback, and open tutorial",
+                    "Adjust reps and hold duration before starting",
+                ),
             ),
             IntroSlide(
-                emoji = "🚀", title = "You're Ready!",
-                subtitle = "Complete sessions and track your improvement over time.",
-                bullets = listOf("Tap Help anytime to replay this guide", "Progress tab shows accuracy trends", "Stop immediately if you feel pain"),
+                title = "Get Started",
+                subtitle = "Complete sessions and review progress trends after every workout.",
+                bullets = listOf(
+                    "Skip anytime and continue later",
+                    "Use Help to replay this walkthrough",
+                    "Always stop if you feel pain",
+                ),
             ),
         )
     }
@@ -181,28 +272,56 @@ private fun OnboardingCarouselScreen(
     val pagerState = rememberPagerState(pageCount = { slides.size })
     val scope = rememberCoroutineScope()
     val isLastPage = pagerState.currentPage == slides.lastIndex
+    var dontShowAgain by rememberSaveable { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize().background(QBgGradient)) {
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-            Spacer(Modifier.height(16.dp))
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Button(
+                    onClick = onSkipped,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x334DFFFF)),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                ) {
+                    Text("Skip")
+                }
 
-            HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
-                CarouselSlideCard(slide = slides[page])
+                if (!isLastPage) {
+                    Button(
+                        onClick = {
+                            // Reset to first page and replay from beginning
+                            scope.launch { pagerState.animateScrollToPage(0) }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x33FFFFFF)),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    ) {
+                        Icon(Icons.Default.Help, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Learn More")
+                    }
+                }
             }
 
             Spacer(Modifier.height(16.dp))
 
-            // Dot indicator
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+                IntroSlideCard(slide = slides[page])
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 repeat(slides.size) { index ->
-                    val isActive = index == pagerState.currentPage
                     Box(
                         modifier = Modifier
-                            .padding(horizontal = 3.dp)
-                            .width(if (isActive) 20.dp else 8.dp)
+                            .padding(horizontal = 4.dp)
+                            .width(if (index == pagerState.currentPage) 22.dp else 8.dp)
                             .height(8.dp)
-                            .clip(RoundedCornerShape(100.dp))
-                            .background(if (isActive) QPurple else QDivider),
+                            .background(
+                                if (index == pagerState.currentPage) Color(0xFFE8622E) else Color(0x4488A0A0),
+                                RoundedCornerShape(100.dp),
+                            ),
                     )
                 }
             }
@@ -210,88 +329,66 @@ private fun OnboardingCarouselScreen(
             Spacer(Modifier.height(16.dp))
 
             if (isLastPage) {
-                TextButton(
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = dontShowAgain, onCheckedChange = { dontShowAgain = it })
+                    Text(text = "Don't show again", color = Color.White)
+                }
+                Spacer(Modifier.height(8.dp))
+                
+                // Full App Tour button on last page
+                Button(
                     onClick = onLearnMore,
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x33FFFFFF)),
                 ) {
-                    Text("View Full App Tour", color = QPurple, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Icon(Icons.Default.Help, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("View Full App Tour", fontWeight = FontWeight.SemiBold)
                 }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
             }
 
-            // Skip / Next / Get Started row
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (!isLastPage) {
-                    TextButton(
-                        onClick = onSkipped,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text("Skip", color = QSubtext)
+            Button(
+                onClick = {
+                    if (isLastPage) {
+                        onCompleted()
+                    } else {
+                        scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                     }
-                }
-                Button(
-                    onClick = {
-                        if (isLastPage) onCompleted()
-                        else scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
-                    },
-                    modifier = Modifier.weight(if (isLastPage) 1f else 2f).height(52.dp),
-                    shape = RoundedCornerShape(26.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = QPurple),
-                ) {
-                    Text(
-                        if (isLastPage) "GET STARTED" else "NEXT",
-                        fontWeight = FontWeight.Bold, color = Color.White, letterSpacing = 1.sp,
-                    )
-                }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8622E)),
+            ) {
+                Text(if (isLastPage) "Get Started" else "Next", fontWeight = FontWeight.Bold)
             }
-
-            Spacer(Modifier.height(20.dp))
         }
     }
 }
 
 @Composable
-private fun CarouselSlideCard(slide: IntroSlide) {
+private fun IntroSlideCard(slide: IntroSlide) {
     Card(
-        modifier = Modifier.fillMaxSize().padding(vertical = 4.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = QCardBg),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        modifier = Modifier.fillMaxSize(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(20.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(slide.emoji, fontSize = 56.sp, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = slide.title,
-                fontSize = 24.sp, fontWeight = FontWeight.ExtraBold,
-                color = QText, textAlign = TextAlign.Center,
-            )
+        Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+            Text(slide.title, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(10.dp))
-            Text(
-                text = slide.subtitle,
-                fontSize = 14.sp, color = QSubtext,
-                lineHeight = 21.sp, textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(20.dp))
+            Text(slide.subtitle, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 22.sp)
+            Spacer(Modifier.height(18.dp))
             slide.bullets.forEach { bullet ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-                ) {
-                    Box(
-                        modifier = Modifier.size(26.dp).clip(CircleShape).background(QPurpleLight),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = QPurple, modifier = Modifier.size(16.dp))
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Text(bullet, fontSize = 14.sp, color = QText, lineHeight = 20.sp)
+                Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(bottom = 10.dp)) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(text = bullet, color = MaterialTheme.colorScheme.onSurface, lineHeight = 20.sp)
                 }
             }
         }
@@ -300,39 +397,67 @@ private fun CarouselSlideCard(slide: IntroSlide) {
 
 @Composable
 private fun FullTourScreen(onClose: () -> Unit) {
-    data class TourSlide(val emoji: String, val title: String, val subtitle: String, val bullets: List<String>)
+    data class TourSlide(
+        val title: String,
+        val subtitle: String,
+        val bullets: List<String>,
+    )
 
     val slides = remember {
         listOf(
             TourSlide(
-                emoji = "🏠", title = "Home Screen",
+                title = "Home Screen",
                 subtitle = "Where users pick exercises and start sessions.",
-                bullets = listOf("Browse categories and recommended workouts", "Open Help to replay onboarding or open this full tour", "Use Profile/Progress to review your session history"),
+                bullets = listOf(
+                    "Browse categories and recommended workouts",
+                    "Open Help to replay onboarding or open this full tour",
+                    "Use Profile/Progress to review your session history",
+                ),
             ),
             TourSlide(
-                emoji = "📋", title = "Exercise Detail",
+                title = "Exercise Detail",
                 subtitle = "Pre-session setup before camera monitoring starts.",
-                bullets = listOf("Confirm phone placement and required orientation", "Set hold duration: Default, 8, 10, 21, or Custom", "Play tutorial preview and then start your rep target"),
+                bullets = listOf(
+                    "Confirm phone placement and required orientation",
+                    "Set hold duration: Default, 8, 10, 21, or Custom",
+                    "Play tutorial preview and then start your rep target",
+                ),
             ),
             TourSlide(
-                emoji = "📸", title = "Monitor Screen",
+                title = "Monitor Screen",
                 subtitle = "Live correction and hold progression.",
-                bullets = listOf("Skeleton overlay turns green when posture is correct", "Top target card shows the current expected state", "Hold timer and rep progress update in real time"),
+                bullets = listOf(
+                    "Skeleton overlay turns green when posture is correct",
+                    "Top target card shows the current expected state",
+                    "Hold timer and rep progress update in real time",
+                ),
             ),
             TourSlide(
-                emoji = "⚙️", title = "Settings Panel",
-                subtitle = "Adjust session behaviour while monitoring.",
-                bullets = listOf("Flip camera and toggle voice feedback", "Use zoom controls for framing adjustments", "Open Help at any time without leaving the session"),
+                title = "Settings Controls",
+                subtitle = "Adjust session behavior while monitoring.",
+                bullets = listOf(
+                    "Flip camera and toggle voice feedback",
+                    "Use zoom controls for framing adjustments",
+                    "Open Help at any time without leaving the session",
+                ),
             ),
             TourSlide(
-                emoji = "📈", title = "Progress Screen",
+                title = "Progress Tracking",
                 subtitle = "Review consistency and quality over time.",
-                bullets = listOf("Rep accuracy history is recorded per session", "Track streaks and completion trends", "Use this data to tune reps and hold duration"),
+                bullets = listOf(
+                    "Rep accuracy history is recorded per session",
+                    "Track streaks and completion trends",
+                    "Use this data to tune reps and hold duration",
+                ),
             ),
             TourSlide(
-                emoji = "🛡️", title = "Safety & Quality",
+                title = "Safety & Quality",
                 subtitle = "Best practices for reliable tracking.",
-                bullets = listOf("Keep full body visible with ~2m distance", "Use fitted clothing for stable keypoint detection", "Stop if painful and treat this as guidance, not diagnosis"),
+                bullets = listOf(
+                    "Keep full body visible with ~2m distance",
+                    "Use fitted clothing for stable keypoint detection",
+                    "Stop if painful and treat this as guidance, not diagnosis",
+                ),
             ),
         )
     }
@@ -340,101 +465,131 @@ private fun FullTourScreen(onClose: () -> Unit) {
     val pagerState = rememberPagerState(pageCount = { slides.size })
     val scope = rememberCoroutineScope()
     val isFirst = pagerState.currentPage == 0
-    val isLast  = pagerState.currentPage == slides.lastIndex
+    val isLast = pagerState.currentPage == slides.lastIndex
 
-    Column(modifier = Modifier.fillMaxSize().background(QBgGradient)) {
-        // Header bar
-        Row(
-            modifier = Modifier.fillMaxWidth().background(QPurple).padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Full App Tour", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            IconButton(onClick = onClose) {
-                Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White)
-            }
-        }
-
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 12.dp),
-        ) { page ->
-            val slide = slides[page]
-            Card(
-                modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = QCardBg),
-                elevation = CardDefaults.cardElevation(3.dp),
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.primary)
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(
-                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                Text("Full App Tour", color = MaterialTheme.colorScheme.onPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Button(
+                    onClick = onClose,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                ) { Text("Close", color = MaterialTheme.colorScheme.onSecondary) }
+            }
+
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) { page ->
+                Card(
+                    modifier = Modifier.fillMaxSize(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 ) {
-                    Text(slide.emoji, fontSize = 48.sp)
-                    Spacer(Modifier.height(12.dp))
-                    Text(slide.title, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = QText, textAlign = TextAlign.Center)
-                    Spacer(Modifier.height(8.dp))
-                    Text(slide.subtitle, fontSize = 14.sp, color = QSubtext, lineHeight = 21.sp, textAlign = TextAlign.Center)
-                    Spacer(Modifier.height(18.dp))
-                    slide.bullets.forEach { bullet ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-                        ) {
-                            Box(
-                                modifier = Modifier.size(26.dp).clip(CircleShape).background(QPurpleLight),
-                                contentAlignment = Alignment.Center,
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(18.dp),
+                    ) {
+                        Text(
+                            text = slides[page].title,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = slides[page].subtitle,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 21.sp,
+                        )
+
+                        Spacer(Modifier.height(16.dp))
+
+                        slides[page].bullets.forEach { bullet ->
+                            Row(
+                                verticalAlignment = Alignment.Top,
+                                modifier = Modifier.padding(bottom = 12.dp),
                             ) {
-                                Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = QPurple, modifier = Modifier.size(16.dp))
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.padding(top = 2.dp),
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    text = bullet,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 14.sp,
+                                    lineHeight = 20.sp,
+                                )
                             }
-                            Spacer(Modifier.width(12.dp))
-                            Text(bullet, fontSize = 14.sp, color = QText, lineHeight = 20.sp)
                         }
                     }
                 }
             }
-        }
 
-        // Dot indicator
-        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.Center) {
-            repeat(slides.size) { index ->
-                val isActive = index == pagerState.currentPage
-                Box(
-                    modifier = Modifier.padding(horizontal = 3.dp)
-                        .width(if (isActive) 20.dp else 8.dp).height(8.dp)
-                        .clip(RoundedCornerShape(100.dp))
-                        .background(if (isActive) QPurple else QDivider),
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                repeat(slides.size) { index ->
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp)
+                            .width(if (index == pagerState.currentPage) 22.dp else 8.dp)
+                            .height(8.dp)
+                            .background(
+                                if (index == pagerState.currentPage) Color(0xFFE8622E) else Color(0x4488A0A0),
+                                RoundedCornerShape(100.dp),
+                            ),
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        if (!isFirst) scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
+                    },
+                    enabled = !isFirst,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Back")
+                }
+
+                Button(
+                    onClick = {
+                        if (isLast) onClose() else scope.launch {
+                            pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8622E)),
+                ) {
+                    Text(if (isLast) "Finish" else "Next")
+                }
             }
         }
-
-        Spacer(Modifier.height(8.dp))
-
-        // Back / Next buttons
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            OutlinedButton(
-                onClick = { if (!isFirst) scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
-                enabled = !isFirst,
-                modifier = Modifier.weight(1f).height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                border = androidx.compose.foundation.BorderStroke(1.5.dp, QPurple),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = QPurple),
-            ) { Text("Back", fontWeight = FontWeight.SemiBold) }
-
-            Button(
-                onClick = {
-                    if (isLast) onClose()
-                    else scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
-                },
-                modifier = Modifier.weight(1f).height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = QPurple),
-            ) { Text(if (isLast) "FINISH" else "NEXT", fontWeight = FontWeight.Bold, color = Color.White) }
-        }
-
-        Spacer(Modifier.height(8.dp))
     }
 }

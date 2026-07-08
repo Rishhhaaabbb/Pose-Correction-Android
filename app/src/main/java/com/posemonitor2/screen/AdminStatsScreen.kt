@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -33,14 +34,6 @@ import androidx.navigation.NavController
 import androidx.compose.ui.res.stringResource
 import com.posemonitor2.R
 
-private val BgCream     = Color(0xFFF2EEE4)
-private val TealDark    = Color(0xFF0A3D3F)
-private val Orange      = Color(0xFFE85A2E)
-private val Yellow      = Color(0xFFE8B840)
-private val CardWhite   = Color.White
-private val LightOrange = Color(0xFFFFF3E0)
-private val LightRed    = Color(0xFFFFEBEE)
-
 @Composable
 fun AdminStatsScreen(
     navController: NavController,
@@ -48,10 +41,17 @@ fun AdminStatsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // Theme-aware colors — derived from MaterialTheme, not system dark mode
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val bgColor = MaterialTheme.colorScheme.background
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val tealColor = if (isDark) Color(0xFF80CBC4) else Color(0xFF0A3D3F)
+    val mutedColor = if (isDark) Color(0xFFB0B0B0) else Color.Gray
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgCream)
+            .background(bgColor)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -61,13 +61,13 @@ fun AdminStatsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { navController.popBackStack() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = TealDark)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = tealColor)
             }
             Text(
                 stringResource(R.string.admin_stats_dashboard),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                color = TealDark,
+                color = tealColor,
                 modifier = Modifier.padding(start = 8.dp)
             )
         }
@@ -76,14 +76,14 @@ fun AdminStatsScreen(
             stringResource(R.string.admin_stats_namaste),
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = TealDark,
+            color = tealColor,
             fontFamily = FontFamily.Serif,
             modifier = Modifier.padding(top = 8.dp, start = 8.dp)
         )
 
         if (uiState.isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = TealDark)
+                CircularProgressIndicator(color = tealColor)
             }
         } else {
             StatCard(
@@ -92,18 +92,24 @@ fun AdminStatsScreen(
                 badgeText = "",
                 badgeColor = Color.Transparent,
                 icon = Icons.Filled.Group,
-                iconBg = Color(0xFFC8E6C9),
-                iconTint = TealDark
+                iconBg = if (isDark) Color(0xFF1B5E20) else Color(0xFFC8E6C9),
+                iconTint = if (isDark) Color.White else Color(0xFF0A3D3F),
+                surfaceColor = surfaceColor,
+                tealColor = tealColor,
+                mutedColor = mutedColor
             )
 
             StatCard(
                 title = stringResource(R.string.admin_stats_new_members),
                 value = uiState.newMembers.toString(),
                 badgeText = "+${(uiState.newMembers * 0.3).toInt()}",
-                badgeColor = Orange,
+                badgeColor = Color(0xFFE85A2E),
                 icon = Icons.Filled.PersonAdd,
-                iconBg = LightOrange,
-                iconTint = Orange
+                iconBg = if (isDark) Color(0xFF3E2723) else Color(0xFFFFF3E0),
+                iconTint = Color(0xFFE85A2E),
+                surfaceColor = surfaceColor,
+                tealColor = tealColor,
+                mutedColor = mutedColor
             )
 
             StatCard(
@@ -112,11 +118,14 @@ fun AdminStatsScreen(
                 badgeText = stringResource(R.string.admin_stats_live_now),
                 badgeColor = Color(0xFFFF5252),
                 icon = Icons.Filled.FlashOn,
-                iconBg = LightRed,
-                iconTint = Yellow
+                iconBg = if (isDark) Color(0xFFB71C1C) else Color(0xFFFFEBEE),
+                iconTint = if (isDark) Color.White else Color(0xFFE8B840),
+                surfaceColor = surfaceColor,
+                tealColor = tealColor,
+                mutedColor = mutedColor
             )
 
-            CommunityGrowthCard(uiState.growthData)
+            CommunityGrowthCard(uiState.growthData, isDark, surfaceColor, tealColor, mutedColor)
         }
         
         Spacer(Modifier.height(32.dp))
@@ -131,12 +140,15 @@ private fun StatCard(
     badgeColor: Color,
     icon: ImageVector,
     iconBg: Color,
-    iconTint: Color = TealDark
+    iconTint: Color,
+    surfaceColor: Color,
+    tealColor: Color,
+    mutedColor: Color
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardWhite),
+        colors = CardDefaults.cardColors(containerColor = surfaceColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Row(
@@ -157,8 +169,8 @@ private fun StatCard(
                     Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(26.dp))
                 }
                 Spacer(Modifier.height(16.dp))
-                Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray, letterSpacing = 0.5.sp)
-                Text(value, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = TealDark, fontFamily = FontFamily.Serif)
+                Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = mutedColor, letterSpacing = 0.5.sp)
+                Text(value, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = tealColor, fontFamily = FontFamily.Serif)
             }
 
             Surface(
@@ -181,13 +193,13 @@ private fun StatCard(
 }
 
 @Composable
-private fun CommunityGrowthCard(growthData: List<Float>) {
+private fun CommunityGrowthCard(growthData: List<Float>, isDark: Boolean, surfaceColor: Color, tealColor: Color, mutedColor: Color) {
     var isWeekly by remember { mutableStateOf(true) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardWhite),
+        colors = CardDefaults.cardColors(containerColor = surfaceColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -196,22 +208,22 @@ private fun CommunityGrowthCard(growthData: List<Float>) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(stringResource(R.string.admin_stats_community_growth), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TealDark, lineHeight = 24.sp)
+                Text(stringResource(R.string.admin_stats_community_growth), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = tealColor, lineHeight = 24.sp)
                 
                 Surface(
                     shape = RoundedCornerShape(20.dp),
-                    color = Color(0xFFF5F5F5)
+                    color = if (isDark) Color(0xFF424242) else Color(0xFFF5F5F5)
                 ) {
                     Row(modifier = Modifier.padding(3.dp)) {
-                        ToggleOption(stringResource(R.string.admin_stats_week), isWeekly) { isWeekly = true }
-                        ToggleOption(stringResource(R.string.admin_stats_month), !isWeekly) { isWeekly = false }
+                        ToggleOption(stringResource(R.string.admin_stats_week), isWeekly, isDark, tealColor) { isWeekly = true }
+                        ToggleOption(stringResource(R.string.admin_stats_month), !isWeekly, isDark, tealColor) { isWeekly = false }
                     }
                 }
             }
 
             Spacer(Modifier.height(28.dp))
             
-            GrowthGraph(growthData)
+            GrowthGraph(growthData, tealColor)
             
             Spacer(Modifier.height(16.dp))
             
@@ -229,7 +241,7 @@ private fun CommunityGrowthCard(growthData: List<Float>) {
                     stringResource(R.string.admin_stats_sun)
                 )
                 days.forEach { day ->
-                    Text(day, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                    Text(day, fontSize = 11.sp, color = mutedColor, fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -237,24 +249,24 @@ private fun CommunityGrowthCard(growthData: List<Float>) {
 }
 
 @Composable
-private fun ToggleOption(text: String, selected: Boolean, onClick: () -> Unit) {
+private fun ToggleOption(text: String, selected: Boolean, isDark: Boolean, tealColor: Color, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
-        color = if (selected) TealDark else Color.Transparent,
+        color = if (selected) tealColor else Color.Transparent,
     ) {
         Text(
             text,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
             fontSize = 12.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = if (selected) Color.White else Color.Gray
+            color = if (selected) (if (isDark) Color.Black else Color.White) else Color.Gray
         )
     }
 }
 
 @Composable
-private fun GrowthGraph(points: List<Float>) {
+private fun GrowthGraph(points: List<Float>, tealColor: Color) {
     Canvas(modifier = Modifier
         .fillMaxWidth()
         .height(140.dp)) {
@@ -291,13 +303,13 @@ private fun GrowthGraph(points: List<Float>) {
         drawPath(
             path = fillPath,
             brush = Brush.verticalGradient(
-                colors = listOf(TealDark.copy(alpha = 0.25f), Color.Transparent)
+                colors = listOf(tealColor.copy(alpha = 0.25f), Color.Transparent)
             )
         )
         
         drawPath(
             path = path,
-            color = TealDark,
+            color = tealColor,
             style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round)
         )
     }
