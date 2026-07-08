@@ -276,6 +276,7 @@ private fun AuthNavigation(
             onSendReset     = { email -> authViewModel.sendPasswordReset(email) {} },
             isLoading       = isLoading,
             errorMessage    = authState.errorMessage,
+            isSent          = authState.resetEmailSent
         )
     }
 }
@@ -662,9 +663,9 @@ private fun ForgotPasswordScreen(
     onSendReset: (String) -> Unit,
     isLoading: Boolean,
     errorMessage: String?,
+    isSent: Boolean,
 ) {
     var email by remember { mutableStateOf("") }
-    var sent  by remember { mutableStateOf(false) }
     androidx.activity.compose.BackHandler { onBack() }
 
     AuthScaffold {
@@ -685,9 +686,9 @@ private fun ForgotPasswordScreen(
         Spacer(Modifier.height(28.dp))
 
         AuthLabel(stringResource(R.string.login_email_address))
-        AuthField(value = email, onValueChange = { email = it; sent = false }, placeholder = stringResource(R.string.login_reset_email_placeholder), keyboardType = KeyboardType.Email)
+        AuthField(value = email, onValueChange = { email = it }, placeholder = stringResource(R.string.login_reset_email_placeholder), keyboardType = KeyboardType.Email)
 
-        if (sent) {
+        if (isSent) {
             Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.login_reset_link_sent), color = Yellow, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
@@ -701,9 +702,8 @@ private fun ForgotPasswordScreen(
 
         OutlinedButton(
             onClick = {
-                if (email.isNotBlank()) {
+                if (email.isNotBlank() && !isLoading) {
                     onSendReset(email.trim())
-                    sent = true
                 }
             },
             enabled = !isLoading,

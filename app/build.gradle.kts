@@ -28,7 +28,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.posemonitor2"
+        applicationId = "com.iisc.posecorrection"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -58,9 +58,6 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
-            // Ensure debug installs as com.posemonitor2.debug so run configurations
-            // that launch the debug package (com.posemonitor2.debug) succeed.
-            applicationIdSuffix = ".debug"
             buildConfigField(
                 "String",
                 "GOOGLE_WEB_CLIENT_ID",

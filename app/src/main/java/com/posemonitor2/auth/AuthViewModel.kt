@@ -167,15 +167,15 @@ class AuthViewModel @Inject constructor(
 
     fun sendPasswordReset(email: String, onSent: () -> Unit) {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, errorMessage = null) }
+            _state.update { it.copy(isLoading = true, errorMessage = null, resetEmailSent = false) }
             sendPasswordResetUseCase(email)
                 .onSuccess {
-                    _state.update { it.copy(isLoading = false) }
+                    _state.update { it.copy(isLoading = false, resetEmailSent = true) }
                     onSent()
                 }
                 .onFailure { err ->
                     _state.update {
-                        it.copy(isLoading = false, errorMessage = err.message ?: "Failed to send reset email")
+                        it.copy(isLoading = false, errorMessage = err.message ?: "Failed to send reset email", resetEmailSent = false)
                     }
                 }
         }
@@ -186,7 +186,7 @@ class AuthViewModel @Inject constructor(
     }
 
     fun clearError() {
-        _state.update { it.copy(errorMessage = null) }
+        _state.update { it.copy(errorMessage = null, resetEmailSent = false) }
     }
 
     fun signOut() {
@@ -210,4 +210,5 @@ data class AuthUiState(
     val userId: String? = null,
     val userEmail: String? = null,
     val errorMessage: String? = null,
+    val resetEmailSent: Boolean = false,
 )

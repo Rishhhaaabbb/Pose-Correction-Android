@@ -74,7 +74,7 @@ class AuthRepositoryImpl @Inject constructor(
         authUser
     }
 
-    override suspend fun signInWithEmail(email: String, password: String): Result<AuthUser> = runCatching {
+    override suspend fun signInWithEmail(email: String, password: String): Result<AuthUser> {
         val normalizedEmail = email.trim().lowercase().replace(" ", "")
         val normalizedPassword = password.trim()
         
@@ -82,18 +82,57 @@ class AuthRepositoryImpl @Inject constructor(
             if (normalizedPassword == "admin") {
                 val adminUser = AuthUser(id = "admin-dev-id", email = "admin@poseapp.com", fullName = "Admin")
                 setDummySession(adminUser)
-                return@runCatching adminUser
+                return Result.success(adminUser)
             }
         }
-        val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
-        val authUser = result.user?.toAuthUser()
-            ?: throw IllegalStateException("Sign-in succeeded but user is null")
-        sessionState.value = authUser
-        authUser
+
+        return try {
+            val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
+            val authUser = result.user?.toAuthUser()
+                ?: throw IllegalStateException("Sign-in succeeded but user is null")
+            sessionState.value = authUser
+            Result.success(authUser)
+        } catch (e: com.google.firebase.auth.FirebaseAuthInvalidUserException) {
+            Result.failure(Exception("Account doesn't exist"))
+        } catch (e: com.google.firebase.auth.FirebaseAuthInvalidCredentialsException) {
+            // Note: Firebase often returns InvalidCredentials for both wrong email and wrong password 
+            // if enumeration protection is ON. If it's OFF, this usually means wrong password.
+            Result.failure(Exception("Incorrect password"))
+        } catch (e: Exception) {
+            val msg = e.message?.lowercase() ?: ""
+            if (msg.contains("no user") || msg.contains("not found")) {
+                Result.failure(Exception("Account doesn't exist"))
+            } else if (msg.contains("password") || msg.contains("credential")) {
+                Result.failure(Exception("Incorrect password"))
+            } else {
+                Result.failure(e)
+            }
+        }
     }
 
-    override suspend fun sendPasswordReset(email: String): Result<Unit> = runCatching {
-        firebaseAuth.sendPasswordResetEmail(email).await()
+    override suspend fun sendPasswordReset(email: String): Result<Unit> {
+        return try {
+            // Note: If "Email Enumeration Protection" is enabled in Firebase Console,
+            // fetchSignInMethods and sendPasswordResetEmail will always return success
+            // to prevent attackers from finding valid emails.
+            // We try to fetch methods first to see if the user exists.
+            val methods = firebaseAuth.fetchSignInMethodsForEmail(email).await().signInMethods
+            if (methods.isNullOrEmpty()) {
+                return Result.failure(Exception("Account doesn't exist"))
+            }
+
+            firebaseAuth.sendPasswordResetEmail(email).await()
+            Result.success(Unit)
+        } catch (e: com.google.firebase.auth.FirebaseAuthInvalidUserException) {
+            Result.failure(Exception("Account doesn't exist"))
+        } catch (e: Exception) {
+            val msg = e.message?.lowercase() ?: ""
+            if (msg.contains("no user") || msg.contains("not found")) {
+                Result.failure(Exception("Account doesn't exist"))
+            } else {
+                Result.failure(e)
+            }
+        }
     }
 
     override suspend fun signOut(): Result<Unit> = runCatching {
