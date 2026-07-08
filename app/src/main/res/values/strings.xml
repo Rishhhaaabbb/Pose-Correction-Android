@@ -295,6 +295,9 @@ Real-time posture feedback enabled.</string>
     <string name="progress_yesterday">Yesterday</string>
     <string name="progress_pose_session_fallback">Pose Session</string>
     <string name="progress_session_subtitle">%1$s • %2$d min</string>
+    <string name="progress_partial_badge">Partial</string>
+    <string name="progress_partial_icon_cd">Incomplete session</string>
+    <string name="progress_partial_session_subtitle">%1$s • %2$d min • %3$d%%</string>
 
     <string name="cd_settings">Settings</string>
     <string name="cd_edit">Edit</string>

@@ -141,6 +141,7 @@ dependencies {
     testImplementation(project(":core:poseengine"))
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.9.0")
     implementation(libs.androidx.navigation.compose)
     implementation(libs.hilt.navigation.compose)
     implementation(libs.play.services.auth)
@@ -151,6 +152,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
 
     // Material components (used by DayNight theme)
+    implementation(libs.work.runtime.ktx)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.work.compiler)
     implementation(libs.material)
     
     // Media3

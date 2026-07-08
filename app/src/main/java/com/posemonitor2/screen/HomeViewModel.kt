@@ -157,6 +157,8 @@ class HomeViewModel @Inject constructor(
         val displayName = profile?.displayName?.takeIf(String::isNotBlank) ?: "User"
         val bmi = calculateBmi(profile?.heightCm, profile?.weightKg)
         val streak = calculateStreak(sessions)
+        val todayMinutes = calculateTodayMinutes(sessions)
+        val goalMinutes = _uiState.value.dailyGoalMinutes
         return _uiState.value.copy(
             displayName = displayName,
             bmi = bmi,
@@ -164,6 +166,8 @@ class HomeViewModel @Inject constructor(
             targetWeightKg = profile?.targetWeightKg,
             currentStreak = streak.first,
             bestStreak = streak.second,
+            todayMinutesDone = todayMinutes,
+            dailyGoalProgress = computeGoalProgress(todayMinutes, goalMinutes),
         )
     }
 
@@ -178,6 +182,8 @@ class HomeViewModel @Inject constructor(
             ?: "User"
         val bmi = calculateBmi(profile?.heightCm, profile?.weightKg)
         val streak = calculateStreak(sessions)
+        val todayMinutes = calculateTodayMinutes(sessions)
+        val goalMinutes = _uiState.value.dailyGoalMinutes
         return _uiState.value.copy(
             displayName = displayName,
             bmi = bmi,
@@ -186,6 +192,8 @@ class HomeViewModel @Inject constructor(
             currentStreak = streak.first,
             bestStreak = streak.second,
             userEmail = authUser.email,
+            todayMinutesDone = todayMinutes,
+            dailyGoalProgress = computeGoalProgress(todayMinutes, goalMinutes),
         )
     }
 
@@ -243,6 +251,16 @@ class HomeViewModel @Inject constructor(
         val c = Calendar.getInstance().apply { timeInMillis = epochMs }
         c.add(Calendar.DAY_OF_YEAR, days)
         return c.timeInMillis
+    }
+
+    private fun calculateTodayMinutes(sessions: List<WorkoutSession>): Int {
+        val todayStart = startOfDayMillis(System.currentTimeMillis())
+        return (sessions.filter { it.startedAtEpochMs >= todayStart }.sumOf { it.durationSec } / 60).coerceAtLeast(0)
+    }
+
+    private fun computeGoalProgress(todayMinutes: Int, goalMinutes: Int): Float {
+        if (goalMinutes <= 0) return 0f
+        return (todayMinutes.toFloat() / goalMinutes.toFloat()).coerceIn(0f, 1f)
     }
 
     companion object {
