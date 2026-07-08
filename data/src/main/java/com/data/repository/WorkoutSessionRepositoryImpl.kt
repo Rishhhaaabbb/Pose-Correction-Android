@@ -43,6 +43,12 @@ class WorkoutSessionRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun deleteSession(sessionId: String): Result<Unit> = runCatching {
+        sessionDao.deleteById(sessionId)
+        // Best-effort remote delete — ignore failures (local delete is the source of truth here)
+        runCatching { firebaseRemoteClient.deleteSession(sessionId) }
+    }
+
     private suspend fun enqueueSessionUpsert(session: WorkoutSession, now: Long, reason: String) {
         syncQueueDao.insert(
             SyncQueueEntity(

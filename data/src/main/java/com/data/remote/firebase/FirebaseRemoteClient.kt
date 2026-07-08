@@ -51,6 +51,10 @@ class FirebaseRemoteClient @Inject constructor(
             .await()
     }
 
+    suspend fun deleteSession(sessionId: String) {
+        sessions.document(sessionId).delete().await()
+    }
+
     // ΓöÇΓöÇ Session Metrics ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     suspend fun upsertSessionMetric(dto: FirestoreSessionMetricDto) {

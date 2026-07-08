@@ -92,6 +92,17 @@ class PoseDetector(private val context: Context) {
     private val rotationMatrix = Matrix()
     private var lastRotationDegrees: Int = Int.MIN_VALUE
 
+    // ── Low-light recovery ────────────────────────────────────────────────────
+    // When MediaPipe's LIVE_STREAM tracker loses the pose for too many consecutive
+    // frames (e.g. due to low light), its internal tracking state goes stale and
+    // it stops recovering even when conditions improve.
+    // Fix: close and re-create the landmarker after NoPose persists for ~1 second
+    // (NO_POSE_RESET_THRESHOLD frames at 30fps ≈ 1s). The camera keeps running
+    // uninterrupted; the re-init runs on the same executor thread.
+    private var consecutiveNoPoseCount = 0
+    private var lastConfidenceThreshold = 0.35f
+    private var isReinitializing = false
+
     fun setSurfaceProvider(provider: Preview.SurfaceProvider) {
         previewSurfaceProvider = provider
     }
@@ -99,6 +110,9 @@ class PoseDetector(private val context: Context) {
     // ── Initialisation ────────────────────────────────────────────────────────
 
     fun initialize(confidenceThreshold: Float = 0.35f) {
+            lastConfidenceThreshold = confidenceThreshold
+            consecutiveNoPoseCount = 0
+            isReinitializing = false
             // Try GPU delegate first; if that fails (device/driver issues), fall back to CPU.
             val baseOptionsGpu = BaseOptions.builder()
                 .setModelAssetPath(MODEL_FILE)
@@ -232,6 +246,8 @@ class PoseDetector(private val context: Context) {
         _zoomStateFlow.value = null
         runCatching { landmarker?.close() }
         landmarker = null
+        consecutiveNoPoseCount = 0
+        isReinitializing = false
         runCatching { executor.shutdown() }
     }
 
@@ -249,6 +265,13 @@ class PoseDetector(private val context: Context) {
 
     private fun processFrame(imageProxy: ImageProxy) {
         val lm = landmarker ?: run {
+            imageProxy.close()
+            onResult?.invoke(PoseDetectorResult.NoLandmarker)
+            return
+        }
+
+        // If re-init is in progress, drop the frame and wait
+        if (isReinitializing) {
             imageProxy.close()
             onResult?.invoke(PoseDetectorResult.NoLandmarker)
             return
@@ -307,6 +330,7 @@ class PoseDetector(private val context: Context) {
             
             if (allLandmarks.size > 1) {
                 Log.d(TAG, "Layer 1 ❌ — multiple poses detected: ${allLandmarks.size}")
+                consecutiveNoPoseCount = 0  // Multiple people is not a tracker failure
                 onResult?.invoke(PoseDetectorResult.MultiplePoses)
                 return
             }
@@ -315,9 +339,34 @@ class PoseDetector(private val context: Context) {
 
             if (landmarks == null) {
                 Log.d(TAG, "Layer 1 ❌ — no pose detected")
+                consecutiveNoPoseCount++
+                Log.d(TAG, "Consecutive NoPose: $consecutiveNoPoseCount / $NO_POSE_RESET_THRESHOLD")
+
+                // Tracker has been stuck for ~1s — close and re-create to clear stale state
+                if (consecutiveNoPoseCount >= NO_POSE_RESET_THRESHOLD && !isReinitializing) {
+                    Log.w(TAG, "NoPose threshold reached — re-initializing landmarker to recover from low-light dropout")
+                    isReinitializing = true
+                    consecutiveNoPoseCount = 0
+                    executor.execute {
+                        try {
+                            landmarker?.close()
+                            landmarker = null
+                            initialize(lastConfidenceThreshold)
+                            Log.d(TAG, "Landmarker re-initialized successfully")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Landmarker re-initialization failed: ${e.message}", e)
+                        } finally {
+                            isReinitializing = false
+                        }
+                    }
+                }
+
                 onResult?.invoke(PoseDetectorResult.NoPose)
                 return
             }
+
+            // Pose detected — reset the failure counter
+            consecutiveNoPoseCount = 0
 
             Log.d(TAG, "Layer 1 ✅ — landmarks detected: ${landmarks.size}")
 
@@ -362,6 +411,10 @@ class PoseDetector(private val context: Context) {
     companion object {
         private const val TAG = "PoseDetector"
         private const val MODEL_FILE = "pose_landmarker_full.task"
+        // Frames of consecutive NoPose before the LIVE_STREAM tracker is reset.
+        // 30 frames ≈ 1 second at 30fps — long enough to avoid spurious resets
+        // on momentary occlusion, short enough to recover from low-light dropout.
+        private const val NO_POSE_RESET_THRESHOLD = 30
     }
 }
 

@@ -1,5 +1,3 @@
-// app/src/main/java/com/posemonitor2/VoiceManager.kt
-
 package com.posemonitor2
 
 import android.content.Context
@@ -12,115 +10,161 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * Manages Text-to-Speech (TTS) for the tracking session.
+ * Manages Text-to-Speech for the monitoring session.
  *
- * Features:
- * - Flushing instructions (new instructions interrupt old ones).
- * - Debounced feedback (prevents repeating the same correction too frequently).
- * - Optional Groq AI rephrasing for more natural feedback.
+ * Three independent voice channels, each with its own cooldown:
+ *
+ *   PRESENCE    — "Step into the frame", "One person only"
+ *                 Instant TTS, 3 s cooldown, always interrupts.
+ *
+ *   INSTRUCTION — State-change cue spoken once per pose transition.
+ *                 Routed through Groq for natural phrasing.
+ *                 8 s same-phrase cooldown, interrupts current speech.
+ *                 Groq in-flight guard prevents concurrent API calls.
+ *
+ *   CORRECTION  — Joint-specific corrective cues during holding.
+ *                 Direct Android TTS (zero latency, no Groq).
+ *                 2.5 s global cooldown + 6 s same-phrase cooldown.
+ *                 Never interrupts an instruction already speaking.
  */
 class VoiceManager(context: Context) : TextToSpeech.OnInitListener {
 
     private val lock = Any()
     private var tts: TextToSpeech? = TextToSpeech(context, this)
-    @Volatile
-    private var isInitialized = false
 
-    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    @Volatile private var isInitialized = false
+    @Volatile private var groqInFlight  = false
+
+    private val scope        = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val groqProvider = GroqFeedbackProvider(BuildConfig.GROQ_API_KEY)
 
-    // Feedback debouncing state
-    private var lastFeedbackTime: Long = 0
-    private var lastSpokenText: String = ""
-    private val globalFeedbackCooldownMs = 4000L  // Wait 4s between any two phrases
-    private val samePhraseCooldownMs = 8000L      // Wait 8s before repeating the same instruction
+    // ── Per-channel cooldown state ────────────────────────────────────────────
+    private var lastPresenceTime    = 0L
+    private var lastInstructionTime = 0L
+    private var lastInstructionText = ""
+    private var lastCorrectionTime  = 0L
+    private var lastCorrectionText  = ""
 
-    private fun isLanguageSupported(status: Int): Boolean {
-        return status != TextToSpeech.LANG_MISSING_DATA && status != TextToSpeech.LANG_NOT_SUPPORTED
-    }
+    private val presenceCooldownMs        = 3_000L
+    private val instructionSameCooldownMs = 8_000L
+    private val correctionGlobalCooldownMs = 2_500L
+    private val correctionSameCooldownMs   = 6_000L
 
-    private fun tryApplyLanguage(locale: Locale): Boolean {
-        val status = tts?.setLanguage(locale) ?: return false
-        return isLanguageSupported(status)
-    }
+    // ── TTS init ──────────────────────────────────────────────────────────────
+
+    private fun isLanguageSupported(status: Int) =
+        status != TextToSpeech.LANG_MISSING_DATA && status != TextToSpeech.LANG_NOT_SUPPORTED
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            val preferredLocales = listOf(Locale.getDefault(), Locale.UK, Locale.US).distinct()
-            val selectedLocale = preferredLocales.firstOrNull { tryApplyLanguage(it) }
-
-            if (selectedLocale == null) {
-                // Keep TTS usable with engine defaults even if explicit locale data is missing.
-                Log.w("VoiceManager", "Preferred TTS language data unavailable; using engine default voice")
-            } else {
-                Log.d("VoiceManager", "TTS language set to ${selectedLocale.toLanguageTag()}")
+            val locales = listOf(Locale.getDefault(), Locale.UK, Locale.US).distinct()
+            val chosen  = locales.firstOrNull { loc ->
+                val s = tts?.setLanguage(loc) ?: return@firstOrNull false
+                isLanguageSupported(s)
             }
-
-            isInitialized = true
-            tts?.setSpeechRate(0.9f) // Slower for clearer instructions
+            if (chosen == null) {
+                Log.w(TAG, "Preferred TTS locale unavailable; using engine default")
+            } else {
+                Log.d(TAG, "TTS locale: ${chosen.toLanguageTag()}")
+            }
+            tts?.setSpeechRate(1.0f)
             tts?.setPitch(1.0f)
-            Log.d("VoiceManager", "TTS Initialized successfully with speech rate 0.9")
+            isInitialized = true
+            Log.d(TAG, "TTS ready")
         } else {
-            Log.e("VoiceManager", "TTS Initialization failed")
+            Log.e(TAG, "TTS init failed")
+        }
+    }
+
+    // ── Public API ────────────────────────────────────────────────────────────
+
+    /**
+     * Speak a PRESENCE message ("Step into the frame", "One person only").
+     * Always interrupts, never uses Groq.
+     */
+    fun speakPresence(text: String) {
+        if (!isInitialized) return
+        val now = System.currentTimeMillis()
+        synchronized(lock) {
+            if (now - lastPresenceTime < presenceCooldownMs) return
+            lastPresenceTime = now
+            tts?.stop()
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "presence")
+        }
+        Log.d(TAG, "Presence: $text")
+    }
+
+    /**
+     * Speak an INSTRUCTION (state-change cue).
+     * Routed through Groq for natural phrasing; falls back to direct TTS.
+     * Groq in-flight guard prevents concurrent API calls.
+     */
+    fun speakInstruction(text: String, exerciseName: String = "") {
+        if (!isInitialized || text.isBlank()) return
+        val now = System.currentTimeMillis()
+
+        val shouldProceed = synchronized(lock) {
+            val isSame = text == lastInstructionText &&
+                         now - lastInstructionTime < instructionSameCooldownMs
+            if (isSame) return@synchronized false
+            lastInstructionTime = now
+            lastInstructionText = text
+            tts?.stop()
+            true
+        }
+        if (!shouldProceed) return
+
+        scope.launch {
+            val spoken = if (!groqInFlight && BuildConfig.GROQ_API_KEY.isNotBlank() &&
+                            BuildConfig.GROQ_API_KEY != "your_groq_api_key_here") {
+                groqInFlight = true
+                try {
+                    groqProvider.getInstruction(text, exerciseName)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Groq instruction error", e)
+                    text
+                } finally {
+                    groqInFlight = false
+                }
+            } else {
+                text
+            }
+            synchronized(lock) {
+                tts?.speak(spoken, TextToSpeech.QUEUE_FLUSH, null, "instruction")
+            }
+            Log.d(TAG, "Instruction: $spoken")
         }
     }
 
     /**
-     * Speaks the given text.
-     * @param text The text to speak.
-     * @param isInstruction If true, it flushes the queue to speak immediately.
-     * @param useGroq If true, uses AI to rephrase the text.
+     * Speak a CORRECTION (joint-specific cue during holding).
+     * Direct Android TTS — zero latency, no Groq.
+     * Will not interrupt an instruction that is currently speaking.
      */
-    fun speak(text: String, isInstruction: Boolean = false, useGroq: Boolean = false) {
-        if (!isInitialized) {
-            Log.w("VoiceManager", "TTS not initialized yet. Skipping: $text")
-            return
-        }
+    fun speakCorrection(text: String) {
+        if (!isInitialized || text.isBlank()) return
+        // Skip generic fallback strings that carry no useful info
+        if (GENERIC_FALLBACKS.any { text.equals(it, ignoreCase = true) }) return
 
         val now = System.currentTimeMillis()
-
-        val shouldProceed = synchronized(lock) {
-            if (tts == null) return@synchronized false
-
-            val isGlobalCooldownActive = (now - lastFeedbackTime) < globalFeedbackCooldownMs
-            val isSamePhraseCooldownActive = (!isInstruction && text == lastSpokenText && (now - lastFeedbackTime) < samePhraseCooldownMs)
-
-            if (isGlobalCooldownActive || isSamePhraseCooldownActive) {
-                Log.d("VoiceManager", "Skipping feedback ($text). Global: $isGlobalCooldownActive, Same: $isSamePhraseCooldownActive")
-                false
-            } else {
-                if (isInstruction) {
-                    // Instructions (like state changes) still interrupt if the cooldown has passed
-                    tts?.stop()
-                }
-                lastFeedbackTime = now
-                lastSpokenText = text
-                true
-            }
+        synchronized(lock) {
+            val globalOk = now - lastCorrectionTime >= correctionGlobalCooldownMs
+            val sameOk   = text != lastCorrectionText ||
+                           now - lastCorrectionTime >= correctionSameCooldownMs
+            if (!globalOk || !sameOk) return
+            lastCorrectionTime = now
+            lastCorrectionText = text
+            // QUEUE_ADD — doesn't cut off an instruction mid-sentence
+            tts?.speak(text, TextToSpeech.QUEUE_ADD, null, "correction")
         }
+        Log.d(TAG, "Correction: $text")
+    }
 
-        if (shouldProceed) {
-            scope.launch {
-                try {
-                    val spokenText = if (useGroq && text.isNotEmpty()) {
-                        groqProvider.getDynamicFeedback(text)
-                    } else {
-                        text
-                    }
-
-                    synchronized(lock) {
-                        // Use QUEUE_FLUSH for everything to ensure instructions are "sharp" and immediate
-                        tts?.speak(spokenText, TextToSpeech.QUEUE_FLUSH, null, null)
-                    }
-                    Log.d("VoiceManager", "Speaking: $spokenText (Original: $text)")
-                } catch (e: Exception) {
-                    Log.e("VoiceManager", "Groq error, falling back to direct TTS", e)
-                    synchronized(lock) {
-                        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
-                    }
-                }
-            }
-        }
+    /**
+     * Immediately silence TTS. Called when the user taps Mute.
+     */
+    fun stop() {
+        synchronized(lock) { tts?.stop() }
     }
 
     fun shutdown() {
@@ -130,5 +174,28 @@ class VoiceManager(context: Context) : TextToSpeech.OnInitListener {
             tts = null
             isInitialized = false
         }
+    }
+
+    // ── Compat shim — keeps existing call sites compiling ─────────────────────
+    // Old code called speak(text, isInstruction, useGroq). Route to the new
+    // channel methods so nothing else needs to change immediately.
+    fun speak(text: String, isInstruction: Boolean = false, useGroq: Boolean = false) {
+        when {
+            isInstruction -> speakInstruction(text)
+            else          -> speakCorrection(text)
+        }
+    }
+
+    companion object {
+        private const val TAG = "VoiceManager"
+
+        /** Short generic strings that should never be spoken aloud. */
+        private val GENERIC_FALLBACKS = setOf(
+            "Hold steady",
+            "Focus on your pose",
+            "Adjust your body position",
+            "Adjust to align",
+            "Your body position is incorrect. Adjust to align.",
+        )
     }
 }

@@ -5,7 +5,6 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -17,47 +16,55 @@ data class GroqRequest(
     val model: String = "llama-3.3-70b-versatile",
     val messages: List<GroqMessage>,
     val temperature: Double = 0.3,
-    val max_tokens: Int = 30
+    val max_tokens: Int = 20,
 )
 
 @Serializable
-data class GroqMessage(
-    val role: String,
-    val content: String
-)
+data class GroqMessage(val role: String, val content: String)
 
 @Serializable
-data class GroqResponse(
-    val choices: List<GroqChoice>
-)
+data class GroqResponse(val choices: List<GroqChoice>)
 
 @Serializable
-data class GroqChoice(
-    val message: GroqMessage
-)
+data class GroqChoice(val message: GroqMessage)
 
+/**
+ * Wraps the Groq chat-completions endpoint.
+ *
+ * Only used for STATE-CHANGE INSTRUCTIONS — one call per pose transition.
+ * Corrections are spoken directly via Android TTS (zero latency).
+ */
 class GroqFeedbackProvider(private val apiKey: String) {
 
     private val client = HttpClient {
         install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-            })
+            json(Json { ignoreUnknownKeys = true })
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 3000
-            connectTimeoutMillis = 2000
+            requestTimeoutMillis = 4_000
+            connectTimeoutMillis = 2_000
         }
     }
 
-    suspend fun getDynamicFeedback(basicFeedback: String): String {
-        if (apiKey.isBlank() || apiKey == "your_groq_api_key_here") {
-            return basicFeedback
-        }
+    /**
+     * Rephrase a pose state instruction into a natural coaching cue.
+     *
+     * @param instruction  The raw instruction from the PoseState (e.g. "Lower into squat position").
+     * @param exerciseName The current exercise (e.g. "chair-dip", "squat"). Used for context.
+     * @return A short, natural coaching sentence. Falls back to [instruction] on any error.
+     */
+    suspend fun getInstruction(instruction: String, exerciseName: String = ""): String {
+        if (apiKey.isBlank() || apiKey == "your_groq_api_key_here") return instruction
+
+        val exerciseContext = if (exerciseName.isNotBlank()) {
+            val readable = exerciseName.removeSuffix(".json").replace("-", " ")
+            "The user is doing a $readable. "
+        } else ""
 
         return try {
-            Log.d("GroqFeedback", "Sending to AI: $basicFeedback")
-            val response: GroqResponse = client.post("https://api.groq.com/openai/v1/chat/completions") {
+            Log.d(TAG, "Groq instruction → \"$instruction\" (exercise: $exerciseName)")
+
+            val response: GroqResponse = client.post(ENDPOINT) {
                 header("Authorization", "Bearer $apiKey")
                 contentType(ContentType.Application.Json)
                 setBody(
@@ -66,36 +73,42 @@ class GroqFeedbackProvider(private val apiKey: String) {
                             GroqMessage(
                                 role = "system",
                                 content = """
-                                    You are an elite fitness coach. 
-                                    The user is trying to align their body with a 'ghost skeleton' guide on their screen.
-                                    You will receive a descriptive observation about their current pose deviation.
-                                    
-                                    Your Task: 
-                                    Provide a SHARP, SHORT (max 4 words), and ACTIONABLE command that tells them exactly how to adjust to match the ghost.
-                                    
-                                    RULES:
-                                    1. Strictly 1 to 4 words.
-                                    2. Focus only on the action (e.g., 'Bend your knee', 'Hips down', 'Arms higher').
-                                    3. Do not use 'Status', 'Action', or technical jargon.
-                                    4. Be direct and authoritative but encouraging.
-                                    5. Preserve 'left' or 'right' if the input mentions them.
-                                """.trimIndent()
+                                    You are a concise personal fitness coach guiding a user through a live workout.
+                                    ${exerciseContext}The user can see a ghost skeleton on their screen showing the target pose.
+                                    You will receive the target pose instruction.
+
+                                    Your job: speak it as a natural, encouraging coaching cue in ONE sentence (max 12 words).
+                                    - Start with an action verb (e.g. "Lower", "Keep", "Extend", "Bring").
+                                    - Be specific to the exercise if possible.
+                                    - Do NOT say "ghost skeleton", "screen", "align", or technical jargon.
+                                    - Sound like a real coach speaking aloud.
+
+                                    Examples:
+                                      Input:  "Extend arms forward at shoulder height"
+                                      Output: "Raise both arms straight out in front of you"
+
+                                      Input:  "Lower hips to seated position"
+                                      Output: "Sit back and lower your hips like you're sitting in a chair"
+                                """.trimIndent(),
                             ),
-                            GroqMessage(
-                                role = "user",
-                                content = basicFeedback
-                            )
-                        )
-                    )
+                            GroqMessage(role = "user", content = instruction),
+                        ),
+                    ),
                 )
             }.body()
 
-            val finalResult = response.choices.firstOrNull()?.message?.content?.trim()?.removeSuffix(".") ?: basicFeedback
-            Log.d("GroqFeedback", "AI Response: $finalResult")
-            finalResult
+            val result = response.choices.firstOrNull()?.message?.content
+                ?.trim()?.removeSuffix(".") ?: instruction
+            Log.d(TAG, "Groq response → \"$result\"")
+            result
         } catch (e: Exception) {
-            Log.e("GroqFeedback", "Error calling Groq API", e)
-            basicFeedback
+            Log.e(TAG, "Groq error, using raw instruction", e)
+            instruction
         }
+    }
+
+    companion object {
+        private const val TAG      = "GroqFeedback"
+        private const val ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
     }
 }

@@ -78,6 +78,7 @@ fun ProfileScreen(
     val goalAchievements by ProfileSettingsPreferences.observeGoalAchievements(context).collectAsStateWithLifecycle(initialValue = true)
     val language by ProfileSettingsPreferences.observeLanguage(context).collectAsStateWithLifecycle(initialValue = AppLanguage.ENGLISH_UK)
     val unitSystem by ProfileSettingsPreferences.observeUnitSystem(context).collectAsStateWithLifecycle(initialValue = UnitSystem.METRIC)
+    val autoRotateScreen by ProfileSettingsPreferences.observeAutoRotateScreen(context).collectAsStateWithLifecycle(initialValue = true)
 
     var showEditDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
@@ -135,6 +136,12 @@ fun ProfileScreen(
         SettingsQuickSheet(
             language = language,
             unitSystem = unitSystem,
+            autoRotateScreen = autoRotateScreen,
+            onAutoRotateChanged = { enabled ->
+                scope.launch {
+                    ProfileSettingsPreferences.setAutoRotateScreen(context, enabled)
+                }
+            },
             onDismiss = { showSettingsDialog = false },
         )
     }
@@ -570,6 +577,8 @@ private fun UnitsSettingsRow(unitSystem: UnitSystem) {
 private fun SettingsQuickSheet(
     language: AppLanguage,
     unitSystem: UnitSystem,
+    autoRotateScreen: Boolean,
+    onAutoRotateChanged: (Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -580,6 +589,32 @@ private fun SettingsQuickSheet(
                 Text(stringResource(R.string.profile_language_summary, languageDisplayLabel(language)))
                 Text(stringResource(R.string.profile_units_summary, unitSystemDisplayLabel(unitSystem)))
                 Text(stringResource(R.string.profile_theme_summary))
+
+                Spacer(Modifier.height(4.dp))
+
+                // ── Auto-rotate toggle ────────────────────────────────────────
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Auto-rotate for exercise",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = "Rotate screen to portrait/landscape based on exercise requirements",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        )
+                    }
+                    Switch(
+                        checked = autoRotateScreen,
+                        onCheckedChange = onAutoRotateChanged,
+                        modifier = Modifier.padding(start = 12.dp),
+                    )
+                }
             }
         },
         confirmButton = {

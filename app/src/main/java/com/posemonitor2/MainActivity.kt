@@ -3,6 +3,8 @@
 package com.posemonitor2
 
 import android.Manifest
+import android.net.Uri
+import android.provider.Settings
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -24,6 +26,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.activity.viewModels
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -49,6 +53,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.DisposableEffect
 import com.posemonitor2.settings.AppLocaleManager
+import com.posemonitor2.settings.ProfileSettingsPreferences
 import com.posemonitor2.onboarding.OnboardingActivity
 import com.posemonitor2.ui.theme.PoseMonitorAppTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -70,8 +75,11 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
+        viewModel.cameraPermissionGranted.value = granted
         if (!granted) {
-            // Permission denied — handled in UI
+            // If the system won't show the rationale anymore, the user hit "Don't ask again"
+            val permanentlyDenied = !shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)
+            viewModel.cameraPermissionPermanentlyDenied.value = permanentlyDenied
         }
     }
 
@@ -113,7 +121,11 @@ class MainActivity : ComponentActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             != PackageManager.PERMISSION_GRANTED
         ) {
+            viewModel.cameraPermissionEverRequested = true
             permissionLauncher.launch(Manifest.permission.CAMERA)
+        } else {
+            // Permission was already granted (e.g. on subsequent launches)
+            viewModel.cameraPermissionGranted.value = true
         }
 
         voiceManager = VoiceManager(this)
@@ -123,9 +135,57 @@ class MainActivity : ComponentActivity() {
                 MainNavigation(
                     viewModel = viewModel,
                     activity = this,
-                    voiceManager = voiceManager
+                    voiceManager = voiceManager,
+                    onRequestCameraPermission = { requestCameraPermissionOrOpenSettings() }
                 )
             }
+        }
+    }
+
+    /**
+     * Request camera permission intelligently:
+     * - If the system will still show a rationale dialog → launch the permission request.
+     * - If the user chose "Don't ask again" (rationale no longer shown after first denial)
+     *   → open app Settings so the user can manually enable it.
+     *
+     * On the very first ask, shouldShowRequestPermissionRationale returns false too,
+     * so we track whether we've asked before via the ViewModel flag to distinguish
+     * "never asked" from "permanently denied".
+     */
+    fun requestCameraPermissionOrOpenSettings() {
+        when {
+            // Already granted — nothing to do
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED -> {
+                viewModel.cameraPermissionGranted.value = true
+            }
+            // System says we can still show the rationale/dialog, OR we haven't asked yet
+            shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) ||
+                    !viewModel.cameraPermissionEverRequested -> {
+                viewModel.cameraPermissionEverRequested = true
+                permissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+            // Permanently denied — send user to app Settings
+            else -> {
+                startActivity(
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", packageName, null)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                )
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-check in case the user granted camera permission from Android Settings
+        // and returned to the app. The permissionLauncher callback won't fire in that
+        // path, so we sync the ViewModel flag here.
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+        if (granted && !viewModel.cameraPermissionGranted.value) {
+            viewModel.cameraPermissionGranted.value = true
         }
     }
 
@@ -167,9 +227,16 @@ private enum class Screen { GRAPH_SELECT, MONITOR }
 private fun MainNavigation(
     viewModel: DebugViewModel,
     activity: MainActivity,
-    voiceManager: VoiceManager
+    voiceManager: VoiceManager,
+    onRequestCameraPermission: () -> Unit,
 ) {
     val context = LocalContext.current
+
+    // Observe the user's auto-rotate preference from DataStore.
+    // Defaults to true so first-run behaviour is identical to before.
+    val autoRotateScreen by ProfileSettingsPreferences
+        .observeAutoRotateScreen(context)
+        .collectAsStateWithLifecycle(initialValue = true)
 
     // Read initial intent synchronously to avoid briefly showing the selector UI
     val initialIntent = activity.intent
@@ -280,11 +347,19 @@ private fun MainNavigation(
         activity.setImmersiveMode(screen == Screen.MONITOR)
     }
     
-    // Lock orientation when starting monitoring
-    LaunchedEffect(screen, selectedGraph) {
+    // Lock orientation when starting monitoring, driven by the user's auto-rotate
+    // preference. Also re-runs when the preference changes mid-session so toggling
+    // it in Profile Settings takes effect immediately.
+    LaunchedEffect(screen, selectedGraph, autoRotateScreen) {
         val graph = selectedGraph
         if (screen == Screen.MONITOR && graph != null) {
-            if (shouldLockOrientation) activity.lockOrientationForExercise(graph.fileName)
+            if (autoRotateScreen) {
+                activity.lockOrientationForExercise(graph.fileName)
+            } else {
+                // User disabled auto-rotate — release any lock so the device
+                // responds to physical rotation freely.
+                activity.unlockOrientation()
+            }
         } else if (screen == Screen.GRAPH_SELECT) {
             activity.unlockOrientation()
         }
@@ -316,9 +391,17 @@ private fun MainNavigation(
                 val targetReps by viewModel.targetReps.collectAsStateWithLifecycle()
                 val accuracies by viewModel.completedRepAccuracies.collectAsStateWithLifecycle()
                 val frameStatus by viewModel.frameStatus.collectAsStateWithLifecycle()
-                
-                LaunchedEffect(graph, isFrontCamera) {
+                val cameraPermissionGranted by viewModel.cameraPermissionGranted.collectAsStateWithLifecycle()
+
+                LaunchedEffect(graph, isFrontCamera, cameraPermissionGranted) {
+                    if (!cameraPermissionGranted) {
+                        // Permission not yet granted — show nothing, wait for the
+                        // launcher callback to flip the flag and re-trigger this effect.
+                        viewModel.initError.value = null
+                        return@LaunchedEffect
+                    }
                     viewModel.resetSessionState()
+                    viewModel.initError.value = null
                     try {
                         viewModel.startPipeline(activity, graph)
                     } catch (e: Exception) {
@@ -340,6 +423,7 @@ private fun MainNavigation(
                     workoutId = workoutId,
                     exerciseIndex = exerciseIndex,
                     exerciseList = exerciseList,
+                    onRequestCameraPermission = onRequestCameraPermission,
                     onQuit = { 
                         viewModel.saveCurrentSessionPartial()
                         viewModel.stopPipeline()
@@ -410,6 +494,7 @@ fun MonitorScreen(
     workoutId: String? = null,
     exerciseIndex: Int = 0,
     exerciseList: List<String> = emptyList(),
+    onRequestCameraPermission: () -> Unit = {},
     onQuit: () -> Unit = {},
     onFinish: () -> Unit = {},
     onNext: (Int, ExerciseResult) -> Unit = { _, _ -> },
@@ -422,12 +507,26 @@ fun MonitorScreen(
     DisposableEffect(Unit) {
         onDispose { toneGenerator.release() }
     }
+
+    // Keep the screen on while monitoring — the user can't tap the screen during exercise.
+    // FLAG_KEEP_SCREEN_ON needs no extra manifest permission and is automatically cleared
+    // when this composable leaves the composition (session ends / user quits).
+    val window = (context as? android.app.Activity)?.window
+    DisposableEffect(Unit) {
+        window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
     val skeleton        by viewModel.currentSkeleton.collectAsStateWithLifecycle()
     val frameStatus     by viewModel.frameStatus.collectAsStateWithLifecycle()
     val targetState     by viewModel.targetState.collectAsStateWithLifecycle()
     val guidancePreview by viewModel.guidancePreviewState.collectAsStateWithLifecycle()
     val deviations      by viewModel.lastDeviations.collectAsStateWithLifecycle()
     val repHistory      by viewModel.completedRepAccuracies.collectAsStateWithLifecycle()
+    val liveAccuracy    by viewModel.liveRepAccuracy.collectAsStateWithLifecycle()
+    val liveFps         by viewModel.liveFps.collectAsStateWithLifecycle()
+    val liveFeatureCount by viewModel.liveFeatureCount.collectAsStateWithLifecycle()
     val initError       by viewModel.initError.collectAsStateWithLifecycle()
     val rawFrameSize    by viewModel.cameraFrameSize.collectAsStateWithLifecycle()
     val isFrontCamera   by viewModel.isFrontCamera.collectAsStateWithLifecycle()
@@ -452,6 +551,196 @@ fun MonitorScreen(
     var countdownSeconds by remember { mutableIntStateOf(5) }
     val hasNext = exerciseIndex + 1 < exerciseList.size
     var resultAdded by remember { mutableStateOf(false) }
+
+    // ── End-session confirmation ───────────────────────────────────────────
+    var showEndSessionDialog by remember { mutableStateOf(false) }
+    // Tracks which reason the user selected — null means step 1 (reason picker) is shown
+    var quitReason by remember { mutableStateOf<String?>(null) }
+
+    // Intercept back press only while the session is still in progress.
+    // Once completed the summary is showing and back should not interrupt.
+    BackHandler(enabled = !sessionCompleted) {
+        quitReason = null
+        showEndSessionDialog = true
+    }
+
+    if (showEndSessionDialog) {
+        // Helper colours
+        val reasonBg    = Color(0xFF1E1E1E)
+        val reasonBorder = Color(0xFF444444)
+        val accentOrange = Color(0xFFE8622E)
+
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = {
+                showEndSessionDialog = false
+                quitReason = null
+            },
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+            ),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = Color(0xFF121212),
+                modifier = Modifier
+                    .padding(horizontal = 24.dp)
+                    .widthIn(max = 420.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    if (quitReason == null) {
+                        // ── Step 1: Reason picker ─────────────────────────────
+                        Text(
+                            text = "Why give up?",
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                        Text(
+                            text = "Tell us what's stopping you. We might be able to help.",
+                            color = Color(0xFF999999),
+                            fontSize = 13.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+
+                        Spacer(Modifier.height(4.dp))
+
+                        val reasons = listOf(
+                            "🫧" to "Just taking a tour",
+                            "😿" to "Exercise is too hard",
+                            "⁉️" to "Don't know how to do it",
+                        )
+                        reasons.forEach {(emoji, label) ->
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = reasonBg,
+                                border = BorderStroke(1.dp, reasonBorder),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { quitReason = label },
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    Text(emoji, fontSize = 22.sp)
+                                    Text(
+                                        text = label,
+                                        color = Color.White,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Medium,
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(4.dp))
+
+                        TextButton(
+                            onClick = {
+                                showEndSessionDialog = false
+                                quitReason = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                "← Keep going",
+                                color = accentOrange,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                            )
+                        }
+
+                    } else {
+                        // ── Step 2: Response + actions ────────────────────────
+                        val (supportEmoji, supportMsg) = when (quitReason) {
+                            "Just taking a tour" ->
+                                "🙌" to "No worries! You can always come back and do it for real. Every rep counts."
+                            "Too hard right now" ->
+                                "💡" to "That's totally fine — try a lighter variation or take a short break. You've already started, which is the hardest part."
+                            "Don't know how to do it" ->
+                                "📖" to "Tap the tutorial video icon in settings during the exercise — it walks you through every move step by step."
+                            else ->
+                                "👋" to "No problem. Come back when you're ready!"
+                        }
+
+                        Text(supportEmoji, fontSize = 40.sp)
+
+                        Text(
+                            text = quitReason!!,
+                            color = Color(0xFF888888),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+
+                        Text(
+                            text = supportMsg,
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            lineHeight = 20.sp,
+                        )
+
+                        Spacer(Modifier.height(4.dp))
+
+                        // Resume button (primary)
+                        Button(
+                            onClick = {
+                                showEndSessionDialog = false
+                                quitReason = null
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = accentOrange),
+                        ) {
+                            Text(
+                                "Resume Workout",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                            )
+                        }
+
+                        // Quit button (secondary)
+                        OutlinedButton(
+                            onClick = {
+                                showEndSessionDialog = false
+                                quitReason = null
+                                onQuit()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFCC3333)),
+                            border = BorderStroke(1.dp, Color(0xFFCC3333)),
+                        ) {
+                            Text(
+                                "Quit Session",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                            )
+                        }
+
+                        // Back to reasons
+                        TextButton(onClick = { quitReason = null }) {
+                            Text(
+                                "← Back",
+                                color = Color(0xFF777777),
+                                fontSize = 13.sp,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
     
     LaunchedEffect(sessionCompleted) {
         if (sessionCompleted && !resultAdded) {
@@ -499,7 +788,21 @@ fun MonitorScreen(
 
     // ── Voice Guidance Logic ──────────────────────────────────────────────
     
-    // Determine the active instruction based on the current phase (Guidance vs Holding)
+    // ── Voice Guidance ────────────────────────────────────────────────────────
+    //
+    // Three independent channels — each fires from its own LaunchedEffect:
+    //
+    //  1. PRESENCE   — skeleton absent or multiple people detected
+    //  2. INSTRUCTION — new pose state, routed through Groq with exercise context
+    //  3. CORRECTION  — joint corrections during holding, direct Android TTS
+    //
+    // LaunchedEffect keys are chosen so each effect only restarts when its own
+    // inputs actually change — not on every frame tick.
+
+    val exerciseName = remember(viewModel) {
+        viewModel.getCurrentExerciseName()?.removeSuffix(".json")?.replace("-", " ") ?: ""
+    }
+
     val isGuidancePhase = frameStatus?.phase == com.core.poseengine.monitor.MonitorPhase.GUIDANCE
     val activeInstruction = if (isGuidancePhase && guidancePreview != null) {
         guidancePreview?.instruction
@@ -507,29 +810,46 @@ fun MonitorScreen(
         targetState?.instruction
     }
 
-    // 1. Instructions: Speak when the instruction changes OR periodically if they are in frame
-    var lastSpokenInstruction by remember { mutableStateOf<String?>(null) }
-    var lastInstructionTime by remember { mutableLongStateOf(0L) }
-    
-    LaunchedEffect(activeInstruction, skeleton != null, isMuted) {
+    // ── 1. Presence channel ───────────────────────────────────────────────────
+    // Keys: skeleton visibility + feedback text.
+    // Fires "step into frame" when skeleton disappears, "one person only" on
+    // multi-person. Does NOT restart on every feedback string change.
+    val isSkeletonVisible = skeleton != null
+    val presenceFeedback  = frameStatus?.feedback ?: ""
+
+    LaunchedEffect(isSkeletonVisible, isMuted) {
         while (true) {
-            val now = System.currentTimeMillis()
-            val isVisible = skeleton != null
-            if (!isMuted && isVisible && activeInstruction != null) {
-                // Speak if it's a new instruction (use AI for variety) OR if it's been 15s (use direct for sharpness)
-                if (activeInstruction != lastSpokenInstruction) {
-                    voiceManager.speak(activeInstruction!!, isInstruction = true, useGroq = true)
-                    lastSpokenInstruction = activeInstruction
-                    lastInstructionTime = now
-                } else if (now - lastInstructionTime > 15000L) {
-                    voiceManager.speak(activeInstruction!!, isInstruction = true, useGroq = false)
-                    lastInstructionTime = now
+            if (!isMuted) {
+                if (!isSkeletonVisible) {
+                    val msg = if (presenceFeedback.contains("one person", ignoreCase = true))
+                        "Please make sure only one person is in the frame"
+                    else
+                        "Step into the camera frame"
+                    voiceManager.speakPresence(msg)
                 }
             }
-            kotlinx.coroutines.delay(2000)
+            kotlinx.coroutines.delay(3_500)
         }
     }
 
+    // Also handle multi-person warning immediately when feedback text contains it
+    LaunchedEffect(presenceFeedback, isMuted) {
+        if (!isMuted && presenceFeedback.contains("one person", ignoreCase = true)) {
+            voiceManager.speakPresence("Please make sure only one person is in the frame")
+        }
+    }
+
+    // ── 2. Instruction channel ────────────────────────────────────────────────
+    // Keys: activeInstruction only — restarts only when the pose state changes,
+    // NOT on every frame. Groq is called once per state transition.
+    LaunchedEffect(activeInstruction, isMuted) {
+        if (isMuted || activeInstruction.isNullOrBlank()) return@LaunchedEffect
+        // Wait briefly for skeleton to appear before speaking
+        kotlinx.coroutines.delay(400)
+        voiceManager.speakInstruction(activeInstruction, exerciseName)
+    }
+
+    // ── Beep on rep completion ────────────────────────────────────────────────
     LaunchedEffect(currentReps) {
         if (currentReps > lastBeepedReps) {
             toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 120)
@@ -537,16 +857,14 @@ fun MonitorScreen(
         }
     }
 
-    // 1b. Hold completion cue: beep when pose state advances without rep increment.
+    // ── Beep on state advance (no rep increment) ──────────────────────────────
     LaunchedEffect(frameStatus?.stateId, currentReps) {
         val stateId = frameStatus?.stateId ?: return@LaunchedEffect
-
         if (lastObservedStateId == -1) {
             lastObservedStateId = stateId
             lastObservedStateReps = currentReps
             return@LaunchedEffect
         }
-
         if (stateId != lastObservedStateId) {
             if (currentReps == lastObservedStateReps) {
                 toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP2, 90)
@@ -556,53 +874,48 @@ fun MonitorScreen(
         }
     }
 
-    // 2. Feedback: Speak corrections or confirmation
+    // ── 3. Correction channel ─────────────────────────────────────────────────
+    // Keys: isMuted + sessionCompleted only. The while(true) loop reads
+    // frameStatus at tick time so it is NOT restarted on every feedback change.
+    // VoiceManager.speakCorrection() handles cooldowns internally.
     var lastCorrectState by remember { mutableStateOf(false) }
-    var lastGoodTime by remember { mutableLongStateOf(0L) }
+    var lastGoodTime     by remember { mutableLongStateOf(0L) }
 
-    LaunchedEffect(frameStatus?.feedback, skeleton != null, isMuted, frameStatus?.isCorrect) {
+    LaunchedEffect(isMuted, sessionCompleted) {
         while (true) {
-            val feedback = frameStatus?.feedback
-            val isCorrect = frameStatus?.isCorrect ?: false
-            val isVisible = skeleton != null
-            val now = System.currentTimeMillis()
-            
-            if (isMuted || frameStatus?.phase == com.core.poseengine.monitor.MonitorPhase.SESSION_COMPLETE) {
-                kotlinx.coroutines.delay(1000)
-                continue
-            }
+            kotlinx.coroutines.delay(2_500)
 
-            // Special case: Urgent warnings should be spoken even if skeleton is null
-            val isUrgentFeedback = feedback?.contains("one person", ignoreCase = true) == true || 
-                                 feedback?.contains("visible", ignoreCase = true) == true ||
-                                 feedback?.contains("to begin", ignoreCase = true) == true
-            if (!isVisible && !isUrgentFeedback) {
-                kotlinx.coroutines.delay(1000)
-                continue
-            }
+            if (isMuted || sessionCompleted) continue
+            if (frameStatus?.phase == com.core.poseengine.monitor.MonitorPhase.SESSION_COMPLETE) continue
+            // Don't speak corrections during guidance or when skeleton not visible
+            if (frameStatus?.phase == com.core.poseengine.monitor.MonitorPhase.GUIDANCE) continue
+            if (!isSkeletonVisible) continue
+
+            val feedback  = frameStatus?.feedback ?: continue
+            val isCorrect = frameStatus?.isCorrect ?: false
+            val now       = System.currentTimeMillis()
 
             if (isCorrect) {
-                // User requested to remove "Good, hold it!"
-                // We now only provide periodic encouragement while holding correctly
-                if (lastCorrectState && (now - lastGoodTime > 10000L)) {
-                    voiceManager.speak("Excellent, keep going!", isInstruction = false)
+                if (lastCorrectState && now - lastGoodTime > 10_000L) {
+                    voiceManager.speakCorrection("Excellent, keep going!")
                     lastGoodTime = now
                 } else if (!lastCorrectState) {
-                    // User just entered correct state.
                     lastCorrectState = true
                     lastGoodTime = now
                 }
             } else {
-                // Speak corrections (VoiceManager handles its own internal 1.5s/4s debouncing)
-                if (!feedback.isNullOrEmpty() && !feedback.startsWith("Good") && !feedback.startsWith("Get ready")) {
-                    voiceManager.speak(feedback!!, isInstruction = false, useGroq = true)
-                }
                 lastCorrectState = false
+                // Skip non-actionable strings — VoiceManager also filters these,
+                // but filtering here avoids the function call overhead at 30fps.
+                if (feedback.isBlank() ||
+                    feedback.startsWith("Get ready") ||
+                    feedback.startsWith("Hold steady") ||
+                    feedback.startsWith("Focus on") ||
+                    feedback.startsWith("Step into") ||
+                    feedback.startsWith("Please make sure")
+                ) continue
+                voiceManager.speakCorrection(feedback)
             }
-            
-            // Re-check every 2 seconds. VoiceManager's internal timers (samePhraseCooldownMs) 
-            // handle the actual speech repetition frequency.
-            kotlinx.coroutines.delay(2000)
         }
     }
 
@@ -663,12 +976,16 @@ fun MonitorScreen(
             guidancePreviewState = guidancePreview,
             deviations = deviations,
             repHistory = repHistory,
+            liveAccuracy = liveAccuracy,
+            liveFps = liveFps,
+            liveFeatureCount = liveFeatureCount,
             cameraFrameSize = cameraFrameSize,
             frameRotationDegrees = frameRotationDegrees,
-            isFrontCamera = isFrontCamera, // Pass camera state to overlay for mirroring
-            onToggleCamera = { viewModel.toggleCamera() }, // Pass toggle action
+            isFrontCamera = isFrontCamera,
+            onToggleCamera = { viewModel.toggleCamera() },
             isMuted = isMuted,
             onToggleMute = { viewModel.toggleMute() },
+            voiceManager = voiceManager,
             zoomLevel = zoomLevel,
             onZoomChange = { viewModel.setZoom(it) },
             currentZoomRatio = currentZoomRatio,
@@ -687,15 +1004,31 @@ fun MonitorScreen(
         )
 
         // ── Top-left quit button ──────────────────────────────────────────────
-        TextButton(
-            onClick = onQuit,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .statusBarsPadding()
-                .padding(start = 8.dp, top = 4.dp),
-            colors = ButtonDefaults.textButtonColors(contentColor = Color(0xCCFFFFFF)),
-        ) {
-            Text("← Quit", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        // Shows the same "End session?" confirmation dialog as the back press,
+        // so the user can't accidentally exit mid-workout with a stray tap.
+        if (!sessionCompleted) {
+            TextButton(
+                onClick = { showEndSessionDialog = true },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(start = 8.dp, top = 4.dp),
+                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xCCFFFFFF)),
+            ) {
+                Text("← Quit", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+        } else {
+            // Session done — quit goes straight home, no confirmation needed.
+            TextButton(
+                onClick = onQuit,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(start = 8.dp, top = 4.dp),
+                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xCCFFFFFF)),
+            ) {
+                Text("← Quit", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
         }
 
 /*
@@ -753,6 +1086,78 @@ fun MonitorScreen(
                     .padding(12.dp),
             ) {
                 Text("⚠️ $error", color = Color(0xFFFF8A80), fontSize = 13.sp)
+            }
+        }
+
+        val cameraPermissionGranted by viewModel.cameraPermissionGranted.collectAsStateWithLifecycle()
+        val cameraPermissionPermanentlyDenied by viewModel.cameraPermissionPermanentlyDenied.collectAsStateWithLifecycle()
+        if (!cameraPermissionGranted) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center,
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0xFF1C1C1C),
+                    modifier = Modifier
+                        .padding(32.dp)
+                        .widthIn(max = 400.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        Text(
+                            text = "📷",
+                            fontSize = 48.sp,
+                        )
+                        Text(
+                            text = "Camera Access Needed",
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                        Text(
+                            text = if (cameraPermissionPermanentlyDenied)
+                                "Camera permission was denied. Please enable it in your device Settings to continue."
+                            else
+                                "This exercise requires the camera to track your pose in real time. Please grant camera access to continue.",
+                            color = Color(0xFFAAAAAA),
+                            fontSize = 14.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                        Button(
+                            onClick = onRequestCameraPermission,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFE8622E),
+                            ),
+                        ) {
+                            Text(
+                                text = if (cameraPermissionPermanentlyDenied)
+                                    "Open Settings"
+                                else
+                                    "Grant Camera Permission",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                            )
+                        }
+                        TextButton(onClick = onQuit) {
+                            Text(
+                                text = "Cancel",
+                                color = Color(0xFF888888),
+                                fontSize = 14.sp,
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -868,9 +1273,59 @@ fun MonitorScreen(
                                 }
                             }
                         } else {
-                            Button(
-                                onClick = {
-                                    if (exerciseList.size > 1) {
+                            if (exerciseList.size <= 1) {
+                                // ── Single exercise: Save / Discard ───────────────
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = "Save this session to your history?",
+                                    fontSize = 13.sp,
+                                    color = Color(0xFF888888),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                )
+                                Spacer(Modifier.height(16.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            viewModel.discardLastSession()
+                                            onFinish()
+                                        },
+                                        modifier = Modifier.weight(1f).height(52.dp),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = Color(0xFFCC3333),
+                                        ),
+                                        border = BorderStroke(
+                                            1.dp, Color(0xFFCC3333)
+                                        ),
+                                    ) {
+                                        Text(
+                                            "Discard",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp,
+                                        )
+                                    }
+                                    Button(
+                                        onClick = onFinish,
+                                        modifier = Modifier.weight(1f).height(52.dp),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFFE8622E),
+                                        ),
+                                    ) {
+                                        Text(
+                                            "Save",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp,
+                                        )
+                                    }
+                                }
+                            } else {
+                                // ── Multi-exercise: See Summary ───────────────────
+                                Button(
+                                    onClick = {
                                         val repsDone = if (currentReps > 0) currentReps else targetReps
                                         val calories = (repsDone * 2.5).toInt()
                                         val avgAccuracy = if (accuracies.isNotEmpty()) {
@@ -881,20 +1336,24 @@ fun MonitorScreen(
                                             repsDone = repsDone,
                                             targetReps = targetReps,
                                             accuracy = avgAccuracy,
-                                            calories = calories
+                                            calories = calories,
                                         )
                                         onShowSummary(result)
-                                    } else {
-                                        onFinish()
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth().height(56.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8622E))
-                            ) {
-                                Text(if (exerciseList.size > 1) "See Summary" else "Finish Exercise", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                    },
+                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFE8622E),
+                                    ),
+                                ) {
+                                    Text(
+                                        "See Summary",
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    )
                                 }
                             }
+                        }
                         }
                     }
                 }
