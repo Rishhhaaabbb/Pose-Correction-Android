@@ -1,63 +1,481 @@
 package com.posemonitor2.questionnaire
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.CheckBox
-import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// ΓöÇΓöÇ Design tokens ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-private val BgDark    = Color(0xFF0E1F20)
-private val CardTeal  = Color(0xFF173436)
-private val Orange    = Color(0xFFE8622E)
-private val TextWhite = Color.White
-private val TextGray  = Color(0xFFAAAAAA)
+// ── Design tokens ──────────────────────────────────────────────────────────────
+val QBg           = Color(0xFFF0ECFA)
+val QBgGradient   = Brush.verticalGradient(listOf(Color(0xFFEDE8F8), Color(0xFFF8F5FF)))
+val QPurple       = Color(0xFF7B4FD8)
+val QPurpleLight  = Color(0xFFEDE5FF)
+val QPurpleBorder = Color(0xFF7B4FD8)
+val QText         = Color(0xFF1A1036)
+val QSubtext      = Color(0xFF888899)
+val QCardBg       = Color.White
+val QDivider      = Color(0xFFEEEEF2)
 
-// Keep a local alias so the rest of the file still compiles (HeightInput, WeightInput etc. use CardColor)
-private val CardColor = CardTeal
-
-// ΓöÇΓöÇ Shared scaffold ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── QStepIndicator ─────────────────────────────────────────────────────────────
 @Composable
-fun QuestionPageScaffold(
+fun QStepIndicator(currentPage: Int, modifier: Modifier = Modifier) {
+    val milestones = listOf(
+        Icons.Filled.TrackChanges,
+        Icons.Filled.FitnessCenter,
+        Icons.Filled.MonitorWeight,
+        Icons.Filled.EmojiEvents,
+    )
+    val activeMilestone = when {
+        currentPage <= 3  -> 0
+        currentPage <= 6  -> 1
+        currentPage <= 9  -> 2
+        else              -> 3
+    }
+    Row(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        milestones.forEachIndexed { index, icon ->
+            val isCompleted = index < activeMilestone
+            val isActive    = index == activeMilestone
+            val bubbleColor by animateColorAsState(
+                targetValue = if (isCompleted || isActive) QPurple else Color.Transparent,
+                animationSpec = tween(300), label = "bubble$index"
+            )
+            val iconTint by animateColorAsState(
+                targetValue = if (isCompleted || isActive) Color.White else QSubtext,
+                animationSpec = tween(300), label = "tint$index"
+            )
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(bubbleColor)
+                    .then(
+                        if (!isCompleted && !isActive)
+                            Modifier.border(1.5.dp, QDivider, CircleShape)
+                        else if (isActive)
+                            Modifier.border(2.dp, QPurpleBorder, CircleShape)
+                        else Modifier
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (isCompleted) Icons.Filled.Check else icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            if (index < milestones.lastIndex) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(2.dp)
+                        .background(if (isCompleted) QPurple else QDivider),
+                )
+            }
+        }
+    }
+}
+
+// ── QTipBox ────────────────────────────────────────────────────────────────────
+@Composable
+fun QTipBox(tip: String, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = QCardBg),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+            Text("💡", fontSize = 18.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(tip, fontSize = 13.sp, color = QSubtext, lineHeight = 19.sp)
+        }
+    }
+}
+
+// ── QPageScaffold ──────────────────────────────────────────────────────────────
+@Composable
+fun QPageScaffold(
+    currentPage: Int,
+    title: String,
+    onBack: (() -> Unit)? = null,
+    onSkip: (() -> Unit)? = null,
+    tip: String? = null,
+    onContinue: (() -> Unit)? = null,
+    continueEnabled: Boolean = true,
+    continueLabel: String = "CONTINUE",
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(QBgGradient),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 24.dp),
-            content = content,
-        )
+                .imePadding(),
+        ) {
+            // Top bar
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = QText)
+                    }
+                } else {
+                    Spacer(Modifier.size(48.dp))
+                }
+                Spacer(Modifier.weight(1f))
+                if (onSkip != null) {
+                    TextButton(onClick = onSkip) {
+                        Text("Skip", color = QSubtext, fontSize = 14.sp)
+                    }
+                }
+            }
+
+            // Step indicator
+            QStepIndicator(currentPage = currentPage)
+
+            Spacer(Modifier.height(8.dp))
+
+            // Title
+            Text(
+                text = title.uppercase(),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = QText,
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // Optional tip
+            if (tip != null) {
+                QTipBox(tip = tip, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // Content slot
+            Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                content()
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Continue button
+            if (onContinue != null) {
+                Button(
+                    onClick = onContinue,
+                    enabled = continueEnabled,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                        .height(54.dp),
+                    shape = RoundedCornerShape(27.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = QPurple,
+                        disabledContainerColor = QPurple.copy(alpha = 0.35f),
+                    ),
+                ) {
+                    Text(
+                        continueLabel,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        letterSpacing = 1.sp,
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
     }
 }
 
-// ΓöÇΓöÇ Single-choice question screen ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── AgeGroupScreen ─────────────────────────────────────────────────────────────
+private data class AgeOption(val key: String, val label: String, val emoji: String)
+
+@Composable
+fun AgeGroupScreen(
+    selectedValue: String?,
+    onSelect: (String) -> Unit,
+    onNext: () -> Unit,
+    currentPage: Int,
+    onBack: (() -> Unit)? = null,
+    onSkip: (() -> Unit)? = null,
+) {
+    val options = listOf(
+        AgeOption(">60",   "55+",    "👴"),
+        AgeOption("51-60", "45–54",  "🧔"),
+        AgeOption("41-50", "35–44",  "🧑"),
+        AgeOption("31-40", "25–34",  "🙋"),
+        AgeOption("20-30", "18–24",  "🧑‍🦱"),
+        AgeOption("<20",   "Under 18","🧒"),
+    )
+    QPageScaffold(
+        currentPage = currentPage,
+        title = "How old are you?",
+        onBack = onBack,
+        onSkip = onSkip,
+    ) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.heightIn(max = 600.dp),
+        ) {
+            items(options) { opt ->
+                val isSelected = opt.key == selectedValue
+                val bgColor by animateColorAsState(
+                    targetValue = if (isSelected) QPurpleLight else QCardBg,
+                    animationSpec = tween(200), label = "age_bg_${opt.key}"
+                )
+                Card(
+                    onClick = { onSelect(opt.key); onNext() },
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(
+                        if (isSelected) 2.dp else 1.dp,
+                        if (isSelected) QPurpleBorder else QDivider,
+                    ),
+                    colors = CardDefaults.cardColors(containerColor = bgColor),
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(opt.emoji, fontSize = 28.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(opt.label, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = QText)
+                        Text("Years old", fontSize = 11.sp, color = QSubtext)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── GenderScreen ───────────────────────────────────────────────────────────────
+@Composable
+fun GenderScreen(
+    selectedValue: String?,
+    onSelect: (String) -> Unit,
+    onNext: () -> Unit,
+    currentPage: Int,
+    onBack: (() -> Unit)? = null,
+    onSkip: (() -> Unit)? = null,
+) {
+    QPageScaffold(
+        currentPage = currentPage,
+        title = "What is your gender?",
+        onBack = onBack,
+        onSkip = onSkip,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            listOf("Male" to "🧔", "Female" to "🧕").forEach { (label, emoji) ->
+                val isSelected = label == selectedValue
+                val bgColor by animateColorAsState(
+                    if (isSelected) QPurpleLight else QCardBg, tween(200), label = "gender_$label"
+                )
+                Card(
+                    onClick = { onSelect(label); onNext() },
+                    modifier = Modifier.weight(1f).height(130.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) QPurpleBorder else QDivider),
+                    colors = CardDefaults.cardColors(containerColor = bgColor),
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Box(
+                            modifier = Modifier.size(60.dp).clip(CircleShape)
+                                .background(if (isSelected) QPurple.copy(alpha = 0.1f) else QBg),
+                            contentAlignment = Alignment.Center,
+                        ) { Text(emoji, fontSize = 32.sp) }
+                        Spacer(Modifier.height(6.dp))
+                        Text(label, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = QText)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        val isPNS = selectedValue == "Prefer Not to Say"
+        val pnsBg by animateColorAsState(if (isPNS) QPurpleLight else QCardBg, tween(200), label = "pns_bg")
+        Card(
+            onClick = { onSelect("Prefer Not to Say"); onNext() },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(if (isPNS) 2.dp else 1.dp, if (isPNS) QPurpleBorder else QDivider),
+            colors = CardDefaults.cardColors(containerColor = pnsBg),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 20.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("🤐", fontSize = 20.sp)
+                Spacer(Modifier.width(10.dp))
+                Text("Prefer Not to Say", fontWeight = FontWeight.Medium, fontSize = 15.sp, color = QText)
+            }
+        }
+    }
+}
+
+// ── GoalScreen ─────────────────────────────────────────────────────────────────
+private data class GoalOption(val key: String, val label: String, val emoji: String)
+
+@Composable
+fun GoalScreen(
+    selectedValue: String?,
+    onSelect: (String) -> Unit,
+    onNext: () -> Unit,
+    currentPage: Int,
+    onBack: (() -> Unit)? = null,
+    onSkip: (() -> Unit)? = null,
+) {
+    val options = listOf(
+        GoalOption("Lose Weight",       "Lose Weight",      "🔥"),
+        GoalOption("Build Strength",    "Build Strength",   "💪"),
+        GoalOption("General Fitness",   "General Fitness",  "🏃"),
+        GoalOption("Improve Flexibility","Improve\nFlexibility","🧘"),
+        GoalOption("Increase Mobility", "Increase\nMobility","❤️"),
+        GoalOption("Relieve Stress",    "Relieve Stress",   "😌"),
+    )
+    QPageScaffold(
+        currentPage = currentPage,
+        title = "What is your primary goal?",
+        onBack = onBack,
+        onSkip = onSkip,
+    ) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.heightIn(max = 600.dp),
+        ) {
+            items(options) { opt ->
+                val isSelected = opt.key == selectedValue
+                val bgColor by animateColorAsState(
+                    if (isSelected) QPurpleLight else QCardBg, tween(200), label = "goal_${opt.key}"
+                )
+                Card(
+                    onClick = { onSelect(opt.key); onNext() },
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) QPurpleBorder else QDivider),
+                    colors = CardDefaults.cardColors(containerColor = bgColor),
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(opt.emoji, fontSize = 28.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            opt.label,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = QText,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── YogaStyleScreen ────────────────────────────────────────────────────────────
+@Composable
+fun YogaStyleScreen(
+    selectedValue: String?,
+    onSelect: (String) -> Unit,
+    onNext: () -> Unit,
+    currentPage: Int,
+    onBack: (() -> Unit)? = null,
+    onSkip: (() -> Unit)? = null,
+) {
+    val options = listOf(
+        "Hatha Yoga" to "🧘",
+        "Vinyasa Yoga" to "🌊",
+        "Yin Yoga" to "🌙",
+        "Power Yoga" to "⚡",
+        "Chair Yoga" to "🪑",
+        "Meditation & Breathing" to "🌸",
+    )
+    QPageScaffold(
+        currentPage = currentPage,
+        title = "Which yoga style interests you?",
+        onBack = onBack,
+        onSkip = onSkip,
+        onContinue = onNext,
+        continueEnabled = selectedValue != null,
+    ) {
+        options.forEach { (label, emoji) ->
+            val isSelected = label == selectedValue
+            val bgColor by animateColorAsState(
+                if (isSelected) QPurpleLight else QCardBg, tween(200), label = "yoga_$label"
+            )
+            Card(
+                onClick = { onSelect(label) },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) QPurpleBorder else QDivider),
+                colors = CardDefaults.cardColors(containerColor = bgColor),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(label, fontWeight = FontWeight.Medium, fontSize = 15.sp, color = QText)
+                    Text(emoji, fontSize = 22.sp)
+                }
+            }
+        }
+    }
+}
+
+// ── SingleChoiceQuestionScreen ─────────────────────────────────────────────────
 @Composable
 fun SingleChoiceQuestionScreen(
     title: String,
@@ -66,88 +484,68 @@ fun SingleChoiceQuestionScreen(
     selectedValue: String?,
     onSelect: (String) -> Unit,
     onNext: () -> Unit,
+    currentPage: Int = 0,
+    onBack: (() -> Unit)? = null,
+    onSkip: (() -> Unit)? = null,
+    showSkip: Boolean = false,
+    autoAdvance: Boolean = false,
+    icons: List<ImageVector>? = null,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            .imePadding()
-            .padding(24.dp),
+    QPageScaffold(
+        currentPage = currentPage,
+        title = title,
+        onBack = onBack,
+        onSkip = if (showSkip) onSkip else null,
+        tip = if (subtitle.isNotBlank()) subtitle else null,
+        onContinue = if (!autoAdvance) onNext else null,
+        continueEnabled = selectedValue != null,
     ) {
-        Text(
-            text = title,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.onBackground,
-            fontFamily = FontFamily.Serif,
-        )
-        if (subtitle.isNotBlank()) {
-            Text(
-                text = subtitle,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
-        Spacer(Modifier.height(24.dp))
-        options.forEach { option ->
+        options.forEachIndexed { index, option ->
             val isSelected = option == selectedValue
+            val bgColor by animateColorAsState(
+                if (isSelected) QPurpleLight else QCardBg, tween(200), label = "sc_$option"
+            )
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                ),
-                border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                onClick = {
+                    onSelect(option)
+                    if (autoAdvance) onNext()
+                },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
                 shape = RoundedCornerShape(14.dp),
-                onClick = { onSelect(option) },
+                border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) QPurpleBorder else QDivider),
+                colors = CardDefaults.cardColors(containerColor = bgColor),
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp, horizontal = 20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp, horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Circle indicator
-                    Box(
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clip(CircleShape)
-                            .then(
-                                if (isSelected) Modifier.background(MaterialTheme.colorScheme.primary)
-                                else Modifier
-                                    .background(Color.Transparent)
-                                    .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                            ),
-                    )
-                    Spacer(Modifier.width(16.dp))
-                    Text(text = option, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                    val icon = icons?.getOrNull(index)
+                    if (icon != null) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = if (isSelected) QPurple else QSubtext,
+                            modifier = Modifier.size(22.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .background(if (isSelected) QPurple else Color.Transparent)
+                                .then(if (!isSelected) Modifier.border(1.5.dp, QSubtext, CircleShape) else Modifier),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                    }
+                    Text(option, fontSize = 15.sp, color = QText, fontWeight = FontWeight.Medium)
                 }
-            }
-        }
-        Spacer(modifier = Modifier.weight(1f))
-        Box(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
-            Button(
-                onClick = onNext,
-                enabled = selectedValue != null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary,
-                    disabledContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f),
-                ),
-            ) {
-                Text("Next", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondary)
             }
         }
     }
 }
 
-// ΓöÇΓöÇ Backward-compat overload (used by QuestionnaireFlow.kt) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Backward-compat overload matching old signature
 @Composable
 fun SingleChoiceQuestionScreen(
     question: String,
@@ -158,14 +556,14 @@ fun SingleChoiceQuestionScreen(
     nextEnabled: Boolean,
 ) = SingleChoiceQuestionScreen(
     title = question,
-    subtitle = "",
     options = options,
     selectedValue = selected,
     onSelect = onSelect,
     onNext = { if (nextEnabled) onNext() },
+    currentPage = 0,
 )
 
-// ΓöÇΓöÇ Multi-select question screen ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── MultiSelectQuestionScreen ──────────────────────────────────────────────────
 @Composable
 fun MultiSelectQuestionScreen(
     title: String,
@@ -174,82 +572,55 @@ fun MultiSelectQuestionScreen(
     selectedValues: Set<String>,
     onToggle: (String) -> Unit,
     onNext: () -> Unit,
+    currentPage: Int = 0,
+    onBack: (() -> Unit)? = null,
+    onSkip: (() -> Unit)? = null,
+    showSkip: Boolean = false,
+    icons: List<ImageVector>? = null,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            .imePadding()
-            .padding(24.dp),
+    QPageScaffold(
+        currentPage = currentPage,
+        title = title,
+        onBack = onBack,
+        onSkip = if (showSkip) onSkip else null,
+        tip = if (subtitle.isNotBlank()) subtitle else null,
+        onContinue = onNext,
+        continueEnabled = selectedValues.isNotEmpty(),
     ) {
-        Text(
-            text = title,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.onBackground,
-            fontFamily = FontFamily.Serif,
-        )
-        if (subtitle.isNotBlank()) {
-            Text(
-                text = subtitle,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
-        Spacer(Modifier.height(24.dp))
-        options.forEach { option ->
+        options.forEachIndexed { index, option ->
             val isSelected = option in selectedValues
+            val bgColor by animateColorAsState(
+                if (isSelected) QPurpleLight else QCardBg, tween(200), label = "ms_$option"
+            )
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                ),
-                border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                shape = RoundedCornerShape(14.dp),
                 onClick = { onToggle(option) },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) QPurpleBorder else QDivider),
+                colors = CardDefaults.cardColors(containerColor = bgColor),
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp, horizontal = 20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp, horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        imageVector = if (isSelected) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
-                        contentDescription = null,
-                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    Spacer(Modifier.width(16.dp))
-                    Text(option, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                    val icon = icons?.getOrNull(index)
+                    if (icon != null) {
+                        Icon(icon, contentDescription = null,
+                            tint = if (isSelected) QPurple else QSubtext,
+                            modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.width(12.dp))
+                    }
+                    Text(option, fontSize = 15.sp, color = QText, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    if (isSelected) {
+                        Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = QPurple, modifier = Modifier.size(22.dp))
+                    }
                 }
-            }
-        }
-        Spacer(modifier = Modifier.weight(1f))
-        Box(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
-            Button(
-                onClick = onNext,
-                enabled = selectedValues.isNotEmpty(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary,
-                    disabledContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f),
-                ),
-            ) {
-                Text("Next", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondary)
             }
         }
     }
 }
 
-// ΓöÇΓöÇ Backward-compat overload (used by QuestionnaireFlow.kt) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Backward-compat overload
 @Composable
 fun MultiSelectQuestionScreen(
     question: String,
@@ -265,9 +636,10 @@ fun MultiSelectQuestionScreen(
     selectedValues = selected,
     onToggle = onToggle,
     onNext = { if (nextEnabled) onNext() },
+    currentPage = 0,
 )
 
-// ΓöÇΓöÇ Height input screen ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── HeightInputScreen ──────────────────────────────────────────────────────────
 @Composable
 fun HeightInputScreen(
     heightRawInput: String,
@@ -276,175 +648,116 @@ fun HeightInputScreen(
     onToggleUnit: () -> Unit,
     onNext: () -> Unit,
     nextEnabled: Boolean,
+    currentPage: Int = 0,
+    onBack: (() -> Unit)? = null,
+    onSkip: (() -> Unit)? = null,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            .imePadding()
-            .padding(24.dp),
-    ) {
-        Text(
-            text = "What is your height?",
-            fontSize = 26.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.onBackground,
-            fontFamily = FontFamily.Serif,
-        )
-        Text(
-            text = "We use this to personalise your experience.",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-            modifier = Modifier.padding(top = 4.dp),
-        )
-        Spacer(Modifier.height(24.dp))
+    // Parse display value
+    val displayValue: Int = if (isMetric) {
+        heightRawInput.toIntOrNull() ?: 170
+    } else {
+        val parts = heightRawInput.split(".")
+        val ft = parts.getOrElse(0) { "5" }.toIntOrNull() ?: 5
+        val inch = parts.getOrElse(1) { "7" }.toIntOrNull() ?: 7
+        ft * 12 + inch
+    }
+    val step = if (isMetric) 1 else 1
 
-        // Unit toggle row
+    QPageScaffold(
+        currentPage = currentPage,
+        title = "What is your height?",
+        onBack = onBack,
+        onSkip = if (onSkip != null) onSkip else null,
+        onContinue = onNext,
+        continueEnabled = nextEnabled,
+    ) {
+        // Unit toggle pill
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(50.dp))
+                .background(QDivider)
+                .padding(4.dp),
+        ) {
+            listOf("cm" to true, "ft / in" to false).forEach { (label, metric) ->
+                val active = isMetric == metric
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(50.dp))
+                        .background(if (active) QPurple else Color.Transparent)
+                        .clickable { if (!active) onToggleUnit() }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        label,
+                        fontSize = 14.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                        color = if (active) Color.White else QSubtext,
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(28.dp))
+
+        // Large number display
+        Text(
+            text = if (isMetric) "$displayValue cm" else {
+                val ft = displayValue / 12; val inch = displayValue % 12; "$ft' $inch\""
+            },
+            fontSize = 52.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = QText,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        // Stepper row
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // "cm" chip
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isMetric) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface)
-                    .clickable { onToggleUnit() }
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center,
+            // Minus
+            FilledIconButton(
+                onClick = {
+                    val newVal = (displayValue - step).coerceAtLeast(1)
+                    onInputChange(if (isMetric) newVal.toString() else "${newVal / 12}.${newVal % 12}")
+                },
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = QPurpleLight),
+                modifier = Modifier.size(52.dp),
             ) {
-                Text(
-                    text = "cm",
-                    fontSize = 14.sp,
-                    color = if (isMetric) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = if (isMetric) FontWeight.Bold else FontWeight.Normal,
-                )
+                Icon(Icons.Filled.Remove, contentDescription = "Decrease", tint = QPurple)
             }
-            // "ft / in" chip
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (!isMetric) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface)
-                    .clickable { onToggleUnit() }
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center,
+            Spacer(Modifier.width(24.dp))
+            // Tick ruler
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                repeat(3) {
+                    Box(modifier = Modifier.width(2.dp).height(if (it == 1) 20.dp else 12.dp).background(QPurple.copy(alpha = 0.4f)))
+                    if (it < 2) Spacer(Modifier.width(8.dp))
+                }
+            }
+            Spacer(Modifier.width(24.dp))
+            // Plus
+            FilledIconButton(
+                onClick = {
+                    val newVal = displayValue + step
+                    onInputChange(if (isMetric) newVal.toString() else "${newVal / 12}.${newVal % 12}")
+                },
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = QPurple),
+                modifier = Modifier.size(52.dp),
             ) {
-                Text(
-                    text = "ft / in",
-                    fontSize = 14.sp,
-                    color = if (!isMetric) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = if (!isMetric) FontWeight.Bold else FontWeight.Normal,
-                )
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // Input field(s)
-        if (isMetric) {
-            OutlinedTextField(
-                value = heightRawInput,
-                onValueChange = onInputChange,
-                label = { Text("Height (cm)", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                shape = RoundedCornerShape(12.dp),
-            )
-        } else {
-            val parts = heightRawInput.split(".")
-            val feetText = parts.getOrElse(0) { "" }
-            val inchesText = parts.getOrElse(1) { "" }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = feetText,
-                    onValueChange = { newFeet -> onInputChange("$newFeet.$inchesText") },
-                    label = { Text("Feet", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                        cursorColor = MaterialTheme.colorScheme.primary,
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                )
-                OutlinedTextField(
-                    value = inchesText,
-                    onValueChange = { newInches -> onInputChange("$feetText.$newInches") },
-                    label = { Text("Inches", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                        cursorColor = MaterialTheme.colorScheme.primary,
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                )
-            }
-        }
-
-        // Inline validation
-        if (heightRawInput.isNotEmpty() && !nextEnabled) {
-            Text(
-                text = "Please enter a valid height.",
-                color = Color(0xFFFF6B6B),
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Box(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
-            Button(
-                onClick = onNext,
-                enabled = nextEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Orange,
-                    disabledContainerColor = Orange.copy(alpha = 0.4f),
-                ),
-            ) {
-                Text("Next", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextWhite)
+                Icon(Icons.Filled.Add, contentDescription = "Increase", tint = Color.White)
             }
         }
     }
 }
 
-// ΓöÇΓöÇ Weight input screen ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── WeightInputScreen ──────────────────────────────────────────────────────────
 @Composable
 fun WeightInputScreen(
     weightRawInput: String,
@@ -453,270 +766,191 @@ fun WeightInputScreen(
     onToggleUnit: () -> Unit,
     onNext: () -> Unit,
     nextEnabled: Boolean,
+    currentPage: Int = 0,
+    onBack: (() -> Unit)? = null,
+    onSkip: (() -> Unit)? = null,
+    heightCm: Int? = null,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            .imePadding()
-            .padding(24.dp),
-    ) {
-        Text(
-            text = "What is your weight?",
-            fontSize = 26.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.onBackground,
-            fontFamily = FontFamily.Serif,
-        )
-        Text(
-            text = "We use this to personalise your experience.",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-            modifier = Modifier.padding(top = 4.dp),
-        )
-        Spacer(Modifier.height(24.dp))
+    val rawDouble = weightRawInput.toDoubleOrNull() ?: if (isMetric) 70.0 else 154.0
+    val displayInt = rawDouble.toInt()
+    val step = if (isMetric) 1 else 1
 
-        // Unit toggle row
+    // Compute BMI if height available
+    val bmi: Double? = if (heightCm != null && heightCm > 0 && nextEnabled) {
+        val kg = if (isMetric) rawDouble else rawDouble * 0.453592
+        val hM = heightCm / 100.0
+        kg / (hM * hM)
+    } else null
+    val bmiCategory = bmi?.let {
+        when {
+            it < 18.5 -> "Underweight"
+            it < 25.0 -> "Normal"
+            it < 30.0 -> "Overweight"
+            else       -> "Obese"
+        }
+    }
+
+    QPageScaffold(
+        currentPage = currentPage,
+        title = "What is your weight?",
+        onBack = onBack,
+        onSkip = if (onSkip != null) onSkip else null,
+        onContinue = onNext,
+        continueEnabled = nextEnabled,
+    ) {
+        // Unit toggle pill
+        Row(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50.dp))
+                .background(QDivider).padding(4.dp),
+        ) {
+            listOf("kg" to true, "lb" to false).forEach { (label, metric) ->
+                val active = isMetric == metric
+                Box(
+                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(50.dp))
+                        .background(if (active) QPurple else Color.Transparent)
+                        .clickable { if (!active) onToggleUnit() }.padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(label, fontSize = 14.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                        color = if (active) Color.White else QSubtext)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(28.dp))
+
+        Text(
+            text = "$displayInt ${if (isMetric) "kg" else "lb"}",
+            fontSize = 52.sp, fontWeight = FontWeight.ExtraBold, color = QText,
+            textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+        )
+
+        Spacer(Modifier.height(12.dp))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // "kg" chip
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isMetric) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface)
-                    .clickable { onToggleUnit() }
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "kg",
-                    fontSize = 14.sp,
-                    color = if (isMetric) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = if (isMetric) FontWeight.Bold else FontWeight.Normal,
-                )
+            FilledIconButton(
+                onClick = {
+                    val newVal = (displayInt - step).coerceAtLeast(1)
+                    onInputChange("$newVal")
+                },
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = QPurpleLight),
+                modifier = Modifier.size(52.dp),
+            ) { Icon(Icons.Filled.Remove, contentDescription = "Decrease", tint = QPurple) }
+            Spacer(Modifier.width(24.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                repeat(3) {
+                    Box(modifier = Modifier.width(2.dp).height(if (it == 1) 20.dp else 12.dp).background(QPurple.copy(alpha = 0.4f)))
+                    if (it < 2) Spacer(Modifier.width(8.dp))
+                }
             }
-            // "lb" chip
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (!isMetric) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface)
-                    .clickable { onToggleUnit() }
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "lb",
-                    fontSize = 14.sp,
-                    color = if (!isMetric) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = if (!isMetric) FontWeight.Bold else FontWeight.Normal,
-                )
-            }
+            Spacer(Modifier.width(24.dp))
+            FilledIconButton(
+                onClick = { onInputChange("${displayInt + step}") },
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = QPurple),
+                modifier = Modifier.size(52.dp),
+            ) { Icon(Icons.Filled.Add, contentDescription = "Increase", tint = Color.White) }
         }
 
-        Spacer(Modifier.height(16.dp))
-
-        // Single input field (weight never splits into sub-fields)
-        OutlinedTextField(
-            value = weightRawInput,
-            onValueChange = onInputChange,
-            label = { Text(if (isMetric) "Weight (kg)" else "Weight (lb)", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                cursorColor = MaterialTheme.colorScheme.primary,
-                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-            ),
-            shape = RoundedCornerShape(12.dp),
-        )
-
-        // Inline validation
-        if (weightRawInput.isNotEmpty() && !nextEnabled) {
-            Text(
-                text = "Please enter a valid weight.",
-                color = Color(0xFFFF6B6B),
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Box(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
-            Button(
-                onClick = onNext,
-                enabled = nextEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Orange,
-                    disabledContainerColor = Orange.copy(alpha = 0.4f),
-                ),
+        // BMI card
+        if (bmi != null && bmiCategory != null) {
+            Spacer(Modifier.height(20.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = QCardBg),
             ) {
-                Text("Next", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextWhite)
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("BMI", fontSize = 13.sp, color = QSubtext)
+                        Text("%.1f · $bmiCategory".format(bmi), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = QText)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    val fraction = ((bmi - 10.0) / 30.0).coerceIn(0.0, 1.0).toFloat()
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50.dp))
+                            .background(Brush.horizontalGradient(listOf(Color(0xFF4CAF50), Color(0xFFFFEB3B), Color(0xFFF44336)))),
+                    ) {
+                        Box(modifier = Modifier.fillMaxWidth(fraction).fillMaxHeight().background(Color.Transparent))
+                    }
+                }
             }
         }
     }
 }
 
-// ΓöÇΓöÇ Camera permission screen ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-
-// Primary composable
+// ── CameraPermissionScreen ─────────────────────────────────────────────────────
 @Composable
 fun CameraPermissionScreen(
     cameraPermissionGranted: Boolean?,
     onEnablePoseCorrection: () -> Unit,
     onContinueWithout: () -> Unit,
     onNext: () -> Unit,
+    currentPage: Int = 0,
+    onBack: (() -> Unit)? = null,
+    onSkip: (() -> Unit)? = null,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            .imePadding()
-            .padding(24.dp),
+    QPageScaffold(
+        currentPage = currentPage,
+        title = "Enable AI Pose Correction",
+        onBack = onBack,
+        onSkip = onSkip,
+        tip = "Your camera is used only on-device. Video is never uploaded or stored.",
+        onContinue = onNext,
+        continueEnabled = cameraPermissionGranted != null,
     ) {
-        Spacer(Modifier.height(32.dp))
-
-        // Camera icon
-        Icon(
-            imageVector = Icons.Default.CameraAlt,
-            contentDescription = null,
+        // Camera icon circle
+        Box(
             modifier = Modifier
-                .size(80.dp)
+                .size(96.dp)
+                .clip(CircleShape)
+                .background(QPurpleLight)
                 .align(Alignment.CenterHorizontally),
-            tint = MaterialTheme.colorScheme.primary,
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        Text(
-            text = "Enable AI Pose Correction",
-            fontSize = 26.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.onBackground,
-            fontFamily = FontFamily.Serif,
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        Text(
-            text = "Your camera is used only on-device for real-time pose correction. Video is never uploaded or stored.",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-            lineHeight = 22.sp,
-        )
-
-        Spacer(Modifier.height(28.dp))
-
-        // Option card 1 — Enable Pose Correction
-        val isEnableSelected = cameraPermissionGranted == true
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 6.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isEnableSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-            ),
-            border = if (isEnableSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            shape = RoundedCornerShape(14.dp),
-            onClick = { onEnablePoseCorrection() },
+            contentAlignment = Alignment.Center,
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp, horizontal = 20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clip(CircleShape)
-                        .then(
-                            if (isEnableSelected) Modifier.background(MaterialTheme.colorScheme.primary)
-                            else Modifier
-                                .background(Color.Transparent)
-                                .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                        ),
-                )
-                Spacer(Modifier.width(16.dp))
-                Text("Enable Pose Correction", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
-            }
+            Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = QPurple, modifier = Modifier.size(48.dp))
         }
 
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(20.dp))
 
-        // Option card 2 — Continue Without Pose Correction
-        val isSkipSelected = cameraPermissionGranted == false
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 6.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isSkipSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-            ),
-            border = if (isSkipSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            shape = RoundedCornerShape(14.dp),
-            onClick = { onContinueWithout() },
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp, horizontal = 20.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        listOf(
+            Triple(true, "Enable Pose Correction", "Get real-time AI form feedback"),
+            Triple(false, "Continue Without Pose Correction", "Skip camera for now"),
+        ).forEach { (value, label, sub) ->
+            val isSelected = cameraPermissionGranted == value
+            val bgColor by animateColorAsState(if (isSelected) QPurpleLight else QCardBg, tween(200), label = "cam_$value")
+            Card(
+                onClick = { if (value) onEnablePoseCorrection() else onContinueWithout() },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) QPurpleBorder else QDivider),
+                colors = CardDefaults.cardColors(containerColor = bgColor),
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clip(CircleShape)
-                        .then(
-                            if (isSkipSelected) Modifier.background(MaterialTheme.colorScheme.primary)
-                            else Modifier
-                                .background(Color.Transparent)
-                                .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                        ),
-                )
-                Spacer(Modifier.width(16.dp))
-                Text("Continue Without Pose Correction", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
-            }
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Next button
-        Box(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
-            Button(
-                onClick = onNext,
-                enabled = cameraPermissionGranted != null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary,
-                    disabledContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f),
-                ),
-            ) {
-                Text("Next", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondary)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp, horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier.size(20.dp).clip(CircleShape)
+                            .background(if (isSelected) QPurple else Color.Transparent)
+                            .then(if (!isSelected) Modifier.border(1.5.dp, QSubtext, CircleShape) else Modifier),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(label, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = QText)
+                        Text(sub, fontSize = 12.sp, color = QSubtext)
+                    }
+                }
             }
         }
     }
 }
 
-// Backward-compat overload (used by QuestionnaireFlow.kt)
+// Backward-compat overload
 @Composable
 fun CameraPermissionScreen(
     onEnablePoseCorrection: () -> Unit,
@@ -728,95 +962,90 @@ fun CameraPermissionScreen(
     onEnablePoseCorrection = onEnablePoseCorrection,
     onContinueWithout = onSkip,
     onNext = { if (nextEnabled) onNext() },
+    currentPage = 0,
 )
 
-// ΓöÇΓöÇ Summary screen ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-
-// Primary composable
+// ── QuestionnaireSummaryScreen ─────────────────────────────────────────────────
 @Composable
 fun QuestionnaireSummaryScreen(
     answers: AnswerState,
     isLoading: Boolean,
     onSubmit: () -> Unit,
+    currentPage: Int = QPage.SUMMARY,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            .imePadding()
-            .padding(24.dp),
-    ) {
-        Text(
-            text = "You're all set! 🎉",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.onBackground,
-            fontFamily = FontFamily.Serif,
-        )
-
-        Spacer(Modifier.height(4.dp))
-
-        Text(
-            text = "Here's a summary of your profile.",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        // Summary card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(16.dp),
+    Box(modifier = Modifier.fillMaxSize().background(QBgGradient)) {
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 16.dp),
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                SummaryRow("Primary Goal", answers.goal ?: "—")
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                SummaryRow("Experience", answers.experienceLevel ?: "—")
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                SummaryRow("Focus Areas", answers.focusAreas.joinToString(", ").ifEmpty { "—" })
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                SummaryRow("Daily Practice", "${answers.dailyPracticeMinutes ?: "—"} min")
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                SummaryRow("Height", answers.heightCm?.let { "$it cm" } ?: "—")
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                SummaryRow("Weight", answers.weightKg?.let { "${"%.1f".format(it)} kg" } ?: "—")
+            QStepIndicator(currentPage = currentPage)
+            Spacer(Modifier.height(12.dp))
+            Text("YOU'RE ALL SET! 🎉", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = QText, letterSpacing = 0.5.sp)
+            Text("Here's a summary of your profile.", fontSize = 14.sp, color = QSubtext, modifier = Modifier.padding(top = 4.dp))
+            Spacer(Modifier.height(20.dp))
+
+            // Summary card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = QCardBg),
+                elevation = CardDefaults.cardElevation(2.dp),
+            ) {
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    SummaryRow("Primary Goal", answers.goal ?: "—")
+                    HorizontalDivider(color = QDivider, modifier = Modifier.padding(horizontal = 16.dp))
+                    SummaryRow("Yoga Style", answers.yogaStyle ?: "—")
+                    HorizontalDivider(color = QDivider, modifier = Modifier.padding(horizontal = 16.dp))
+                    SummaryRow("Experience", answers.experienceLevel ?: "—")
+                    HorizontalDivider(color = QDivider, modifier = Modifier.padding(horizontal = 16.dp))
+                    SummaryRow("Focus Areas", answers.focusAreas.joinToString(", ").ifEmpty { "—" })
+                    HorizontalDivider(color = QDivider, modifier = Modifier.padding(horizontal = 16.dp))
+                    SummaryRow("Daily Practice", "${answers.dailyPracticeMinutes ?: "—"} min")
+                    HorizontalDivider(color = QDivider, modifier = Modifier.padding(horizontal = 16.dp))
+                    SummaryRow("Height", answers.heightCm?.let { "$it cm" } ?: "—")
+                    HorizontalDivider(color = QDivider, modifier = Modifier.padding(horizontal = 16.dp))
+                    SummaryRow("Weight", answers.weightKg?.let { "${"%.1f".format(it)} kg" } ?: "—")
+                    HorizontalDivider(color = QDivider, modifier = Modifier.padding(horizontal = 16.dp))
+                    SummaryRow("Injuries", answers.injuries.joinToString(", ").ifEmpty { "None" })
+                }
             }
-        }
 
-        Spacer(modifier = Modifier.weight(1f))
+            Spacer(Modifier.height(16.dp))
 
-        // Start Your Journey button
-        Box(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
+            // Motivational card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = QPurple),
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("Your personalised plan is ready ✨", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                    Spacer(Modifier.height(4.dp))
+                    Text("Let's begin your yoga journey and track your progress every step of the way.", fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f), lineHeight = 19.sp)
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
             Button(
                 onClick = onSubmit,
                 enabled = !isLoading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary,
-                    disabledContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f),
-                ),
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                shape = RoundedCornerShape(27.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = QPurple, disabledContainerColor = QPurple.copy(alpha = 0.35f)),
             ) {
                 if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onSecondary,
-                    )
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp, color = Color.White)
                 } else {
-                    Text("Start Your Journey", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondary)
+                    Text("START YOUR JOURNEY", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White, letterSpacing = 1.sp)
                 }
             }
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
 
-// Backward-compat overload (used by QuestionnaireFlow.kt)
+// Backward-compat overload
 @Composable
 fun QuestionnaireSummaryScreen(
     answers: AnswerState,
@@ -834,13 +1063,29 @@ fun QuestionnaireSummaryScreen(
 @Composable
 private fun SummaryRow(label: String, value: String) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp, horizontal = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+        Text(label, fontSize = 13.sp, color = QSubtext)
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = QText)
+    }
+}
+
+// ── QuestionPageScaffold (backward compat) ─────────────────────────────────────
+@Composable
+fun QuestionPageScaffold(
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Box(
+        modifier = Modifier.fillMaxSize().background(QBgGradient),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            content = content,
+        )
     }
 }

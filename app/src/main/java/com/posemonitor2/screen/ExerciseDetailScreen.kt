@@ -51,6 +51,8 @@ fun ExerciseDetailScreen(
     workoutId: String? = null,
     exerciseIndex: Int = 0,
     exerciseList: String? = null,
+    category: String? = null,
+    difficulty: String? = null,
     targetReps: Int? = null,
     targetRepsMap: String? = null,
     onBack: () -> Unit,

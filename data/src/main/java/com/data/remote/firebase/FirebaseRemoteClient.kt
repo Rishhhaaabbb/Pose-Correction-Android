@@ -70,6 +70,13 @@ class FirebaseRemoteClient @Inject constructor(
         Log.i(TAG, "insertSession: succeeded — id=${dto.id}")
     }
 
+    suspend fun deleteSession(sessionId: String) {
+        requireFirebaseAuth()
+        Log.d(TAG, "deleteSession: id=${sessionId}")
+        sessions.document(sessionId).delete().await()
+        Log.i(TAG, "deleteSession: succeeded — id=${sessionId}")
+    }
+
     // ── Session Metrics ───────────────────────────────────────────────────
 
     suspend fun upsertSessionMetric(dto: FirestoreSessionMetricDto) {

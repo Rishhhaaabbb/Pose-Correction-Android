@@ -207,10 +207,10 @@ fun QuestionnaireFlow(
                         showSkip = !isEditMode,
                         onSkip = onSkip,
                         icons = listOf(
-                            Icons.Filled.SignalCellular1Bar,
-                            Icons.Filled.SignalCellular2Bar,
-                            Icons.Filled.SignalCellular3Bar,
-                            Icons.Filled.SignalCellular4Bar,
+                            Icons.Filled.SignalCellularAlt,
+                            Icons.Filled.SignalCellularAlt,
+                            Icons.Filled.SignalCellularAlt,
+                            Icons.Filled.SignalCellularAlt,
                             Icons.Filled.SignalCellularAlt,
                         ),
                     )
@@ -286,9 +286,9 @@ fun QuestionnaireFlow(
                         showSkip = !isEditMode,
                         onSkip = onSkip,
                         icons = listOf(
-                            Icons.Filled.SignalCellular1Bar,
-                            Icons.Filled.SignalCellular2Bar,
-                            Icons.Filled.SignalCellular3Bar,
+                            Icons.Filled.SignalCellularAlt,
+                            Icons.Filled.SignalCellularAlt,
+                            Icons.Filled.SignalCellularAlt,
                             Icons.Filled.SignalCellularAlt,
                         ),
                     )

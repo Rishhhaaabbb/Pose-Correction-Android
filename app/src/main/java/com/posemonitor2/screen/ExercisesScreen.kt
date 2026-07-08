@@ -107,9 +107,6 @@ fun ExercisesScreen(
         viewModel.refreshGraphs()
     }
 
-    // Refresh graph file list whenever this screen becomes visible (e.g. after
-    // returning from the Library tab where a new graph may have been generated)
-    val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {

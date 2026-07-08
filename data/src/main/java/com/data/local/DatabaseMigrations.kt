@@ -137,6 +137,9 @@ object DatabaseMigrations {
 
     val MIGRATION_6_7: Migration = object : Migration(6, 7) {
         override fun migrate(db: SupportSQLiteDatabase) {
+            // Drop stale index left by a previous broken migration run
+            db.execSQL("DROP INDEX IF EXISTS index_custom_workouts_is_default_created_at")
+
             // Create custom_workouts table for persistence
             db.execSQL(
                 """
@@ -145,15 +148,12 @@ object DatabaseMigrations {
                     title TEXT NOT NULL,
                     exercise_ids TEXT NOT NULL,
                     exercise_target_reps TEXT NOT NULL,
-                    is_default INTEGER NOT NULL DEFAULT 0,
+                    is_default INTEGER NOT NULL,
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL
                 )
                 """.trimIndent()
             )
-
-            // Create index for efficient queries
-            db.execSQL("CREATE INDEX IF NOT EXISTS index_custom_workouts_is_default_created_at ON custom_workouts(is_default DESC, created_at DESC)")
         }
     }
 }

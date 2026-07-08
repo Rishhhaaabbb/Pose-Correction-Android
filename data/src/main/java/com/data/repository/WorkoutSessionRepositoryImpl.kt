@@ -59,6 +59,11 @@ class WorkoutSessionRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun deleteSession(sessionId: String): Result<Unit> = runCatching {
+        sessionDao.deleteById(sessionId)
+        runCatching { firebaseRemoteClient.deleteSession(sessionId) }
+    }
+
     private fun scheduleSync() {
         try {
             // Get application context via ActivityThread — no direct dependency needed
