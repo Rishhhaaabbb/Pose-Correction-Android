@@ -63,6 +63,20 @@ class AuthViewModel @Inject constructor(
 
             val authResult = signInWithGoogleUseCase(idToken)
             authResult.onSuccess { authUser ->
+                // BUG-02 FIX: Ensure profile exists after sign-in
+                ensureProfileUseCase(
+                    UserProfile(
+                        id = authUser.id,
+                        displayName = authUser.fullName ?: fallbackName ?: "",
+                        email = authUser.email ?: fallbackEmail ?: "",
+                        profileImageUrl = null,
+                        heightCm = null,
+                        weightKg = null,
+                        fitnessGoal = null,
+                        targetWeightKg = null,
+                        weeklyGoalSessions = null,
+                    )
+                )
                 _state.update {
                     it.copy(
                         isLoading = false,
@@ -147,6 +161,20 @@ class AuthViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true, errorMessage = null) }
             signInWithEmailUseCase(email, password)
                 .onSuccess { authUser ->
+                    // BUG-02 FIX: Ensure profile exists after sign-in
+                    ensureProfileUseCase(
+                        UserProfile(
+                            id = authUser.id,
+                            displayName = authUser.fullName ?: "",
+                            email = authUser.email ?: "",
+                            profileImageUrl = null,
+                            heightCm = null,
+                            weightKg = null,
+                            fitnessGoal = null,
+                            targetWeightKg = null,
+                            weeklyGoalSessions = null,
+                        )
+                    )
                     _state.update {
                         it.copy(
                             isLoading = false,

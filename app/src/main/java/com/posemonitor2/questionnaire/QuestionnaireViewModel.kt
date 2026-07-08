@@ -3,9 +3,11 @@ package com.posemonitor2.questionnaire
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.domain.model.OnboardingResponse
+import com.domain.model.UserProfile
 import com.domain.repository.AuthRepository
 import com.domain.repository.OnboardingRepository
 import com.domain.repository.ProfileRepository
+import kotlinx.coroutines.flow.first
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -294,6 +296,35 @@ class QuestionnaireViewModel @Inject constructor(
             )
             onboardingRepository.saveAnswers(response)
                 .onSuccess {
+                    // FIX: Also update UserProfile with questionnaire data (height, weight, goal, etc.)
+                    // so that the Profile screen, BMI, and Today's Goal all reflect the answers.
+                    if (answers.heightCm != null || answers.weightKg != null || answers.goal != null) {
+                        // Fetch existing profile to preserve displayName/email
+                        val existing = profileRepository.observeProfile(userId).first()
+                        val updatedProfile = com.domain.model.UserProfile(
+                            id = userId,
+                            displayName = existing?.displayName ?: "",
+                            email = existing?.email,
+                            profileImageUrl = existing?.profileImageUrl,
+                            heightCm = answers.heightCm ?: existing?.heightCm,
+                            weightKg = answers.weightKg ?: existing?.weightKg,
+                            fitnessGoal = answers.goal ?: existing?.fitnessGoal,
+                            targetWeightKg = existing?.targetWeightKg,
+                            weeklyGoalSessions = existing?.weeklyGoalSessions,
+                            ageGroup = answers.ageGroup ?: existing?.ageGroup,
+                            gender = answers.gender ?: existing?.gender,
+                            experienceLevel = answers.experienceLevel ?: existing?.experienceLevel,
+                            yogaStyle = answers.yogaStyle ?: existing?.yogaStyle,
+                            flexibilityLevel = answers.flexibilityLevel ?: existing?.flexibilityLevel,
+                            focusAreas = answers.focusAreas.joinToString(",").ifEmpty { null } ?: existing?.focusAreas,
+                            dailyPracticeMinutes = answers.dailyPracticeMinutes ?: existing?.dailyPracticeMinutes,
+                            weeklyFrequency = answers.weeklyFrequency ?: existing?.weeklyFrequency,
+                            injuries = answers.injuries.joinToString(",").ifEmpty { null } ?: existing?.injuries,
+                            medicalConditions = answers.medicalConditions.joinToString(",").ifEmpty { null } ?: existing?.medicalConditions,
+                            cameraPermissionGranted = answers.cameraPermissionGranted ?: existing?.cameraPermissionGranted,
+                        )
+                        profileRepository.upsertProfile(updatedProfile)
+                    }
                     _uiState.update { it.copy(isLoading = false, isSaved = true) }
                 }
                 .onFailure { err ->

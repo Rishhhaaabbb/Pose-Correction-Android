@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -507,25 +508,60 @@ private fun RecentSessionRow(session: RecentSessionUiItem) {
             .padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Icon circle — orange for partial, green-tinted for completed
         Box(
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFFDE8E8)),
+                .background(if (session.isPartial) Color(0xFFFFE8E0) else Color(0xFFFDE8E8)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Default.Check, contentDescription = null, tint = TealDark, modifier = Modifier.size(20.dp))
+            if (session.isPartial) {
+                Icon(
+                    Icons.Outlined.HourglassEmpty,
+                    contentDescription = stringResource(R.string.progress_partial_icon_cd),
+                    tint = Orange,
+                    modifier = Modifier.size(20.dp),
+                )
+            } else {
+                Icon(Icons.Default.Check, contentDescription = null, tint = TealDark, modifier = Modifier.size(20.dp))
+            }
         }
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TealDark)
-            Text(
-                stringResource(R.string.progress_session_subtitle, resolvedDayLabel, session.durationMinutes),
-                fontSize = 12.sp,
-                color = TextGray,
-            )
+            if (session.isPartial) {
+                Text(
+                    stringResource(R.string.progress_partial_session_subtitle, resolvedDayLabel, session.durationMinutes, session.completionPercent),
+                    fontSize = 12.sp,
+                    color = TextGray,
+                )
+            } else {
+                Text(
+                    stringResource(R.string.progress_session_subtitle, resolvedDayLabel, session.durationMinutes),
+                    fontSize = 12.sp,
+                    color = TextGray,
+                )
+            }
         }
-        Icon(Icons.Default.Check, contentDescription = stringResource(R.string.progress_done_cd), tint = GreenOk, modifier = Modifier.size(20.dp))
+        // Right side: partial orange pill or green check
+        if (session.isPartial) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Orange)
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+            ) {
+                Text(
+                    stringResource(R.string.progress_partial_badge),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                )
+            }
+        } else {
+            Icon(Icons.Default.Check, contentDescription = stringResource(R.string.progress_done_cd), tint = GreenOk, modifier = Modifier.size(20.dp))
+        }
     }
 }
 

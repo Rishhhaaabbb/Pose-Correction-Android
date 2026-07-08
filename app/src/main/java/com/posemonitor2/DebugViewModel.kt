@@ -478,22 +478,17 @@ class DebugViewModel @Inject constructor(
         // Don't save if already saved OR if target not yet reached
         if (completionPersisted || !isTargetReached) return
 
-        // Get userId directly from repository to ensure we have the latest
-        var userId: String? = null
+        // Mark immediately to prevent duplicate saves from rapid frame callbacks
+        completionPersisted = true
+
         viewModelScope.launch {
-            authRepository.observeSession().first()?.let { authUser ->
-                userId = authUser.id
-            }
-            
-            // Fall back to default user if no auth session available
-            if (userId.isNullOrBlank()) {
-                userId = DEFAULT_USER_ID
-                Log.w(TAG, "Using default user ID since no authenticated session available")
-            }
-            
+            // Use currentUserId if already set, otherwise wait for auth
+            val userId: String = currentUserId?.takeIf { it.isNotBlank() }
+                ?: authRepository.observeSession().first()?.id?.takeIf { it.isNotBlank() }
+                ?: DEFAULT_USER_ID
+
             Log.d(TAG, "persistSessionIfComplete: userId=$userId, currentReps=$currentReps, target=$target")
-            
-            saveSession(userId!!, currentReps, target, status)
+            saveSession(userId, currentReps, target, status)
         }
     }
 
@@ -525,8 +520,6 @@ class DebugViewModel @Inject constructor(
 
         // Calculate default calories (will be recalculated properly in coroutine)
         val defaultCalories = totalReps * 2.5
-        
-        completionPersisted = true
 
         try {
             // Get exercise data for calorie calculation
@@ -664,8 +657,11 @@ class DebugViewModel @Inject constructor(
     }
 
     fun saveCurrentSessionPartial() {
-        val userId = currentUserId ?: return
         val graphEntry = currentGraphEntry ?: return
+        val userId = currentUserId ?: run {
+            Log.w(TAG, "saveCurrentSessionPartial: currentUserId is null, skipping save")
+            return
+        }
         val now = System.currentTimeMillis()
         val durationSec = ((now - sessionStartEpochMs) / 1000L).toInt().coerceAtLeast(0)
         val totalReps = currentRepCount.value
@@ -690,11 +686,43 @@ class DebugViewModel @Inject constructor(
                     startedAtEpochMs = sessionStartEpochMs,
                     endedAtEpochMs = now,
                     durationSec = durationSec,
-                    status = SessionStatus.COMPLETED,
+                    status = SessionStatus.PARTIAL,
                 )
             ).onFailure {
                 Log.e(TAG, "Failed to save partial session", it)
             }
+
+            // BUG-04 FIX: Update daily stats so partial sessions count toward Today's Goal
+            val statDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(now))
+            val existingDayStat = observeDailyStatsUseCase(userId, limit = 365)
+                .first()
+                .firstOrNull { it.statDate == statDate }
+
+            val previousSessions = existingDayStat?.sessionsCount ?: 0
+            val newSessionsCount = previousSessions + 1
+            val newTotalReps = (existingDayStat?.totalReps ?: 0) + totalReps
+            val newAverageAccuracy = if (previousSessions == 0) {
+                avgAccuracy
+            } else {
+                ((existingDayStat?.avgAccuracy ?: 0.0) * previousSessions + avgAccuracy) / newSessionsCount
+            }
+
+            val dailyStatId = existingDayStat?.id
+                ?: UUID.nameUUIDFromBytes("$userId:$statDate".toByteArray(StandardCharsets.UTF_8)).toString()
+
+            upsertDailyStatUseCase(
+                DailyStat(
+                    id = dailyStatId,
+                    userId = userId,
+                    statDate = statDate,
+                    sessionsCount = newSessionsCount,
+                    totalReps = newTotalReps,
+                    avgAccuracy = newAverageAccuracy,
+                )
+            ).onFailure {
+                Log.e(TAG, "Failed to upsert daily stats for partial session", it)
+            }
+
             Log.d(TAG, "Partial session saved: $totalReps reps, $calories calories")
         }
     }

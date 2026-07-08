@@ -1,5 +1,6 @@
 package com.data.sync
 
+import android.util.Log
 import com.data.local.dao.SyncQueueDao
 import com.data.remote.firebase.FirebaseRemoteClient
 import com.data.remote.firebase.FirestoreDailyStatDto
@@ -21,10 +22,16 @@ class FirebaseSyncRunner @Inject constructor(
 ) {
     suspend fun syncPending() {
         // Only sync if a Firebase user is signed in
-        if (FirebaseAuth.getInstance().currentUser == null) return
+        if (FirebaseAuth.getInstance().currentUser == null) {
+            Log.d(TAG, "syncPending: skipping — no authenticated Firebase user")
+            return
+        }
 
         val items = syncQueueDao.getAll()
+        Log.d(TAG, "syncPending: found ${items.size} pending item(s)")
+
         items.forEach { item ->
+            Log.d(TAG, "syncPending: processing type=${item.entityType} id=${item.entityId}")
             runCatching {
                 when (item.entityType) {
                     "profiles" -> {
@@ -51,11 +58,20 @@ class FirebaseSyncRunner @Inject constructor(
                         val dto = json.decodeFromString<FirestoreOnboardingDto>(item.payload)
                         firebaseRemoteClient.upsertOnboardingResponse(dto)
                     }
+                    else -> Log.w(TAG, "syncPending: unknown entityType=${item.entityType}, skipping")
                 }
                 syncQueueDao.deleteById(item.id)
+                Log.i(TAG, "syncPending: synced and removed — type=${item.entityType} id=${item.entityId}")
             }.onFailure { err ->
+                Log.e(TAG, "syncPending: failed type=${item.entityType} id=${item.entityId}: ${err.message}", err)
                 syncQueueDao.markFailed(item.id, err.message ?: "Sync failed")
             }
         }
+
+        Log.d(TAG, "syncPending: done")
+    }
+
+    companion object {
+        private const val TAG = "FirebaseSyncRunner"
     }
 }

@@ -4,6 +4,7 @@ enum class SessionStatus {
     COMPLETED,
     CANCELLED,
     DRAFT,
+    PARTIAL,
 }
 
 data class WorkoutSession(

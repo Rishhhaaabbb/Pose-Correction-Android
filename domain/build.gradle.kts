@@ -1,12 +1,24 @@
 // domain/build.gradle.kts
 
 plugins {
-    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
 }
 
-// Domain depends only on core. No Android, no MediaPipe, no Hilt.
-// All repository interfaces are defined here as Kotlin interfaces.
+android {
+    namespace = "com.posemonitor.domain"
+    compileSdk = 36
+
+    defaultConfig {
+        minSdk = 24
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
 
 kotlin {
     jvmToolchain(17)
