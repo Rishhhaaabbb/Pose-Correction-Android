@@ -5,7 +5,6 @@ import com.core.poseengine.model.KeypointIndex
 import com.core.poseengine.model.RawFeatureMap
 import com.core.poseengine.model.Skeleton2d
 import com.core.poseengine.model.Skeleton3d
-import java.util.EnumMap
 import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.atan2
@@ -47,7 +46,7 @@ class FeatureExtractor(
      * Extract features from a 2-D skeleton.
      *
      * Returns null when the skeleton fails validation (< 4/6 critical
-     * keypoints above threshold, or body scale < 0.05 (normalized [0,1])).
+     * keypoints above threshold, or body scale < 10 px).
      *
      * Matches Python: extract_features()
      */
@@ -55,53 +54,39 @@ class FeatureExtractor(
         if (!validateKeypoints(skeleton)) return null
 
         val bodyScale = computeBodyScale(skeleton)
-        if (bodyScale < BODY_SCALE_MIN) return null
+        if (bodyScale < BODY_SCALE_MIN_PX) return null
 
-        val features = EnumMap<FeatureKey, Double>(FeatureKey::class.java)
-        
-        // Joint angles — each is independently optional
-        features.putIfNotNull(FeatureKey.LEFT_ELBOW_ANGLE, computeElbowAngle(skeleton, side = Side.LEFT))
-        features.putIfNotNull(FeatureKey.RIGHT_ELBOW_ANGLE, computeElbowAngle(skeleton, side = Side.RIGHT))
-        features.putIfNotNull(FeatureKey.LEFT_KNEE_ANGLE, computeKneeAngle(skeleton, side = Side.LEFT))
-        features.putIfNotNull(FeatureKey.RIGHT_KNEE_ANGLE, computeKneeAngle(skeleton, side = Side.RIGHT))
-        features.putIfNotNull(FeatureKey.LEFT_SHOULDER_ANGLE, computeShoulderAngle(skeleton, side = Side.LEFT))
-        features.putIfNotNull(FeatureKey.RIGHT_SHOULDER_ANGLE, computeShoulderAngle(skeleton, side = Side.RIGHT))
-        features.putIfNotNull(FeatureKey.LEFT_HIP_ANGLE, computeHipAngle(skeleton, side = Side.LEFT))
-        features.putIfNotNull(FeatureKey.RIGHT_HIP_ANGLE, computeHipAngle(skeleton, side = Side.RIGHT))
+        return buildMap<FeatureKey, Double> {
+            // Joint angles — each is independently optional
+            putIfNotNull(FeatureKey.LEFT_ELBOW_ANGLE, computeElbowAngle(skeleton, side = Side.LEFT))
+            putIfNotNull(FeatureKey.RIGHT_ELBOW_ANGLE, computeElbowAngle(skeleton, side = Side.RIGHT))
+            putIfNotNull(FeatureKey.LEFT_KNEE_ANGLE, computeKneeAngle(skeleton, side = Side.LEFT))
+            putIfNotNull(FeatureKey.RIGHT_KNEE_ANGLE, computeKneeAngle(skeleton, side = Side.RIGHT))
+            putIfNotNull(FeatureKey.LEFT_SHOULDER_ANGLE, computeShoulderAngle(skeleton, side = Side.LEFT))
+            putIfNotNull(FeatureKey.RIGHT_SHOULDER_ANGLE, computeShoulderAngle(skeleton, side = Side.RIGHT))
+            putIfNotNull(FeatureKey.LEFT_HIP_ANGLE, computeHipAngle(skeleton, side = Side.LEFT))
+            putIfNotNull(FeatureKey.RIGHT_HIP_ANGLE, computeHipAngle(skeleton, side = Side.RIGHT))
 
-        // Torso — always computable if validation passed (uses same 4 keypoints)
-        features[FeatureKey.TORSO_ANGLE] = computeTorsoAngle(skeleton)
+            // Torso — always computable if validation passed (uses same 4 keypoints)
+            put(FeatureKey.TORSO_ANGLE, computeTorsoAngle(skeleton))
 
-        // Asymmetry deltas — left minus right, requires both sides
-        val leftHip = features[FeatureKey.LEFT_HIP_ANGLE]
-        val rightHip = features[FeatureKey.RIGHT_HIP_ANGLE]
-        if (leftHip != null && rightHip != null) {
-            features[FeatureKey.HIP_ASYMMETRY_DELTA] = leftHip - rightHip
-        }
-        val leftKnee = features[FeatureKey.LEFT_KNEE_ANGLE]
-        val rightKnee = features[FeatureKey.RIGHT_KNEE_ANGLE]
-        if (leftKnee != null && rightKnee != null) {
-            features[FeatureKey.KNEE_ASYMMETRY_DELTA] = leftKnee - rightKnee
-        }
+            // Arm elevations — optional per side
+            putIfNotNull(
+                FeatureKey.LEFT_ARM_ELEVATION,
+                computeArmElevation(skeleton, KeypointIndex.LEFT_WRIST, KeypointIndex.LEFT_SHOULDER, bodyScale)
+            )
+            putIfNotNull(
+                FeatureKey.RIGHT_ARM_ELEVATION,
+                computeArmElevation(skeleton, KeypointIndex.RIGHT_WRIST, KeypointIndex.RIGHT_SHOULDER, bodyScale)
+            )
 
-        // Arm elevations — optional per side
-        features.putIfNotNull(
-            FeatureKey.LEFT_ARM_ELEVATION,
-            computeArmElevation(skeleton, KeypointIndex.LEFT_WRIST, KeypointIndex.LEFT_SHOULDER, bodyScale)
-        )
-        features.putIfNotNull(
-            FeatureKey.RIGHT_ARM_ELEVATION,
-            computeArmElevation(skeleton, KeypointIndex.RIGHT_WRIST, KeypointIndex.RIGHT_SHOULDER, bodyScale)
-        )
+            // Leg spread — optional per side
+            putIfNotNull(FeatureKey.LEFT_LEG_SPREAD, computeLegSpread(skeleton, Side.LEFT, bodyScale))
+            putIfNotNull(FeatureKey.RIGHT_LEG_SPREAD, computeLegSpread(skeleton, Side.RIGHT, bodyScale))
 
-        // Leg spread — optional per side
-        features.putIfNotNull(FeatureKey.LEFT_LEG_SPREAD, computeLegSpread(skeleton, Side.LEFT, bodyScale))
-        features.putIfNotNull(FeatureKey.RIGHT_LEG_SPREAD, computeLegSpread(skeleton, Side.RIGHT, bodyScale))
-
-        // Body center
-        features[FeatureKey.BODY_CENTER_Y] = computeBodyCenterY(skeleton, bodyScale)
-        
-        return RawFeatureMap(features)
+            // Body center
+            put(FeatureKey.BODY_CENTER_Y, computeBodyCenterY(skeleton, bodyScale))
+        }.let { RawFeatureMap(it) }
     }
 
     /**
@@ -122,43 +107,42 @@ class FeatureExtractor(
      * semantics per dimension — preserved here.
      */
     fun extractFeatures3d(skeleton: Skeleton3d): RawFeatureMap {
-        val features = EnumMap<FeatureKey, Double>(FeatureKey::class.java)
+        return buildMap<FeatureKey, Double> {
+            // Elbow angles
+            putIfNotNull(FeatureKey.LEFT_ELBOW_ANGLE,
+                angle3d(skeleton, KeypointIndex.LEFT_SHOULDER, KeypointIndex.LEFT_ELBOW, KeypointIndex.LEFT_WRIST))
+            putIfNotNull(FeatureKey.RIGHT_ELBOW_ANGLE,
+                angle3d(skeleton, KeypointIndex.RIGHT_SHOULDER, KeypointIndex.RIGHT_ELBOW, KeypointIndex.RIGHT_WRIST))
 
-        // Elbow angles
-        features.putIfNotNull(FeatureKey.LEFT_ELBOW_ANGLE,
-            angle3d(skeleton, KeypointIndex.LEFT_SHOULDER, KeypointIndex.LEFT_ELBOW, KeypointIndex.LEFT_WRIST))
-        features.putIfNotNull(FeatureKey.RIGHT_ELBOW_ANGLE,
-            angle3d(skeleton, KeypointIndex.RIGHT_SHOULDER, KeypointIndex.RIGHT_ELBOW, KeypointIndex.RIGHT_WRIST))
+            // Knee angles
+            putIfNotNull(FeatureKey.LEFT_KNEE_ANGLE,
+                angle3d(skeleton, KeypointIndex.LEFT_HIP, KeypointIndex.LEFT_KNEE, KeypointIndex.LEFT_ANKLE))
+            putIfNotNull(FeatureKey.RIGHT_KNEE_ANGLE,
+                angle3d(skeleton, KeypointIndex.RIGHT_HIP, KeypointIndex.RIGHT_KNEE, KeypointIndex.RIGHT_ANKLE))
 
-        // Knee angles
-        features.putIfNotNull(FeatureKey.LEFT_KNEE_ANGLE,
-            angle3d(skeleton, KeypointIndex.LEFT_HIP, KeypointIndex.LEFT_KNEE, KeypointIndex.LEFT_ANKLE))
-        features.putIfNotNull(FeatureKey.RIGHT_KNEE_ANGLE,
-            angle3d(skeleton, KeypointIndex.RIGHT_HIP, KeypointIndex.RIGHT_KNEE, KeypointIndex.RIGHT_ANKLE))
+            // Hip angles
+            putIfNotNull(FeatureKey.LEFT_HIP_ANGLE,
+                angle3d(skeleton, KeypointIndex.LEFT_SHOULDER, KeypointIndex.LEFT_HIP, KeypointIndex.LEFT_KNEE))
+            putIfNotNull(FeatureKey.RIGHT_HIP_ANGLE,
+                angle3d(skeleton, KeypointIndex.RIGHT_SHOULDER, KeypointIndex.RIGHT_HIP, KeypointIndex.RIGHT_KNEE))
 
-        // Hip angles
-        features.putIfNotNull(FeatureKey.LEFT_HIP_ANGLE,
-            angle3d(skeleton, KeypointIndex.LEFT_SHOULDER, KeypointIndex.LEFT_HIP, KeypointIndex.LEFT_KNEE))
-        features.putIfNotNull(FeatureKey.RIGHT_HIP_ANGLE,
-            angle3d(skeleton, KeypointIndex.RIGHT_SHOULDER, KeypointIndex.RIGHT_HIP, KeypointIndex.RIGHT_KNEE))
+            // Shoulder angles
+            // Python uses indices [7,5,11] → elbow,shoulder,hip — note the vertex order
+            putIfNotNull(FeatureKey.LEFT_SHOULDER_ANGLE,
+                angle3d(skeleton, KeypointIndex.LEFT_ELBOW, KeypointIndex.LEFT_SHOULDER, KeypointIndex.LEFT_HIP))
+            putIfNotNull(FeatureKey.RIGHT_SHOULDER_ANGLE,
+                angle3d(skeleton, KeypointIndex.RIGHT_ELBOW, KeypointIndex.RIGHT_SHOULDER, KeypointIndex.RIGHT_HIP))
 
-        // Shoulder angles
-        // Python uses indices [7,5,11] → elbow,shoulder,hip — note the vertex order
-        features.putIfNotNull(FeatureKey.LEFT_SHOULDER_ANGLE,
-            angle3d(skeleton, KeypointIndex.LEFT_ELBOW, KeypointIndex.LEFT_SHOULDER, KeypointIndex.LEFT_HIP))
-        features.putIfNotNull(FeatureKey.RIGHT_SHOULDER_ANGLE,
-            angle3d(skeleton, KeypointIndex.RIGHT_ELBOW, KeypointIndex.RIGHT_SHOULDER, KeypointIndex.RIGHT_HIP))
+            // Arm elevation — angle between arm vector and world up [0,1,0]
+            putIfNotNull(FeatureKey.LEFT_ARM_ELEVATION,
+                armElevation3d(skeleton, KeypointIndex.LEFT_SHOULDER, KeypointIndex.LEFT_ELBOW))
+            putIfNotNull(FeatureKey.RIGHT_ARM_ELEVATION,
+                armElevation3d(skeleton, KeypointIndex.RIGHT_SHOULDER, KeypointIndex.RIGHT_ELBOW))
 
-        // Arm elevation — angle between arm vector and world up [0,1,0]
-        features.putIfNotNull(FeatureKey.LEFT_ARM_ELEVATION,
-            armElevation3d(skeleton, KeypointIndex.LEFT_SHOULDER, KeypointIndex.LEFT_ELBOW))
-        features.putIfNotNull(FeatureKey.RIGHT_ARM_ELEVATION,
-            armElevation3d(skeleton, KeypointIndex.RIGHT_SHOULDER, KeypointIndex.RIGHT_ELBOW))
+            // Torso angle — signed forward lean in the Z-Y sagittal plane
+            putIfNotNull(FeatureKey.TORSO_ANGLE, torsoAngle3d(skeleton))
 
-        // Torso angle — signed forward lean in the Z-Y sagittal plane
-        features.putIfNotNull(FeatureKey.TORSO_ANGLE, torsoAngle3d(skeleton))
-
-        return RawFeatureMap(features)
+        }.let { RawFeatureMap(it) }
     }
 
     /**
@@ -200,14 +184,14 @@ class FeatureExtractor(
      * Critical set: both shoulders, both hips, both knees.
      */
     private fun validateKeypoints(skeleton: Skeleton2d): Boolean {
-        var validCount = 0
-        if (skeleton[KeypointIndex.LEFT_SHOULDER].confidence >= confidenceThreshold) validCount++
-        if (skeleton[KeypointIndex.RIGHT_SHOULDER].confidence >= confidenceThreshold) validCount++
-        if (skeleton[KeypointIndex.LEFT_HIP].confidence >= confidenceThreshold) validCount++
-        if (skeleton[KeypointIndex.RIGHT_HIP].confidence >= confidenceThreshold) validCount++
-        if (skeleton[KeypointIndex.LEFT_KNEE].confidence >= confidenceThreshold) validCount++
-        if (skeleton[KeypointIndex.RIGHT_KNEE].confidence >= confidenceThreshold) validCount++
-
+        val criticalIndices = listOf(
+            KeypointIndex.LEFT_SHOULDER, KeypointIndex.RIGHT_SHOULDER,
+            KeypointIndex.LEFT_HIP, KeypointIndex.RIGHT_HIP,
+            KeypointIndex.LEFT_KNEE, KeypointIndex.RIGHT_KNEE,
+        )
+        val validCount = criticalIndices.count { idx ->
+            skeleton[idx].confidence >= confidenceThreshold
+        }
         return validCount >= 4
     }
 
@@ -216,7 +200,7 @@ class FeatureExtractor(
     /**
      * Matches Python: _compute_body_scale()
      *
-     * Returns normalized [0,1] distance between shoulder midpoint and hip midpoint.
+     * Returns pixel distance between shoulder midpoint and hip midpoint.
      * Used as normalization denominator for all non-angle features.
      */
     private fun computeBodyScale(skeleton: Skeleton2d): Double {
@@ -369,7 +353,7 @@ class FeatureExtractor(
         val torsoVecY = shoulderCy - hipCy
 
         // atan2(torso_vec[0], -torso_vec[1])
-        return Math.toDegrees(atan2(torsoVecX, -torsoVecY))
+        return -Math.toDegrees(atan2(-torsoVecX, torsoVecY))
     }
 
     // ── Arm elevation (2D) ────────────────────────────────────────────────────
@@ -575,8 +559,8 @@ class FeatureExtractor(
     // ── Constants ─────────────────────────────────────────────────────────────
 
     companion object {
-        /** Minimum body scale in normalized [0,1] coords. Below this, detection is unreliable. */
-        private const val BODY_SCALE_MIN = 0.05
+        /** Minimum body scale in pixels. Below this, detection is unreliable. */
+        private const val BODY_SCALE_MIN_PX = 0.05
 
         /**
          * Degenerate vector threshold.

@@ -62,7 +62,11 @@ fun GraphGenerationScreen(viewModel: GraphGenerationViewModel) {
     val videoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: android.net.Uri? ->
-        if (uri != null) pendingVideoUri = uri.toString()
+        if (uri != null) {
+            pendingVideoUri = uri.toString()
+            // Ensure we're in idle state when video is selected
+            viewModel.reset()
+        }
     }
 
     Box(
@@ -72,6 +76,27 @@ fun GraphGenerationScreen(viewModel: GraphGenerationViewModel) {
         contentAlignment = Alignment.Center,
     ) {
         when {
+            // Show settings when video is selected and not processing
+            pendingVideoUri != null && uiState is GenerationUiState.Idle -> {
+                Box(modifier = Modifier.padding(24.dp)) {
+                    SettingsContent(
+                        videoUri = pendingVideoUri!!,
+                        onConfirm = { config, graphName ->
+                            viewModel.startGeneration(
+                                videoUri  = pendingVideoUri!!,
+                                config    = config,
+                                graphName = graphName,
+                            )
+                        },
+                        onBack = { 
+                            pendingVideoUri = null
+                            viewModel.reset()
+                        },
+                    )
+                }
+            }
+
+            // Show processing/success/error states
             uiState !is GenerationUiState.Idle -> {
                 when (val state = uiState) {
                     is GenerationUiState.Processing -> {
@@ -97,22 +122,7 @@ fun GraphGenerationScreen(viewModel: GraphGenerationViewModel) {
                 }
             }
 
-            pendingVideoUri != null -> {
-                Box(modifier = Modifier.padding(24.dp)) {
-                    SettingsContent(
-                        videoUri = pendingVideoUri!!,
-                        onConfirm = { config, graphName ->
-                            viewModel.startGeneration(
-                                videoUri  = pendingVideoUri!!,
-                                config    = config,
-                                graphName = graphName,
-                            )
-                        },
-                        onBack = { pendingVideoUri = null },
-                    )
-                }
-            }
-
+            // Show initial idle screen
             else -> {
                 Box(modifier = Modifier.padding(24.dp)) {
                     IdleContent(onPickVideo = { videoPicker.launch("video/*") })
@@ -150,7 +160,7 @@ private fun IdleContent(onPickVideo: () -> Unit) {
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 @Composable
-private fun SettingsContent(
+fun SettingsContent(
     videoUri: String,
     onConfirm: (GeneratorConfig, String) -> Unit,
     onBack: () -> Unit,
@@ -299,6 +309,9 @@ private fun SuccessContent(
     }
 
     var showVisualization by remember { mutableStateOf(false) }
+    val fileName = remember(state.outputPath) {
+        state.outputPath.substringAfterLast("/").substringBeforeLast(".")
+    }
 
     if (showVisualization && graph != null) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -343,23 +356,32 @@ private fun SuccessContent(
                     modifier = Modifier.padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    StatRow(stringResource(R.string.gg_graph_name), fileName)
                     StatRow(stringResource(R.string.gg_states_discovered), "${state.numStates}")
                     StatRow(stringResource(R.string.gg_valid_frames), "${state.numFrames}")
-                    StatRow(stringResource(R.string.gg_saved_to), state.outputPath.substringAfterLast("/"))
                 }
             }
 
             Spacer(Modifier.height(4.dp))
 
-            if (graph != null) {
-                Button(
-                    onClick = { showVisualization = true },
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF37474F), contentColor = Color.White),
-                ) {
-                    Text(stringResource(R.string.gg_view_graph), fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                }
+            // Always show View Graph button
+            Button(
+                onClick = {
+                    if (graph != null) {
+                        showVisualization = true
+                    }
+                },
+                enabled = graph != null,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF37474F),
+                    contentColor = Color.White,
+                    disabledContainerColor = Color(0xFF2A2A2A),
+                    disabledContentColor = Color(0xFF666666)
+                ),
+            ) {
+                Text(stringResource(R.string.gg_view_graph), fontSize = 15.sp, fontWeight = FontWeight.Medium)
             }
 
             Button(

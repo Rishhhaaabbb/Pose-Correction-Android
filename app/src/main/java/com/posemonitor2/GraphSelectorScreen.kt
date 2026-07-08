@@ -38,6 +38,48 @@ fun GraphSelectorScreen(
     var graphs by remember { mutableStateOf(loadAvailableGraphs(context)) }
     var selected by remember { mutableStateOf<GraphEntry?>(null) }
     var renameTarget by remember { mutableStateOf<GraphEntry?>(null) }
+    var deleteTarget by remember { mutableStateOf<GraphEntry?>(null) }
+
+    // Refresh graphs on composition
+    LaunchedEffect(Unit) {
+        graphs = loadAvailableGraphs(context)
+    }
+
+    // Delete confirmation dialog
+    deleteTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            containerColor = Color(0xFF1E1E1E),
+            titleContentColor = Color.White,
+            textContentColor = Color(0xFFCCCCCC),
+            title = { Text("Delete Graph", fontWeight = FontWeight.SemiBold) },
+            text = {
+                Text("Are you sure you want to delete \"${target.fileName.removeSuffix(".json")}\"?")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (!target.isAsset) {
+                            val file = File(target.filePath)
+                            if (file.exists()) {
+                                file.delete()
+                            }
+                            graphs = loadAvailableGraphs(context)
+                            if (selected == target) selected = null
+                        }
+                        deleteTarget = null
+                    },
+                ) {
+                    Text("Delete", color = Color(0xFFEF5350), fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) {
+                    Text(stringResource(R.string.common_cancel), color = Color(0xFF9E9E9E))
+                }
+            },
+        )
+    }
 
     // Rename dialog
     renameTarget?.let { target ->
@@ -53,7 +95,7 @@ fun GraphSelectorScreen(
                             fileName = newFile.name,
                             filePath = newFile.absolutePath,
                         )
-                        graphs = graphs.map { if (it == target) updatedEntry else it }
+                        graphs = loadAvailableGraphs(context)
                         if (selected == target) selected = updatedEntry
                     }
                 }
@@ -129,6 +171,9 @@ fun GraphSelectorScreen(
                             onClick = { selected = entry },
                             onLongClick = if (!entry.isAsset) {
                                 { renameTarget = entry }
+                            } else null,
+                            onDelete = if (!entry.isAsset) {
+                                { deleteTarget = entry }
                             } else null,
                         )
                     }
@@ -223,6 +268,7 @@ private fun GraphEntryCard(
     isSelected: Boolean,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
+    onDelete: (() -> Unit)? = null,
 ) {
     val borderColor = if (isSelected) Color(0xFF2196F3) else Color(0xFF2A2A2A)
     val bgColor     = if (isSelected) Color(0xFF0D2A3E) else Color(0xFF1A1A1A)
@@ -291,9 +337,17 @@ fun loadAvailableGraphs(context: Context): List<GraphEntry> {
     val result = mutableListOf<GraphEntry>()
 
     val graphsDir = File(context.filesDir, "graphs")
+    android.util.Log.d("GraphLoader", "graphsDir path: ${graphsDir.absolutePath}")
+    android.util.Log.d("GraphLoader", "graphsDir exists: ${graphsDir.exists()}")
+    
     if (graphsDir.exists()) {
-        graphsDir.listFiles { f -> f.extension == "json" }
-            ?.sortedByDescending { it.lastModified() }
+        val files = graphsDir.listFiles { f -> f.extension == "json" }
+        android.util.Log.d("GraphLoader", "Found ${files?.size ?: 0} JSON files in graphs dir")
+        files?.forEach { file ->
+            android.util.Log.d("GraphLoader", "  - ${file.name}")
+        }
+        
+        files?.sortedByDescending { it.lastModified() }
             ?.forEach { file ->
                 result.add(GraphEntry(
                     fileName = file.name,
@@ -301,12 +355,15 @@ fun loadAvailableGraphs(context: Context): List<GraphEntry> {
                     isAsset = false,
                 ))
             }
+    } else {
+        android.util.Log.w("GraphLoader", "graphs directory does not exist!")
     }
 
     try {
-        context.assets.list("")
-            ?.filter { it.endsWith(".json") }
-            ?.forEach { name ->
+        val assetFiles = context.assets.list("")?.filter { it.endsWith(".json") }
+        android.util.Log.d("GraphLoader", "Found ${assetFiles?.size ?: 0} JSON files in assets")
+        
+        assetFiles?.forEach { name ->
                 if (result.none { it.fileName == name }) {
                     result.add(GraphEntry(
                         fileName = name,
@@ -315,7 +372,10 @@ fun loadAvailableGraphs(context: Context): List<GraphEntry> {
                     ))
                 }
             }
-    } catch (_: Exception) {}
+    } catch (e: Exception) {
+        android.util.Log.e("GraphLoader", "Error loading assets", e)
+    }
 
+    android.util.Log.d("GraphLoader", "Total graphs loaded: ${result.size}")
     return result
 }

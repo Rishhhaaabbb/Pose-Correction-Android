@@ -169,6 +169,12 @@ class OfflineGraphGeneratorImpl @Inject constructor(
             transitionBuffer = config.transitionBuffer,
             toleranceMultiplier = config.toleranceMultiplier,
         )
+        
+        android.util.Log.d("GraphGenerator", "StateDiscovery params:")
+        android.util.Log.d("GraphGenerator", "  stabilityThreshold: ${stateDiscovery.stabilityThreshold}")
+        android.util.Log.d("GraphGenerator", "  mergeThreshold: ${stateDiscovery.mergeThreshold}")
+        android.util.Log.d("GraphGenerator", "  minHoldFrames: ${stateDiscovery.minHoldFrames}")
+        android.util.Log.d("GraphGenerator", "  smoothingWindow: ${stateDiscovery.smoothingWindow}")
 
         // Matches Python:
         //   states = self.state_discovery.discover_states(feature_sequence, fps, keypoints)

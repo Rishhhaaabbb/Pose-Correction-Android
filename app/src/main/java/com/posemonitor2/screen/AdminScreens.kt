@@ -17,17 +17,14 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
@@ -50,20 +47,15 @@ fun LibraryScreen(
     var pendingVideoUri by remember { mutableStateOf<Uri?>(null) }
     var capturedVideoFile by remember { mutableStateOf<File?>(null) }
 
-    // Theme-aware colors — use MaterialTheme, never isSystemInDarkTheme()
-    val isDark      = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val bgColor     = MaterialTheme.colorScheme.background
-    val surfaceColor  = MaterialTheme.colorScheme.surface
-    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
-    val tealColor   = MaterialTheme.colorScheme.primary
-    val mutedColor  = MaterialTheme.colorScheme.onSurfaceVariant
-    val actionColor = if (isDark) Color(0xFF4DB6AC) else Color(0xFF0D4A4E)
-    val actionOnColor = if (isDark) Color.Black else Color.White
-
     val videoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        if (uri != null) pendingVideoUri = uri
+        if (uri != null) {
+            android.util.Log.d("LibraryScreen", "Video selected: $uri")
+            viewModel.reset()  // Ensure clean state
+            pendingVideoUri = uri
+            android.util.Log.d("LibraryScreen", "State reset, pendingVideoUri set")
+        }
     }
 
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -71,20 +63,37 @@ fun LibraryScreen(
     ) { success ->
         if (success && capturedVideoFile != null) {
             pendingVideoUri = Uri.fromFile(capturedVideoFile)
+        } else {
+            capturedVideoFile = null
         }
+    }
+
+    var showError by remember { mutableStateOf<String?>(null) }
+
+    if (showError != null) {
+        AlertDialog(
+            onDismissRequest = { showError = null },
+            title = { Text("Camera Error") },
+            text = { Text(showError ?: "") },
+            confirmButton = {
+                TextButton(onClick = { showError = null }) {
+                    Text("OK")
+                }
+            }
+        )
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(bgColor)
+            .background(Color(0xFFF2EEE4))
             .padding(16.dp),
         contentAlignment = Alignment.Center
     ) {
         when (val state = uiState) {
             is GenerationUiState.Idle -> {
+                android.util.Log.d("LibraryScreen", "State is Idle, pendingVideoUri=$pendingVideoUri")
                 if (pendingVideoUri == null) {
-                    // ── Upload / record picker ────────────────────────────────
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -93,24 +102,21 @@ fun LibraryScreen(
                             text = "Admin Video Library",
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = tealColor
+                            color = Color(0xFF0A3D3F)
                         )
                         Text(
                             text = "Upload or record an exercise video to automatically generate a pose graph.",
                             fontSize = 14.sp,
-                            color = mutedColor,
+                            color = Color(0xFF888888),
                             modifier = Modifier.padding(horizontal = 32.dp),
-                            textAlign = TextAlign.Center
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
-
+                        
                         Button(
                             onClick = { videoPicker.launch("video/*") },
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = actionColor,
-                                contentColor = actionOnColor,
-                            )
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D4A4E))
                         ) {
                             Icon(Icons.Default.FileUpload, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
@@ -119,220 +125,178 @@ fun LibraryScreen(
 
                         OutlinedButton(
                             onClick = {
-                                val file = File(
-                                    context.cacheDir,
-                                    "captured_video_${System.currentTimeMillis()}.mp4"
-                                )
-                                capturedVideoFile = file
-                                val uri = FileProvider.getUriForFile(
-                                    context,
-                                    "${context.packageName}.provider",
-                                    file
-                                )
-                                cameraLauncher.launch(uri)
+                                try {
+                                    val file = File(context.cacheDir, "captured_video_${System.currentTimeMillis()}.mp4")
+                                    capturedVideoFile = file
+                                    val uri = FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.provider",
+                                        file
+                                    )
+                                    cameraLauncher.launch(uri)
+                                } catch (e: Exception) {
+                                    showError = "Camera launch failed: ${e.message}"
+                                }
                             },
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(12.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, actionColor),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = actionColor)
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0D4A4E)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF0D4A4E))
                         ) {
                             Icon(Icons.Default.CameraAlt, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Record with Camera")
+                            Text("Choose Camera (Record)")
                         }
                     }
                 } else {
-                    // ── Confirm graph name before generating ──────────────────
-                    var graphName by remember { mutableStateOf("") }
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            "Confirm Graph Details",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = onSurfaceColor
-                        )
-                        OutlinedTextField(
-                            value = graphName,
-                            onValueChange = { graphName = it },
-                            label = { Text("Exercise Name (Optional)") },
-                            placeholder = { Text("e.g. squat, bird-dog", color = mutedColor) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = onSurfaceColor,
-                                unfocusedTextColor = onSurfaceColor,
-                                focusedBorderColor = tealColor,
-                                unfocusedBorderColor = mutedColor
+                    // Show full parameter settings
+                    android.util.Log.d("LibraryScreen", "Showing SettingsContent")
+                    SettingsContent(
+                        videoUri = pendingVideoUri.toString(),
+                        onConfirm = { config, graphName ->
+                            viewModel.startGeneration(
+                                videoUri = pendingVideoUri.toString(),
+                                config = config,
+                                graphName = graphName
                             )
-                        )
-                        Button(
-                            onClick = {
-                                viewModel.startGeneration(
-                                    videoUri = pendingVideoUri.toString(),
-                                    config = GeneratorConfig.DEFAULT,
-                                    graphName = graphName
-                                )
-                                pendingVideoUri = null
-                            },
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = tealColor)
-                        ) {
-                            Text("Generate Graph", color = MaterialTheme.colorScheme.onPrimary)
+                        },
+                        onBack = { 
+                            pendingVideoUri = null
+                            viewModel.reset()
                         }
-                        TextButton(onClick = { pendingVideoUri = null }) {
-                            Text("Cancel", color = mutedColor)
-                        }
-                    }
+                    )
                 }
             }
-
             is GenerationUiState.Processing -> {
-                // ── Progress ──────────────────────────────────────────────────
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    CircularProgressIndicator(
-                        progress = { state.progressFraction },
-                        color = tealColor,
-                        modifier = Modifier.size(72.dp),
-                        strokeWidth = 6.dp,
-                    )
-                    Text(
-                        state.message,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = onSurfaceColor
-                    )
-                    Text(
-                        state.detail,
-                        fontSize = 13.sp,
-                        color = mutedColor,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 24.dp)
-                    )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(progress = { state.progressFraction })
+                    Spacer(Modifier.height(16.dp))
+                    Text(state.message, fontWeight = FontWeight.Bold)
+                    Text(state.detail, fontSize = 12.sp, color = Color.Gray)
                 }
             }
-
             is GenerationUiState.Success -> {
-                // ── Success — show name + direct navigation to exercise ───────
-                val exerciseName = remember(state.outputPath) {
-                    File(state.outputPath).nameWithoutExtension
-                        .replace("-", " ")
-                        .replaceFirstChar { it.uppercase() }
+                val fileName = remember(state.outputPath) {
+                    state.outputPath.substringAfterLast("/").substringBeforeLast(".")
                 }
-
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = surfaceColor,
-                    shadowElevation = 4.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                
+                val graph = remember(state.outputPath) {
+                    runCatching {
+                        PoseGraph.fromJson(File(state.outputPath).readText(Charsets.UTF_8))
+                    }.getOrNull()
+                }
+                
+                var showVisualization by remember { mutableStateOf(false) }
+                
+                if (showVisualization && graph != null) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF1A1A1A))
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            TextButton(onClick = { showVisualization = false }) {
+                                Text("← Back", color = Color(0xFF2196F3), fontSize = 15.sp)
+                            }
+                            Text(
+                                text = "Graph Visualization",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White,
+                            )
+                        }
+                        PoseGraphVisualizationScreen(graph = graph)
+                    }
+                } else {
                     Column(
-                        modifier = Modifier.padding(28.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("✅", fontSize = 48.sp)
-                        Text(
-                            "Graph Generated!",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF4CAF50)
-                        )
-                        Text(
-                            exerciseName,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = tealColor,
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            "${state.numStates} states  •  ${state.numFrames} frames",
-                            fontSize = 13.sp,
-                            color = mutedColor
-                        )
-
-                        Spacer(Modifier.height(8.dp))
-
-                        // Primary: go straight to the Exercises tab to start working out
+                        Text("✅ Success!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
+                        Text("Graph saved to library.", fontSize = 14.sp)
+                        
+                        Spacer(Modifier.height(16.dp))
+                        
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFF5F5F5),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Filename", fontSize = 13.sp, color = Color.Gray)
+                                    Text(fileName, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("States", fontSize = 13.sp, color = Color.Gray)
+                                    Text("${state.numStates}", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Valid Frames", fontSize = 13.sp, color = Color.Gray)
+                                    Text("${state.numFrames}", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        }
+                        
+                        Spacer(Modifier.height(16.dp))
+                        
                         Button(
                             onClick = {
-                                viewModel.reset()
-                                navController.navigate(UserRoute.Exercises.route) {
-                                    popUpTo(UserRoute.Home.route)
-                                    launchSingleTop = true
+                                if (graph != null) {
+                                    showVisualization = true
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            enabled = graph != null,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(52.dp),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = tealColor)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF37474F),
+                                contentColor = Color.White,
+                                disabledContainerColor = Color(0xFF2A2A2A),
+                                disabledContentColor = Color(0xFF666666)
+                            ),
                         ) {
-                            Icon(
-                                Icons.Default.FitnessCenter,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                "Go to Exercise",
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Text("View Graph", fontSize = 15.sp, fontWeight = FontWeight.Medium)
                         }
-
-                        // Secondary: stay in the library and generate another
-                        OutlinedButton(
+                        
+                        Spacer(Modifier.height(8.dp))
+                        
+                        Button(
                             onClick = { viewModel.reset() },
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(52.dp),
                             shape = RoundedCornerShape(12.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, mutedColor)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2196F3),
+                                contentColor = Color.White
+                            ),
                         ) {
-                            Text("Generate Another", color = mutedColor)
+                            Text("Generate Another", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
             }
-
             is GenerationUiState.Error -> {
-                // ── Error ─────────────────────────────────────────────────────
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = surfaceColor,
-                    shadowElevation = 4.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(28.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text("❌", fontSize = 48.sp)
-                        Text(
-                            "Generation Failed",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        Text(
-                            state.detail,
-                            fontSize = 13.sp,
-                            color = mutedColor,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Button(
-                            onClick = { viewModel.reset() },
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = tealColor)
-                        ) {
-                            Text("Try Again", color = MaterialTheme.colorScheme.onPrimary)
-                        }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("❌ Error", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Red)
+                    Text(state.detail, fontSize = 14.sp)
+                    Spacer(Modifier.height(24.dp))
+                    Button(onClick = { viewModel.reset() }) {
+                        Text("Try Again")
                     }
                 }
             }
@@ -348,13 +312,57 @@ fun GraphsScreen(
     var graphs by remember { mutableStateOf(loadAvailableGraphs(context)) }
     var selectedGraph by remember { mutableStateOf<GraphEntry?>(null) }
     var graphPendingDelete by remember { mutableStateOf<GraphEntry?>(null) }
-
-    val isDark         = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val bgColor        = MaterialTheme.colorScheme.background
-    val surfaceColor   = MaterialTheme.colorScheme.surface
-    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
-    val tealColor      = MaterialTheme.colorScheme.primary
-    val mutedColor     = MaterialTheme.colorScheme.onSurfaceVariant
+    var graphPendingRename by remember { mutableStateOf<GraphEntry?>(null) }
+    
+    // Refresh graphs when returning to this screen
+    DisposableEffect(Unit) {
+        onDispose {
+            // Reload graphs when leaving to ensure fresh state on return
+            graphs = loadAvailableGraphs(context)
+        }
+    }
+    
+    // Rename dialog
+    graphPendingRename?.let { entry ->
+        var newName by remember { mutableStateOf(entry.fileName.removeSuffix(".json")) }
+        
+        AlertDialog(
+            onDismissRequest = { graphPendingRename = null },
+            title = { Text("Rename Graph") },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Graph Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val trimmed = newName.trim()
+                        if (trimmed.isNotEmpty() && !entry.isAsset) {
+                            val oldFile = File(entry.filePath)
+                            val newFile = File(oldFile.parent, "$trimmed.json")
+                            if (oldFile.renameTo(newFile)) {
+                                graphs = loadAvailableGraphs(context)
+                            }
+                        }
+                        graphPendingRename = null
+                    },
+                    enabled = newName.trim().isNotEmpty()
+                ) {
+                    Text("Rename")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { graphPendingRename = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     if (selectedGraph != null) {
         val entry = selectedGraph!!
@@ -369,26 +377,21 @@ fun GraphsScreen(
             }.getOrNull()
         }
 
-        Column(modifier = Modifier.fillMaxSize().background(bgColor)) {
+        Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = { selectedGraph = null }) {
-                    Text("← Back", color = tealColor)
+                    Text("← Back")
                 }
-                Text(
-                    entry.fileName.removeSuffix(".json"),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = onSurfaceColor
-                )
+                Text(entry.fileName.removeSuffix(".json"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
             }
             if (graph != null) {
                 PoseGraphVisualizationScreen(graph = graph)
             } else {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Failed to load graph", color = MaterialTheme.colorScheme.error)
+                    Text("Failed to load graph", color = Color.Red)
                 }
             }
         }
@@ -396,7 +399,7 @@ fun GraphsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(bgColor)
+                .background(Color(0xFFF2EEE4))
                 .padding(16.dp)
         ) {
             Row(
@@ -408,36 +411,51 @@ fun GraphsScreen(
                     "Pose Graphs Library",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    color = tealColor
+                    color = Color(0xFF0A3D3F)
                 )
 
                 if (graphPendingDelete != null) {
-                    IconButton(
-                        onClick = {
-                            val file = File(graphPendingDelete!!.filePath)
-                            if (file.exists()) {
-                                file.delete()
-                                graphs = loadAvailableGraphs(context)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Rename button (only for non-assets)
+                        if (!graphPendingDelete!!.isAsset) {
+                            IconButton(
+                                onClick = {
+                                    graphPendingRename = graphPendingDelete
+                                    graphPendingDelete = null
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add, // Using Add as placeholder for rename/edit
+                                    contentDescription = "Rename Graph",
+                                    tint = Color(0xFF2196F3)
+                                )
                             }
-                            graphPendingDelete = null
                         }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete Graph",
-                            tint = Color(0xFFE85A2E)
-                        )
+                        
+                        // Delete button
+                        IconButton(
+                            onClick = {
+                                val file = File(graphPendingDelete!!.filePath)
+                                if (file.exists()) {
+                                    file.delete()
+                                }
+                                graphs = loadAvailableGraphs(context)
+                                graphPendingDelete = null
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete Graph",
+                                tint = Color(0xFFE85A2E)
+                            )
+                        }
                     }
                 }
             }
 
             if (graphs.isEmpty()) {
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    Text(
-                        "No graphs yet. Generate some from the Library tab.",
-                        color = mutedColor,
-                        textAlign = TextAlign.Center
-                    )
+                    Text("No graphs yet. Generate some from the Library tab.", color = Color.Gray)
                 }
             } else {
                 LazyColumn(
@@ -463,14 +481,13 @@ fun GraphsScreen(
                                         }
                                     },
                                     onLongClick = {
-                                        if (!entry.isAsset) graphPendingDelete = entry
+                                        if (!entry.isAsset) {
+                                            graphPendingDelete = entry
+                                        }
                                     }
                                 ),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isPendingDelete)
-                                    (if (isDark) Color(0xFF3E2723) else Color(0xFFFFF3E0))
-                                else
-                                    surfaceColor
+                                containerColor = if (isPendingDelete) Color(0xFFFFF3E0) else Color.White
                             )
                         ) {
                             Row(
@@ -480,16 +497,8 @@ fun GraphsScreen(
                                 Text(if (entry.isAsset) "📦" else "📊", fontSize = 24.sp)
                                 Spacer(Modifier.width(16.dp))
                                 Column {
-                                    Text(
-                                        entry.fileName.removeSuffix(".json"),
-                                        fontWeight = FontWeight.Bold,
-                                        color = onSurfaceColor
-                                    )
-                                    Text(
-                                        if (entry.isAsset) "System Provided" else "Generated",
-                                        fontSize = 12.sp,
-                                        color = mutedColor
-                                    )
+                                    Text(entry.fileName.removeSuffix(".json"), fontWeight = FontWeight.Bold)
+                                    Text(if (entry.isAsset) "System Provided" else "Generated", fontSize = 12.sp, color = Color.Gray)
                                 }
                             }
                         }

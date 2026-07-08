@@ -75,6 +75,37 @@ fun ExercisesScreen(
     val drawableByExerciseId = uiState.drawableByExerciseId
     val preloadedThumbnails = uiState.preloadedThumbnails
     val filteredExercises by viewModel.filteredExercises.collectAsState()
+    
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val navBackStackEntry = navController.currentBackStackEntry
+    
+    // Create a key that changes on every navigation to force refresh
+    val refreshKey = remember {
+        derivedStateOf {
+            navBackStackEntry?.destination?.route
+        }
+    }.value
+    
+    // Refresh graphs when screen becomes visible (not just on creation)
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            android.util.Log.d("ExercisesScreen", "Lifecycle event: $event")
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                android.util.Log.d("ExercisesScreen", "ON_RESUME - calling refreshGraphs()")
+                viewModel.refreshGraphs()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+    
+    // Refresh when navigating to this screen or when route changes
+    LaunchedEffect(refreshKey) {
+        android.util.Log.d("ExercisesScreen", "LaunchedEffect triggered for route: $refreshKey")
+        viewModel.refreshGraphs()
+    }
 
     // Refresh graph file list whenever this screen becomes visible (e.g. after
     // returning from the Library tab where a new graph may have been generated)
@@ -324,12 +355,19 @@ fun ExercisesScreen(
                     isDeletable = isDeletable,
                     onLongPress = { deleteTarget = exercise },
                     onClick = {
+                        android.util.Log.d("ExercisesScreen", "Clicked exercise: ${exercise.name}, id: ${exercise.id}")
+                        android.util.Log.d("ExercisesScreen", "Looking for graph: ${exercise.name}.json")
+                        android.util.Log.d("ExercisesScreen", "Graph entry: $graphEntry")
+                        android.util.Log.d("ExercisesScreen", "Available graphs: ${graphsByFileName.keys}")
+                        
                         if (graphEntry != null) {
                             val cat = exercise.category?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
                             val diff = exercise.difficulty?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
                             navController.navigate(
                                 "exercise_detail/${graphEntry.fileName}/${graphEntry.isAsset}?index=0&exerciseList=${exercise.name}&category=$cat&difficulty=$diff"
                             )
+                        } else {
+                            android.util.Log.e("ExercisesScreen", "Graph entry is NULL for exercise ${exercise.name}")
                         }
                     }
                 )

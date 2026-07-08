@@ -104,6 +104,10 @@
     <string name="gs_graph_name_placeholder">Graph name</string>
     <string name="gs_bundled">Bundled</string>
     <string name="gs_generated_hold_rename">Generated · hold to rename</string>
+    <string name="gs_delete_graph">Delete Graph</string>
+    <string name="gs_delete_confirm">Are you sure you want to delete this graph?</string>
+
+    <string name="common_delete">Delete</string>
 
     <string name="admin_home_title">PoseMonitor</string>
     <string name="admin_home_subtitle">Real-time exercise pose analysis</string>

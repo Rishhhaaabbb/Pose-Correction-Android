@@ -662,12 +662,39 @@ class DebugViewModel @Inject constructor(
     // ── Graph loading ─────────────────────────────────────────────────────────
 
     private fun loadGraph(context: Context, entry: GraphEntry): PoseGraph {
-        return if (entry.isAsset) {
-            val json = context.assets.open(entry.fileName).bufferedReader().readText()
-            PoseGraph.fromJson(json)
-        } else {
-            val json = File(entry.filePath).readText(Charsets.UTF_8)
-            PoseGraph.fromJson(json)
+        return try {
+            if (entry.isAsset) {
+                val json = context.assets.open(entry.fileName).bufferedReader().readText()
+                PoseGraph.fromJson(json)
+            } else {
+                val file = File(entry.filePath)
+                android.util.Log.d(TAG, "Loading custom graph:")
+                android.util.Log.d(TAG, "  fileName: ${entry.fileName}")
+                android.util.Log.d(TAG, "  filePath: ${entry.filePath}")
+                android.util.Log.d(TAG, "  file.exists(): ${file.exists()}")
+                android.util.Log.d(TAG, "  file.absolutePath: ${file.absolutePath}")
+                android.util.Log.d(TAG, "  file.parentFile.exists(): ${file.parentFile?.exists()}")
+                
+                if (!file.exists()) {
+                    throw IllegalStateException("Graph file not found: ${entry.filePath}")
+                }
+                val json = file.readText(Charsets.UTF_8)
+                if (json.isBlank()) {
+                    throw IllegalStateException("Graph file is empty: ${entry.filePath}")
+                }
+                val graph = PoseGraph.fromJson(json)
+                
+                // Validate the graph
+                val validation = graph.validate()
+                if (validation is com.core.poseengine.model.ValidationResult.Invalid) {
+                    Log.w(TAG, "Graph validation warnings for ${entry.fileName}: ${validation.errors}")
+                }
+                
+                graph
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load graph ${entry.fileName}: ${e.message}", e)
+            throw IllegalStateException("Failed to load graph ${entry.fileName}: ${e.message}", e)
         }
     }
 

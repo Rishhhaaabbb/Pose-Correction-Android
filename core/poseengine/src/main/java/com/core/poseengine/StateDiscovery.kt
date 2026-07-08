@@ -1,7 +1,6 @@
 package com.core.poseengine
 
 import com.core.poseengine.model.*
-import kotlin.math.abs
 
 /**
  * Discovers pose states from a sequence of extracted features.
@@ -29,9 +28,9 @@ import kotlin.math.abs
  *
  * @param stabilityThreshold  Maximum mean normalized distance for a frame to
  *   be considered "still in the same segment" as the segment reference.
- *   Default 0.10 matches Python default.
+ *   Default 0.15 matches Python default.
  * @param minHoldFrames       A segment is only emitted if it spans at least
- *   this many frames. Default 12 matches Python default.
+ *   this many frames. Default 15 matches Python default.
  * @param smoothingWindow     Rolling average window size. Default 5.
  * @param transitionBuffer    Frames skipped after a segment boundary to ignore
  *   transition motion. Default 3.
@@ -43,15 +42,15 @@ import kotlin.math.abs
  *   treated as symmetric and do not trigger the veto gate. Default 5.0.
  */
 class StateDiscovery(
-    val stabilityThreshold: Double = 0.10,
-    val minHoldFrames: Int = 12,
+    val stabilityThreshold: Double = 0.15,
+    val minHoldFrames: Int = 15,
     val smoothingWindow: Int = 5,
     val transitionBuffer: Int = 3,
     val toleranceMultiplier: Double = 2.0,
     mergeThreshold: Double? = null,
     val asymmetryVetoMinMagnitude: Double = 5.0,
 ) {
-    val mergeThreshold: Double = mergeThreshold ?: stabilityThreshold * 0.5
+    val mergeThreshold: Double = mergeThreshold ?: stabilityThreshold
 
     // ── Primary entry point ───────────────────────────────────────────────────
 
@@ -116,39 +115,30 @@ class StateDiscovery(
         val window = ArrayDeque<RawFeatureMap>(smoothingWindow)
         val result = ArrayList<RawFeatureMap>(featureSequence.size)
 
-        // Optimization: Maintain running sums and counts per key to achieve O(N*K) complexity
-        val runningSums = mutableMapOf<FeatureKey, Double>()
-        val runningCounts = mutableMapOf<FeatureKey, Int>()
-
         for (frame in featureSequence) {
             if (frame.isEmpty) {
+                // Matches Python: if not features: smoothed.append({}); continue
                 result.add(RawFeatureMap.EMPTY)
                 continue
             }
 
             // Evict oldest entry when window is full
-            if (window.size == smoothingWindow) {
-                val oldest = window.removeFirst()
-                for ((key, value) in oldest.map) {
-                    runningSums[key] = (runningSums[key] ?: 0.0) - value
-                    runningCounts[key] = (runningCounts[key] ?: 1) - 1
-                }
-            }
-
-            // Add newest entry
+            // Matches Python: deque(maxlen=self.smoothing_window) auto-eviction
+            if (window.size == smoothingWindow) window.removeFirst()
             window.addLast(frame)
-            for ((key, value) in frame.map) {
-                runningSums[key] = (runningSums[key] ?: 0.0) + value
-                runningCounts[key] = (runningCounts[key] ?: 0) + 1
-            }
 
             // Compute rolling mean for each key
-            val smoothedFrame = buildMap<FeatureKey, Double>(allKeys.size) {
+            val smoothedFrame = buildMap<FeatureKey, Double> {
                 for (key in allKeys) {
-                    val count = runningCounts[key] ?: 0
-                    if (count > 0) {
-                        put(key, (runningSums[key] ?: 0.0) / count)
+                    // Collect values from current window (only frames that have this key)
+                    // Matches Python: values = [f[fname] for f in window if fname in f]
+                    var sum = 0.0
+                    var count = 0
+                    for (windowFrame in window) {
+                        val v = windowFrame[key]
+                        if (v != null) { sum += v; count++ }
                     }
+                    if (count > 0) put(key, sum / count)
                 }
             }
             result.add(RawFeatureMap(smoothedFrame))
@@ -414,11 +404,14 @@ class StateDiscovery(
         canonicalStates: List<CanonicalState>,
     ): Int? {
         for (canonical in canonicalStates) {
-            if (asymmetryVeto(segmentFeatures, canonical.meanFeatures)) continue
+            // Stage 1: asymmetry veto
 
+            // Stage 2: distance check
             val distance = DistanceCalculator.compute(segmentFeatures, canonical.meanFeatures)
+            println("StateDiscovery: Distance to State ${canonical.stateId}: $distance (threshold: $mergeThreshold)")
             if (distance <= mergeThreshold) return canonical.stateId
         }
+        println("StateDiscovery: No match found, creating new state")
         return null
     }
 
@@ -435,22 +428,7 @@ class StateDiscovery(
      * magnitude threshold, so the veto does NOT fire — matching Python's
      * setdefault(key, 0.0) behavior.
      */
-    private val asymmetryKeys = FeatureKey.entries.filter { it.isAsymmetry }
 
-    internal fun asymmetryVeto(
-        segmentFeatures: RawFeatureMap,
-        canonicalFeatures: RawFeatureMap,
-    ): Boolean {
-        for (key in asymmetryKeys) {
-            val sv = segmentFeatures[key] ?: 0.0
-            val cv = canonicalFeatures[key] ?: 0.0
-            if (abs(sv) >= asymmetryVetoMinMagnitude &&
-                abs(cv) >= asymmetryVetoMinMagnitude &&
-                sv * cv < 0.0
-            ) return true
-        }
-        return false
-    }
 
     // ── Statistical helpers ───────────────────────────────────────────────────
 
