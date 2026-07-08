@@ -130,10 +130,16 @@ class ProgressViewModel @Inject constructor(
             .take(5)
             .map { session ->
                 val minutes = (session.durationSec / 60).coerceAtLeast(1)
+                val isPartial = session.status != com.domain.model.SessionStatus.COMPLETED
+                val completionPercent = if (isPartial && (session.targetReps ?: 0) > 0) {
+                    ((session.totalReps ?: 0) * 100 / session.targetReps!!).coerceIn(0, 99)
+                } else 100
                 RecentSessionUiItem(
                     title = session.exerciseName?.takeIf(String::isNotBlank),
                     startedAtEpochMs = session.startedAtEpochMs,
                     durationMinutes = minutes,
+                    isPartial = isPartial,
+                    completionPercent = completionPercent,
                 )
             }
 
@@ -262,4 +268,6 @@ data class RecentSessionUiItem(
     val title: String?,
     val startedAtEpochMs: Long,
     val durationMinutes: Int,
+    val isPartial: Boolean = false,
+    val completionPercent: Int = 100,
 )

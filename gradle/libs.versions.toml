@@ -45,6 +45,8 @@ coroutinesTest          = "1.10.2"
 mockk                   = "1.14.2"
 appcompat = "1.7.1"
 material = "1.13.0"
+workManager = "2.10.1"
+hiltWork = "1.2.0"
 
 [libraries]
 # ── Kotlin stdlib ─────────────────────────────────────────────────────────────
@@ -128,6 +130,9 @@ test-kotlin                     = { module = "org.jetbrains.kotlin:kotlin-test",
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 javax-inject = { module = "javax.inject:javax.inject", version = "1" }
+work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workManager" }
+hilt-work = { module = "androidx.hilt:hilt-work", version.ref = "hiltWork" }
+hilt-work-compiler = { module = "androidx.hilt:hilt-compiler", version.ref = "hiltWork" }
 
 [plugins]
 android-application             = { id = "com.android.application",                    version.ref = "agp" }

@@ -1,16 +1,21 @@
 package com.data.remote.firebase
 
+import android.util.Log
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** Thrown when a write is attempted without a signed-in Firebase user. */
+class UnauthenticatedException(message: String = "No authenticated Firebase user") : Exception(message)
+
 @Singleton
 class FirebaseRemoteClient @Inject constructor(
     private val firestore: FirebaseFirestore,
 ) {
-    // ΓöÇΓöÇ Collections ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // ── Collections ────────────────────────────────────────────────────────
     private val profiles get() = firestore.collection("profiles")
     private val sessions get() = firestore.collection("workout_sessions")
     private val sessionMetrics get() = firestore.collection("session_metrics")
@@ -18,9 +23,17 @@ class FirebaseRemoteClient @Inject constructor(
     private val dailyStats get() = firestore.collection("daily_stats")
     private val onboardingResponses get() = firestore.collection("onboarding_responses")
 
-    // ΓöÇΓöÇ Profiles ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // ── Auth guard ────────────────────────────────────────────────────────
+    private fun requireFirebaseAuth() {
+        if (FirebaseAuth.getInstance().currentUser == null) {
+            throw UnauthenticatedException()
+        }
+    }
+
+    // ── Profiles ──────────────────────────────────────────────────────────
 
     suspend fun fetchProfile(userId: String): FirestoreProfileDto? {
+        Log.d(TAG, "fetchProfile: userId=$userId")
         val snapshot = profiles.document(userId).get().await()
         if (!snapshot.exists()) return null
         val data = snapshot.data ?: return null
@@ -38,52 +51,71 @@ class FirebaseRemoteClient @Inject constructor(
     }
 
     suspend fun upsertProfile(dto: FirestoreProfileDto) {
+        requireFirebaseAuth()
+        Log.d(TAG, "upsertProfile: id=${dto.id}")
         profiles.document(dto.id)
             .set(dto.toMap().filterValues { it != null }, SetOptions.merge())
             .await()
+        Log.i(TAG, "upsertProfile: succeeded — id=${dto.id}")
     }
 
-    // ΓöÇΓöÇ Workout Sessions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // ── Workout Sessions ──────────────────────────────────────────────────
 
     suspend fun insertSession(dto: FirestoreSessionDto) {
+        requireFirebaseAuth()
+        Log.d(TAG, "insertSession: id=${dto.id}")
         sessions.document(dto.id)
             .set(dto.toMap().filterValues { it != null }, SetOptions.merge())
             .await()
+        Log.i(TAG, "insertSession: succeeded — id=${dto.id}")
     }
 
-    // ΓöÇΓöÇ Session Metrics ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // ── Session Metrics ───────────────────────────────────────────────────
 
     suspend fun upsertSessionMetric(dto: FirestoreSessionMetricDto) {
+        requireFirebaseAuth()
+        Log.d(TAG, "upsertSessionMetric: id=${dto.id}")
         sessionMetrics.document(dto.id)
             .set(dto.toMap(), SetOptions.merge())
             .await()
+        Log.i(TAG, "upsertSessionMetric: succeeded — id=${dto.id}")
     }
 
-    // ΓöÇΓöÇ Pose Graphs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // ── Pose Graphs ───────────────────────────────────────────────────────
 
     suspend fun upsertPoseGraph(dto: FirestorePoseGraphDto) {
+        requireFirebaseAuth()
+        Log.d(TAG, "upsertPoseGraph: id=${dto.id}")
         poseGraphs.document(dto.id)
             .set(dto.toMap().filterValues { it != null }, SetOptions.merge())
             .await()
+        Log.i(TAG, "upsertPoseGraph: succeeded — id=${dto.id}")
     }
 
-    // ΓöÇΓöÇ Daily Stats ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // ── Daily Stats ───────────────────────────────────────────────────────
 
     suspend fun upsertDailyStat(dto: FirestoreDailyStatDto) {
+        requireFirebaseAuth()
+        Log.d(TAG, "upsertDailyStat: id=${dto.id}")
         dailyStats.document(dto.id)
             .set(dto.toMap(), SetOptions.merge())
             .await()
+        Log.i(TAG, "upsertDailyStat: succeeded — id=${dto.id}")
     }
 
-    // ΓöÇΓöÇ Onboarding Responses ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // ── Onboarding Responses ──────────────────────────────────────────────
 
     suspend fun upsertOnboardingResponse(dto: FirestoreOnboardingDto) {
+        requireFirebaseAuth()
+        Log.d(TAG, "upsertOnboardingResponse: userId=${dto.user_id}")
         onboardingResponses.document(dto.user_id)
             .set(dto.toMap().filterValues { it != null }, SetOptions.merge())
             .await()
+        Log.i(TAG, "upsertOnboardingResponse: succeeded — userId=${dto.user_id}")
     }
 
     suspend fun fetchOnboardingResponse(userId: String): FirestoreOnboardingDto? {
+        Log.d(TAG, "fetchOnboardingResponse: userId=$userId")
         val snapshot = onboardingResponses.document(userId).get().await()
         if (!snapshot.exists()) return null
         val data = snapshot.data ?: return null
@@ -106,5 +138,9 @@ class FirebaseRemoteClient @Inject constructor(
             is_completed = (data["is_completed"] as? Boolean) ?: false,
             updated_at = (data["updated_at"] as? Long) ?: 0L,
         )
+    }
+
+    companion object {
+        private const val TAG = "FirebaseRemoteClient"
     }
 }
