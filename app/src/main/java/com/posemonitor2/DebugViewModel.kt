@@ -474,15 +474,23 @@ class DebugViewModel @Inject constructor(
         val target = targetReps.value
         val currentReps = status.repsCompleted
         val isTargetReached = currentReps >= target
-        
+
         // Don't save if already saved OR if target not yet reached
         if (completionPersisted || !isTargetReached) return
 
+<<<<<<< Updated upstream
         // Mark immediately to prevent duplicate saves from rapid frame callbacks
         completionPersisted = true
 
         viewModelScope.launch {
             // Use currentUserId if already set, otherwise wait for auth
+=======
+        // Mark before launching coroutine to prevent duplicate saves from rapid frame callbacks
+        completionPersisted = true
+
+        viewModelScope.launch {
+            // Use currentUserId if already set; otherwise read directly from auth repository
+>>>>>>> Stashed changes
             val userId: String = currentUserId?.takeIf { it.isNotBlank() }
                 ?: authRepository.observeSession().first()?.id?.takeIf { it.isNotBlank() }
                 ?: DEFAULT_USER_ID
@@ -669,7 +677,7 @@ class DebugViewModel @Inject constructor(
         val avgAccuracy = if (accuracies.isNotEmpty()) accuracies.average() * 100 else 0.0
         val target = targetReps.value
         val exerciseName = graphEntry.fileName?.removeSuffix(".json") ?: "pose-session"
-        
+
         val calories = if (totalReps > 0) (totalReps * 2.5 * (avgAccuracy / 100.0)).toInt() else 0
 
         viewModelScope.launch {
