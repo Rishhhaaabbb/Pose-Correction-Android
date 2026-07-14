@@ -64,13 +64,28 @@ data class ExerciseResult(
     val targetReps: Int,
     val accuracy: Int,
     val calories: Int
-)
+) : java.io.Serializable
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val viewModel: DebugViewModel by viewModels()
     private lateinit var voiceManager: VoiceManager
+
+    companion object {
+        private val tempSessionResults = mutableListOf<ExerciseResult>()
+
+        fun setSessionResults(results: List<ExerciseResult>) {
+            tempSessionResults.clear()
+            tempSessionResults.addAll(results)
+        }
+
+        fun getAndClearSessionResults(): List<ExerciseResult> {
+            val results = tempSessionResults.toList()
+            tempSessionResults.clear()
+            return results
+        }
+    }
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()

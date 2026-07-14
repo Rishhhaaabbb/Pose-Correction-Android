@@ -55,6 +55,7 @@ sealed class UserRoute(val route: String, val labelResId: Int, val icon: ImageVe
 private val userBottomNavItems = listOf(
     UserRoute.Home,
     UserRoute.Exercises,
+    UserRoute.CustomWorkout,
     UserRoute.Progress,
     UserRoute.Profile,
 )
@@ -62,6 +63,7 @@ private val userBottomNavItems = listOf(
 private val adminBottomNavItems = listOf(
     UserRoute.Home,
     UserRoute.Exercises,
+    UserRoute.CustomWorkout,
     UserRoute.Progress,
     UserRoute.Graphs,
     UserRoute.Profile,
