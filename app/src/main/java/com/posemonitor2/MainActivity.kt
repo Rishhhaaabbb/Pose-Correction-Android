@@ -263,6 +263,7 @@ private fun MainNavigation(
     val initialworkoutId = initialIntent.getStringExtra("EXTRA_WORKOUT_ID")
     val initialExerciseIndex = initialIntent.getIntExtra("EXTRA_CURRENT_INDEX", 0)
     val initialExerciseList = initialIntent.getStringExtra("EXTRA_EXERCISE_LIST")
+    val initialTargetRepsMap = initialIntent.getStringExtra("EXTRA_TARGET_REPS_MAP")
 
     var selectedGraph by remember { mutableStateOf<GraphEntry?>(
         initialFileName?.let { fn ->
@@ -283,6 +284,7 @@ private fun MainNavigation(
     var workoutId by remember { mutableStateOf(initialworkoutId) }
     var exerciseIndex by remember { mutableIntStateOf(initialExerciseIndex) }
     var exerciseList by remember { mutableStateOf(initialExerciseList?.split(",")?.filter { it.isNotBlank() } ?: emptyList()) }
+    var targetRepsMapStr by remember { mutableStateOf(initialTargetRepsMap) }
 
     // If we started with an intent that requested auto-start, apply those settings once
     LaunchedEffect(initialFileName) {
@@ -299,6 +301,7 @@ private fun MainNavigation(
             workoutId = initialIntent.getStringExtra("EXTRA_WORKOUT_ID")
             exerciseIndex = initialIntent.getIntExtra("EXTRA_CURRENT_INDEX", 0)
             exerciseList = initialIntent.getStringExtra("EXTRA_EXERCISE_LIST")?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+            targetRepsMapStr = initialIntent.getStringExtra("EXTRA_TARGET_REPS_MAP")
             
             initialIntent.removeExtra("EXTRA_FILE_NAME")
             initialIntent.removeExtra("EXTRA_IS_ASSET")
@@ -307,6 +310,7 @@ private fun MainNavigation(
             initialIntent.removeExtra("EXTRA_WORKOUT_ID")
             initialIntent.removeExtra("EXTRA_CURRENT_INDEX")
             initialIntent.removeExtra("EXTRA_EXERCISE_LIST")
+            initialIntent.removeExtra("EXTRA_TARGET_REPS_MAP")
             
             if (initialIntent.hasExtra("EXTRA_LOCK_ORIENTATION")) {
                 shouldLockOrientation = initialIntent.getBooleanExtra("EXTRA_LOCK_ORIENTATION", false)
@@ -332,6 +336,7 @@ private fun MainNavigation(
             workoutId = intent.getStringExtra("EXTRA_WORKOUT_ID")
             exerciseIndex = intent.getIntExtra("EXTRA_CURRENT_INDEX", 0)
             exerciseList = intent.getStringExtra("EXTRA_EXERCISE_LIST")?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+            targetRepsMapStr = intent.getStringExtra("EXTRA_TARGET_REPS_MAP")
 
             intent.removeExtra("EXTRA_FILE_NAME")
             intent.removeExtra("EXTRA_IS_ASSET")
@@ -340,6 +345,7 @@ private fun MainNavigation(
             intent.removeExtra("EXTRA_WORKOUT_ID")
             intent.removeExtra("EXTRA_CURRENT_INDEX")
             intent.removeExtra("EXTRA_EXERCISE_LIST")
+            intent.removeExtra("EXTRA_TARGET_REPS_MAP")
             
             if (intent.hasExtra("EXTRA_LOCK_ORIENTATION")) {
                 shouldLockOrientation = intent.getBooleanExtra("EXTRA_LOCK_ORIENTATION", false)
@@ -464,9 +470,16 @@ private fun MainNavigation(
                         sessionResults.add(currentResult)
                         viewModel.stopPipeline()
                         val nextExercise = exerciseList[nextIdx]
+                        // Parse targetRepsMap to get reps for the next exercise
+                        val nextTargetReps = targetRepsMapStr?.let { mapStr ->
+                            mapStr.split(",").mapNotNull { entry ->
+                                val parts = entry.split(":")
+                                if (parts.size == 2) parts[0].trim() to (parts[1].trim().toIntOrNull() ?: 10) else null
+                            }?.toMap()?.get(nextExercise)
+                        } ?: targetReps
                         val intent = Intent(context, UserFlowActivity::class.java).apply {
                             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                            putExtra("TARGET_ROUTE", "exercise_detail/$nextExercise.json/true?workoutId=${workoutId ?: ""}&index=$nextIdx&exerciseList=${exerciseList.joinToString(",")}")
+                            putExtra("TARGET_ROUTE", "exercise_detail/$nextExercise.json/true?workoutId=${workoutId ?: ""}&index=$nextIdx&exerciseList=${exerciseList.joinToString(",")}&targetReps=${nextTargetReps ?: 10}&targetRepsMap=${targetRepsMapStr ?: ""}")
                         }
                         context.startActivity(intent)
                         (context as? Activity)?.finish()

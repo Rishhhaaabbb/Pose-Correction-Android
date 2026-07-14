@@ -336,9 +336,12 @@ fun CustomWorkoutEditorScreen(
                             val exerciseNames = uiState.selectedExercises.map { it.name }
                             val exerciseListStr = exerciseNames.joinToString(",")
                             
-                            // Build targetRepsMap for the workout
+                            // Build targetRepsMap for the workout (name:reps,name:reps,...)
                             val targetRepsForFirst = uiState.selectedExerciseTargetReps[uiState.selectedExercises.first().id]
-                            val targetRepsMap = uiState.selectedExercises.associate { it.id to (uiState.selectedExerciseTargetReps[it.id] ?: 12) }
+                            val targetRepsMap = uiState.selectedExercises.joinToString(",") { ex ->
+                                val reps = uiState.selectedExerciseTargetReps[ex.id] ?: 12
+                                "${ex.name}:$reps"
+                            }
                             
                             navController.navigate(
                                 "exercise_detail/${graphEntry.fileName}/${graphEntry.isAsset}?workoutId=$workoutId&index=0&exerciseList=$exerciseListStr&targetReps=$targetRepsForFirst&targetRepsMap=$targetRepsMap"

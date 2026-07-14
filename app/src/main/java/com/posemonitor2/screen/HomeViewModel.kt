@@ -14,6 +14,7 @@ import com.domain.repository.WorkoutSessionRepository
 import com.domain.usecase.GetRecommendedExercisesUseCase
 import com.domain.usecase.ObserveProfileUseCase
 import com.domain.usecase.ObserveWorkoutSessionsUseCase
+import com.domain.usecase.RefreshProfileUseCase
 import com.domain.usecase.RestoreSessionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -35,6 +36,7 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModel @Inject constructor(
     private val restoreSessionUseCase: RestoreSessionUseCase,
+    private val refreshProfileUseCase: RefreshProfileUseCase,
     private val observeProfileUseCase: ObserveProfileUseCase,
     private val observeWorkoutSessionsUseCase: ObserveWorkoutSessionsUseCase,
     private val authRepository: AuthRepository,
@@ -56,7 +58,6 @@ class HomeViewModel @Inject constructor(
             restoreSessionUseCase()
         }
 
-        // ΓöÇΓöÇ Profile + session stream ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         viewModelScope.launch {
             authRepository.observeSession()
                 .collect { authUser ->
@@ -72,6 +73,8 @@ class HomeViewModel @Inject constructor(
                             _uiState.value = newState
                         }
                     } else {
+                        // Fetch profile from Firestore into Room before observing
+                        refreshProfileUseCase(userId)
                         combine(
                             observeProfileUseCase(userId),
                             observeWorkoutSessionsUseCase(userId, limit = 100),
