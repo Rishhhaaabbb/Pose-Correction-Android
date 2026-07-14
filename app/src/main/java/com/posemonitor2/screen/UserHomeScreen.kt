@@ -50,12 +50,11 @@ import com.posemonitor2.onboarding.OnboardingActivity
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.SelfImprovement
 
-// ΓöÇΓöÇ Design tokens ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 private val BgCream     = Color(0xFFF2EEE4)
-private val TealDark    = Color(0xFF0A3D3F)
-private val TealChip    = Color(0xFF0D4A4E)
 private val Yellow      = Color(0xFFE8B840)
 private val Orange      = Color(0xFFE85A2E)
+private val TealDark    = Color(0xFF0A3D3F)
+private val TealChip    = Color(0xFF0D4A4E)
 private val TextDark    = Color(0xFF1A1A1A)
 private val TextGray    = Color(0xFF888888)
 private val CardWhite   = Color.White

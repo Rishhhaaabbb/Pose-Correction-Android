@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -69,6 +70,8 @@ fun ExerciseDetailScreen(
     // Auto-start flag for custom workout mode
     val isCustomWorkoutMode = targetReps != null
     var hasAutoStarted by rememberSaveable(fileName, targetReps) { mutableStateOf(false) }
+
+    BackHandler { onBack() }
     
     val videoAssetPath = fileName.removeSuffix(".json") + ".mp4"
     val displayName = fileName.removeSuffix(".json").replace("-", " ").uppercase()

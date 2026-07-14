@@ -245,6 +245,10 @@ fun ProfileScreen(
                     Spacer(Modifier.width(16.dp))
                     Column {
                         Text(uiState.displayName, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = onBackground, fontFamily = FontFamily.Serif)
+                        val email = uiState.email
+                        if (!email.isNullOrBlank()) {
+                            Text(email, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = textGray)
+                        }
                         Text(uiState.memberSince, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textGray, letterSpacing = 1.sp)
                     }
                 }
@@ -672,10 +676,10 @@ private fun EditProfileDialog(
             decorFitsSystemWindows = false,
         ),
     ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxSize().imePadding(), contentAlignment = Alignment.Center) {
             Surface(shape = RoundedCornerShape(12.dp), tonalElevation = 8.dp, modifier = Modifier
                 .fillMaxWidth(0.92f)
-                .height(520.dp)) {
+                .heightIn(max = 520.dp)) {
             Column(modifier = Modifier
                 .fillMaxSize()
                 .imePadding()

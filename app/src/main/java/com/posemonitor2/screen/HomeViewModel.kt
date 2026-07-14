@@ -122,10 +122,12 @@ class HomeViewModel @Inject constructor(
         val subtitle = buildGreetingSubtitle(answers)
         val dailyGoal = answers.dailyPracticeMinutes ?: 20
 
-        _uiState.value = _uiState.value.copy(
+        val currentState = _uiState.value
+        _uiState.value = currentState.copy(
             recommendedExercises = recs,
             greetingSubtitle = subtitle,
             dailyGoalMinutes = dailyGoal,
+            dailyGoalProgress = computeGoalProgress(currentState.todayMinutesDone, dailyGoal),
         )
     }
 

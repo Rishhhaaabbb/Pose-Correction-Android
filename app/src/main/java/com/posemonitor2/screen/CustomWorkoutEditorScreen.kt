@@ -286,17 +286,8 @@ fun CustomWorkoutEditorScreen(
 
             Button(
                 onClick = {
-                    val savedId = viewModel.saveCustomWorkout()
-                    
-                    // If this was a new workout, navigate to the editor with the actual workout ID
-                    // This ensures the URL reflects the real workout and reloading will work correctly
-                    if (uiState.isNewCustomWorkout) {
-                        navController.navigate(customWorkoutEditorRoute(savedId)) {
-                            popUpTo(customWorkoutEditorRoute(NEW_WORKOUT_ID)) { inclusive = true }
-                        }
-                    }
-                    
                     coroutineScope.launch {
+                        viewModel.saveCustomWorkout()
                         snackbarHostState.showSnackbar(
                             context.getString(R.string.CustomWorkout_saved_message)
                         )
@@ -338,15 +329,21 @@ fun CustomWorkoutEditorScreen(
                         }
                     } else {
                         // Save the workout and get its ID
-                        val workoutId = viewModel.saveCustomWorkout()
-                        
-                        // Get all exercise names for the sequence
-                        val exerciseNames = uiState.selectedExercises.map { it.name }
-                        val exerciseListStr = exerciseNames.joinToString(",")
-                        
-                        navController.navigate(
-                            "exercise_detail/${graphEntry.fileName}/${graphEntry.isAsset}?workoutId=$workoutId&index=0&exerciseList=$exerciseListStr"
-                        )
+                        coroutineScope.launch {
+                            val workoutId = viewModel.saveCustomWorkout()
+                            
+                            // Get all exercise names for the sequence
+                            val exerciseNames = uiState.selectedExercises.map { it.name }
+                            val exerciseListStr = exerciseNames.joinToString(",")
+                            
+                            // Build targetRepsMap for the workout
+                            val targetRepsForFirst = uiState.selectedExerciseTargetReps[uiState.selectedExercises.first().id]
+                            val targetRepsMap = uiState.selectedExercises.associate { it.id to (uiState.selectedExerciseTargetReps[it.id] ?: 12) }
+                            
+                            navController.navigate(
+                                "exercise_detail/${graphEntry.fileName}/${graphEntry.isAsset}?workoutId=$workoutId&index=0&exerciseList=$exerciseListStr&targetReps=$targetRepsForFirst&targetRepsMap=$targetRepsMap"
+                            )
+                        }
                     }
                 },
                 enabled = !uiState.isLoading && uiState.selectedExercises.isNotEmpty(),

@@ -232,7 +232,7 @@ fun UserFlowNavigation() {
             }
             // ... remainder same
             composable(
-                "exercise_detail/{fileName}/{isAsset}?workoutId={workoutId}&index={index}&exerciseList={exerciseList}&category={category}&difficulty={difficulty}",
+                "exercise_detail/{fileName}/{isAsset}?workoutId={workoutId}&index={index}&exerciseList={exerciseList}&category={category}&difficulty={difficulty}&targetReps={targetReps}&targetRepsMap={targetRepsMap}",
                 enterTransition = { fadeIn(animationSpec = tween(200)) },
                 exitTransition = { fadeOut(animationSpec = tween(200)) },
             ) { backStack ->
@@ -243,6 +243,8 @@ fun UserFlowNavigation() {
                 val exerciseList = backStack.arguments?.getString("exerciseList")
                 val category     = backStack.arguments?.getString("category")
                 val difficulty   = backStack.arguments?.getString("difficulty")
+                val targetReps   = backStack.arguments?.getString("targetReps")?.toIntOrNull()
+                val targetRepsMap = backStack.arguments?.getString("targetRepsMap")
 
                 ExerciseDetailScreen(
                     fileName = fileName,
@@ -252,6 +254,8 @@ fun UserFlowNavigation() {
                     exerciseList = exerciseList,
                     category = category,
                     difficulty = difficulty,
+                    targetReps = targetReps,
+                    targetRepsMap = targetRepsMap,
                     onBack   = { navController.popBackStack() },
                 )
             }
@@ -306,20 +310,8 @@ private fun UserBottomNavBar(navController: NavController, items: List<UserRoute
                         if (currentRoute != item.route) {
                             navController.popBackStack(item.route, inclusive = false)
                         }
-                    } else if (item.route == UserRoute.Home.route) {
-                        // Going to Home — pop everything off the back stack back to
-                        // Home (inclusive) and navigate fresh so it's never "restored"
-                        // from a stale saved state
-                        navController.navigate(UserRoute.Home.route) {
-                            popUpTo(navController.graph.startDestinationId) {
-                                inclusive = true
-                                saveState = false
-                            }
-                            launchSingleTop = true
-                            restoreState = false
-                        }
                     } else {
-                        // Switch to any other tab — save/restore state so each tab
+                        // Switch to any tab — save/restore state so each tab
                         // remembers its scroll position and back stack
                         navController.navigate(item.route) {
                             popUpTo(navController.graph.startDestinationId) {

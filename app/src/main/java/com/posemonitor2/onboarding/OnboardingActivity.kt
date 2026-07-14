@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -63,6 +65,7 @@ import kotlinx.coroutines.launch
 class OnboardingActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
 
         val mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_INTRO
 
@@ -144,7 +147,7 @@ private fun OnboardingIntroVideoScreen(
         onCompleted()
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
+    Surface(modifier = Modifier.fillMaxSize().systemBarsPadding(), color = Color.Black) {
         Box(modifier = Modifier.fillMaxSize()) {
             ZoomableVideoPlayer(
                 videoAssetPath = "onboarding_intro_30s.mp4",
@@ -274,12 +277,12 @@ private fun OnboardingCarouselScreen(
     val isLastPage = pagerState.currentPage == slides.lastIndex
     var dontShowAgain by rememberSaveable { mutableStateOf(false) }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(modifier = Modifier.fillMaxSize().systemBarsPadding(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Button(
                     onClick = onSkipped,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x334DFFFF)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4DFFFF)),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                 ) {
@@ -292,7 +295,7 @@ private fun OnboardingCarouselScreen(
                             // Reset to first page and replay from beginning
                             scope.launch { pagerState.animateScrollToPage(0) }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x33FFFFFF)),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xDDFFFFFF)),
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                     ) {
@@ -340,7 +343,7 @@ private fun OnboardingCarouselScreen(
                     onClick = onLearnMore,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x33FFFFFF)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xDDFFFFFF)),
                 ) {
                     Icon(Icons.Default.Help, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
@@ -467,7 +470,7 @@ private fun FullTourScreen(onClose: () -> Unit) {
     val isFirst = pagerState.currentPage == 0
     val isLast = pagerState.currentPage == slides.lastIndex
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(modifier = Modifier.fillMaxSize().systemBarsPadding(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier

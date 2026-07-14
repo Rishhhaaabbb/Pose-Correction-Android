@@ -10,6 +10,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
@@ -55,8 +57,8 @@ fun ExercisesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    var selectedDifficulty  by remember { mutableStateOf<String?>(null) }
-    var selectedCategory    by remember { mutableStateOf<String?>(null) }
+    var selectedDifficulty  by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedCategory    by rememberSaveable { mutableStateOf<String?>(null) }
     
     val greeting = getGreeting()
     val userProfile = uiState.userProfile
@@ -108,7 +110,10 @@ fun ExercisesScreen(
         showSkeleton = uiState.isLoading
     }
 
+    val listState = rememberLazyListState()
+
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .background(BgColor)
