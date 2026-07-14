@@ -51,16 +51,19 @@ class ExercisesViewModel @Inject constructor(
     val filteredExercises: StateFlow<List<Exercise>> =
         combine(uiState, _searchQuery, selectedDifficulty, selectedCategory) { state, query, diff, cat ->
             val exercises = state.exercises
-            val trimmedQuery = query.trim()
+            val graphsByFileName = state.graphByFileName
+            
             exercises.filter { exercise ->
-                val normalizedQuery = trimmedQuery.replace("-", " ")
-                val normalizedName  = exercise.name.replace("-", " ")
-                val matchesSearch = trimmedQuery.isBlank() ||
-                    normalizedName.contains(normalizedQuery, ignoreCase = true) ||
-                    (exercise.category?.contains(trimmedQuery, ignoreCase = true) == true)
+                val matchesSearch = query.isBlank() ||
+                    exercise.name.contains(query, ignoreCase = true) ||
+                    (exercise.category?.contains(query, ignoreCase = true) == true)
                 val matchesDifficulty = diff == null || diff == "All Levels" || exercise.difficulty == diff
                 val matchesCategory = cat == null || cat == "All" || exercise.category == cat
-                matchesSearch && matchesDifficulty && matchesCategory
+                
+                // Filter out exercises that don't have a corresponding graph file
+                val hasGraph = graphsByFileName.containsKey("${exercise.name}.json")
+                
+                matchesSearch && matchesDifficulty && matchesCategory && hasGraph
             }
         }.distinctUntilChanged()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -68,7 +71,7 @@ class ExercisesViewModel @Inject constructor(
     init {
         loadExercises()
         loadUserProfile()
-        // loadGraphs is called inside loadExercises() after each exercises emission
+        loadGraphs()
     }
 
     private fun loadExercises() {
@@ -107,20 +110,12 @@ class ExercisesViewModel @Inject constructor(
                     }
                 }
 
-                // Reload graphs on every exercise emission so newly generated
-                // graph files are picked up without requiring an app restart
-                val graphs = withContext(Dispatchers.IO) {
-                    loadAvailableGraphs(getApplication())
-                }
-
                 _uiState.value = _uiState.value.copy(
                     exercises = exercises,
                     categories = categories,
                     difficulties = difficulties,
                     drawableByExerciseId = drawableMap,
                     preloadedThumbnails = thumbnails,
-                    graphs = graphs,
-                    graphByFileName = graphs.associateBy { it.fileName },
                     isLoading = false,
                 )
             }
@@ -160,6 +155,23 @@ class ExercisesViewModel @Inject constructor(
         }
     }
 
+    private fun loadGraphs() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val graphs = loadAvailableGraphs(getApplication())
+            android.util.Log.d("ExercisesViewModel", "Loaded ${graphs.size} graphs: ${graphs.map { it.fileName }}")
+            _uiState.value = _uiState.value.copy(
+                graphs = graphs,
+                graphByFileName = graphs.associateBy { it.fileName },
+            )
+            android.util.Log.d("ExercisesViewModel", "Updated state with graphs")
+        }
+    }
+    
+    fun refreshGraphs() {
+        android.util.Log.d("ExercisesViewModel", "refreshGraphs() called")
+        loadGraphs()
+    }
+
     private fun isAdminEmail(email: String?): Boolean {
         if (email.isNullOrBlank()) return false
         val normalized = email.trim().lowercase().replace(" ", "")
@@ -168,37 +180,6 @@ class ExercisesViewModel @Inject constructor(
 
     fun onSearchQueryChanged(query: String) {
         _searchQuery.value = query
-    }
-
-    /** Call when the screen becomes visible to pick up any newly generated graph files. */
-    fun refreshGraphs() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val graphs = loadAvailableGraphs(getApplication())
-            _uiState.value = _uiState.value.copy(
-                graphs = graphs,
-                graphByFileName = graphs.associateBy { it.fileName },
-            )
-        }
-    }
-
-    /**
-     * Deletes a generated/uploaded exercise — removes it from the DB and deletes
-     * the matching graph file from disk. Built-in (asset) exercises cannot be deleted.
-     */
-    fun deleteExercise(exercise: Exercise) {
-        viewModelScope.launch(Dispatchers.IO) {
-            // Remove from DB
-            exerciseRepository.deleteById(exercise.id)
-
-            // Delete the matching graph file from disk (not assets)
-            val graphsDir = java.io.File(getApplication<Application>().filesDir, "graphs")
-            val candidates = listOf(
-                java.io.File(graphsDir, "${exercise.name}.json"),
-                java.io.File(graphsDir, "${exercise.name.lowercase().replace(" ", "-")}.json"),
-                java.io.File(graphsDir, "${exercise.id}.json"),
-            )
-            candidates.forEach { file -> if (file.exists()) file.delete() }
-        }
     }
 
     fun updateFilters(

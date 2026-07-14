@@ -36,6 +36,23 @@ class AuthRepositoryImpl @Inject constructor(
         // Try to restore dummy session from storage
         val dummySession = sessionTokenStore.readDummySession()
         if (dummySession != null) {
+            android.util.Log.d("AuthRepository", "Restoring dummy session for: ${dummySession.email}")
+            
+            // If this is admin, also sign into Firebase anonymously
+            if (dummySession.email == "admin@poseapp.com" || dummySession.email == "admin") {
+                android.util.Log.d("AuthRepository", "Admin dummy session detected, signing into Firebase...")
+                try {
+                    if (firebaseAuth.currentUser == null) {
+                        val result = firebaseAuth.signInAnonymously().await()
+                        android.util.Log.d("AuthRepository", "✓ Signed into Firebase anonymously: uid=${result.user?.uid}")
+                    } else {
+                        android.util.Log.d("AuthRepository", "Already signed into Firebase: uid=${firebaseAuth.currentUser?.uid}")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("AuthRepository", "✗ Failed to sign into Firebase: ${e.message}", e)
+                }
+            }
+            
             val dummyUser = AuthUser(
                 id = dummySession.userId,
                 email = dummySession.email,
@@ -74,65 +91,44 @@ class AuthRepositoryImpl @Inject constructor(
         authUser
     }
 
-    override suspend fun signInWithEmail(email: String, password: String): Result<AuthUser> {
+    override suspend fun signInWithEmail(email: String, password: String): Result<AuthUser> = runCatching {
         val normalizedEmail = email.trim().lowercase().replace(" ", "")
         val normalizedPassword = password.trim()
         
+        // Special handling for admin - sign into Firebase anonymously to enable Firestore access
         if (normalizedEmail == "admin" || normalizedEmail == "admin@poseapp.com") {
             if (normalizedPassword == "admin") {
+                android.util.Log.d("AuthRepository", "Admin login detected, attempting Firebase anonymous sign-in...")
+                
+                // Sign in anonymously to Firebase so Firestore rules work
+                try {
+                    val result = firebaseAuth.signInAnonymously().await()
+                    android.util.Log.d("AuthRepository", "✓ Admin signed into Firebase anonymously: uid=${result.user?.uid}")
+                } catch (e: Exception) {
+                    android.util.Log.e("AuthRepository", "✗ Failed to sign into Firebase anonymously: ${e.message}", e)
+                    // Continue anyway - admin will work locally but not have Firestore access
+                }
+                
                 val adminUser = AuthUser(id = "admin-dev-id", email = "admin@poseapp.com", fullName = "Admin")
                 setDummySession(adminUser)
-                return Result.success(adminUser)
+                
+                // Verify Firebase auth state
+                val currentUser = firebaseAuth.currentUser
+                android.util.Log.d("AuthRepository", "Firebase currentUser after sign-in: ${currentUser?.uid}, isAnonymous: ${currentUser?.isAnonymous}")
+                
+                return@runCatching adminUser
             }
         }
-
-        return try {
-            val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
-            val authUser = result.user?.toAuthUser()
-                ?: throw IllegalStateException("Sign-in succeeded but user is null")
-            sessionState.value = authUser
-            Result.success(authUser)
-        } catch (e: com.google.firebase.auth.FirebaseAuthInvalidUserException) {
-            Result.failure(Exception("Account doesn't exist"))
-        } catch (e: com.google.firebase.auth.FirebaseAuthInvalidCredentialsException) {
-            // Note: Firebase often returns InvalidCredentials for both wrong email and wrong password 
-            // if enumeration protection is ON. If it's OFF, this usually means wrong password.
-            Result.failure(Exception("Incorrect password"))
-        } catch (e: Exception) {
-            val msg = e.message?.lowercase() ?: ""
-            if (msg.contains("no user") || msg.contains("not found")) {
-                Result.failure(Exception("Account doesn't exist"))
-            } else if (msg.contains("password") || msg.contains("credential")) {
-                Result.failure(Exception("Incorrect password"))
-            } else {
-                Result.failure(e)
-            }
-        }
+        
+        val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
+        val authUser = result.user?.toAuthUser()
+            ?: throw IllegalStateException("Sign-in succeeded but user is null")
+        sessionState.value = authUser
+        authUser
     }
 
-    override suspend fun sendPasswordReset(email: String): Result<Unit> {
-        return try {
-            // Note: If "Email Enumeration Protection" is enabled in Firebase Console,
-            // fetchSignInMethods and sendPasswordResetEmail will always return success
-            // to prevent attackers from finding valid emails.
-            // We try to fetch methods first to see if the user exists.
-            val methods = firebaseAuth.fetchSignInMethodsForEmail(email).await().signInMethods
-            if (methods.isNullOrEmpty()) {
-                return Result.failure(Exception("Account doesn't exist"))
-            }
-
-            firebaseAuth.sendPasswordResetEmail(email).await()
-            Result.success(Unit)
-        } catch (e: com.google.firebase.auth.FirebaseAuthInvalidUserException) {
-            Result.failure(Exception("Account doesn't exist"))
-        } catch (e: Exception) {
-            val msg = e.message?.lowercase() ?: ""
-            if (msg.contains("no user") || msg.contains("not found")) {
-                Result.failure(Exception("Account doesn't exist"))
-            } else {
-                Result.failure(e)
-            }
-        }
+    override suspend fun sendPasswordReset(email: String): Result<Unit> = runCatching {
+        firebaseAuth.sendPasswordResetEmail(email).await()
     }
 
     override suspend fun signOut(): Result<Unit> = runCatching {
