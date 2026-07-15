@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalFoundationApi::class)
+
 package com.posemonitor2.screen
 
 import android.content.Context
@@ -8,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -435,12 +438,14 @@ fun GraphsScreen(
                         // Delete button
                         IconButton(
                             onClick = {
-                                val file = File(graphPendingDelete!!.filePath)
-                                if (file.exists()) {
-                                    file.delete()
+                                graphPendingDelete?.let { target ->
+                                    val file = File(target.filePath)
+                                    if (!target.isAsset && file.exists()) {
+                                        file.delete()
+                                    }
+                                    graphs = loadAvailableGraphs(context)
+                                    graphPendingDelete = null
                                 }
-                                graphs = loadAvailableGraphs(context)
-                                graphPendingDelete = null
                             }
                         ) {
                             Icon(

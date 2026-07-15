@@ -337,9 +337,13 @@ class PoseMonitorEngine(
         feedbackGenerator.updateHistory(features)
 
         if (!accuracyActive) accuracyActive = true
+
+        // Check grace period BEFORE clearing inTransition, so the accuracy
+        // exclusion actually works during the grace window.
+        val wasInGrace = inGracePeriod(now)
         if (inTransition) inTransition = false
 
-        if (!inGracePeriod(now)) {
+        if (!wasInGrace) {
             accuracyFrame = accuracyFrame.withCorrectFrame()
             stateSuccessCounts[stateId] = (stateSuccessCounts[stateId] ?: 0) + 1
         }
@@ -348,7 +352,10 @@ class PoseMonitorEngine(
         maxStreak = maxOf(maxStreak, currentStreak)
         lastWasCorrect = true
 
-        val delta = now - currentStateStartTime
+        val rawDelta = now - currentStateStartTime
+        // Cap delta to prevent frame drops from inflating hold time.
+        // Max 0.5s per frame — beyond that, the stall is likely a pipeline hiccup.
+        val delta = rawDelta.coerceAtMost(0.5)
         currentStateHoldTime += delta
         currentStateStartTime = now
 
@@ -445,7 +452,7 @@ class PoseMonitorEngine(
             currentStateId = currentStateId,
         )
 
-        if (navResult.repCompleted) {
+        if (navResult.repCompleted && !skipped) {
             totalReps++
             val maxReps = config.maxReps
             if (maxReps != null && totalReps >= maxReps) {
