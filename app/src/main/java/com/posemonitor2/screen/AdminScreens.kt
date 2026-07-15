@@ -316,6 +316,7 @@ fun GraphsScreen(
     var selectedGraph by remember { mutableStateOf<GraphEntry?>(null) }
     var graphPendingDelete by remember { mutableStateOf<GraphEntry?>(null) }
     var graphPendingRename by remember { mutableStateOf<GraphEntry?>(null) }
+    var confirmDeleteVisible by remember { mutableStateOf(false) }
     
     // Refresh graphs when returning to this screen
     DisposableEffect(Unit) {
@@ -361,6 +362,45 @@ fun GraphsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { graphPendingRename = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Delete confirmation dialog
+    if (confirmDeleteVisible && graphPendingDelete != null) {
+        AlertDialog(
+            onDismissRequest = {
+                confirmDeleteVisible = false
+                graphPendingDelete = null
+            },
+            title = { Text("Delete Graph", fontWeight = FontWeight.SemiBold) },
+            text = {
+                Text("Delete \"${graphPendingDelete!!.fileName.removeSuffix(".json")}\"? This cannot be undone.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        graphPendingDelete?.let { target ->
+                            val file = File(target.filePath)
+                            if (!target.isAsset && file.exists()) {
+                                file.delete()
+                            }
+                            graphs = loadAvailableGraphs(context)
+                            graphPendingDelete = null
+                        }
+                        confirmDeleteVisible = false
+                    }
+                ) {
+                    Text("Delete", color = Color(0xFFE85A2E))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    confirmDeleteVisible = false
+                    graphPendingDelete = null
+                }) {
                     Text("Cancel")
                 }
             }
@@ -438,13 +478,8 @@ fun GraphsScreen(
                         // Delete button
                         IconButton(
                             onClick = {
-                                graphPendingDelete?.let { target ->
-                                    val file = File(target.filePath)
-                                    if (!target.isAsset && file.exists()) {
-                                        file.delete()
-                                    }
-                                    graphs = loadAvailableGraphs(context)
-                                    graphPendingDelete = null
+                                if (graphPendingDelete != null) {
+                                    confirmDeleteVisible = true
                                 }
                             }
                         ) {
