@@ -144,6 +144,21 @@ class ProgressViewModel @Inject constructor(
             }
 
         val streakInfo = computeStreak(sessions)
+        val activeDays = distinctDayKeys(sessions)
+        val allSessionsUi = sessions.sortedByDescending { it.startedAtEpochMs }.take(200).map { s ->
+            val minutes = (s.durationSec / 60).coerceAtLeast(1)
+            val isPartial = s.status != com.domain.model.SessionStatus.COMPLETED
+            val completionPercent = if ((s.totalReps ?: 0) > 0 && (s.targetReps ?: 0) > 0) {
+                (((s.totalReps ?: 0).toFloat() / (s.targetReps ?: 1)) * 100).toInt().coerceIn(0, 100)
+            } else 100
+            RecentSessionUiItem(
+                title = s.exerciseName,
+                startedAtEpochMs = s.startedAtEpochMs,
+                durationMinutes = minutes,
+                isPartial = isPartial,
+                completionPercent = completionPercent,
+            )
+        }
 
         return ProgressUiState(
             isLoading = false,
@@ -160,6 +175,8 @@ class ProgressViewModel @Inject constructor(
             dailyStreakDays = streakInfo.current,
             bestStreakDays = streakInfo.best,
             recentSessions = recentSessions,
+            allSessions = allSessionsUi,
+            activeDays = activeDays,
         )
     }
 
@@ -250,6 +267,8 @@ data class ProgressUiState(
     val dailyStreakDays: Int = 0,
     val bestStreakDays: Int = 0,
     val recentSessions: List<RecentSessionUiItem> = emptyList(),
+    val allSessions: List<RecentSessionUiItem> = emptyList(),
+    val activeDays: Set<Long> = emptySet(),
 )
 
 enum class StatsRange(val days: Int, val label: String) {

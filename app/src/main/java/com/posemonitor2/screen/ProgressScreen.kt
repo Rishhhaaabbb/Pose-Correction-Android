@@ -3,6 +3,7 @@ package com.posemonitor2.screen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,6 +53,9 @@ fun ProgressScreen(
     } else {
         uiState.weeklyActivity
     }
+
+    var showStreakCalendar by remember { mutableStateOf(false) }
+    var showAllSessions by remember { mutableStateOf(false) }
 
     // Theme-aware colors
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -318,6 +322,7 @@ fun ProgressScreen(
                         colors = listOf(Color(0xFFE85A2E), Color(0xFFE8803E)),
                     ),
                 )
+                .clickable { showStreakCalendar = true }
                 .padding(20.dp),
         ) {
             // Decorative faint triangle / shape top right
@@ -397,7 +402,7 @@ fun ProgressScreen(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = Orange,
-                modifier = Modifier.clickable { },
+                modifier = Modifier.clickable { showAllSessions = true },
             )
         }
 
@@ -417,6 +422,24 @@ fun ProgressScreen(
         }
 
         Spacer(Modifier.height(24.dp))
+    }
+
+    // ── Streak Calendar Bottom Sheet ────────────────────────────────────────
+    if (showStreakCalendar) {
+        StreakCalendarSheet(
+            activeDays = uiState.activeDays,
+            currentStreak = uiState.dailyStreakDays,
+            bestStreak = uiState.bestStreakDays,
+            onDismiss = { showStreakCalendar = false },
+        )
+    }
+
+    // ── All Sessions Bottom Sheet ───────────────────────────────────────────
+    if (showAllSessions) {
+        AllSessionsSheet(
+            sessions = uiState.allSessions,
+            onDismiss = { showAllSessions = false },
+        )
     }
 }
 
@@ -586,4 +609,242 @@ private fun addDays(epochMs: Long, days: Int): Long {
     val c = Calendar.getInstance().apply { timeInMillis = epochMs }
     c.add(Calendar.DAY_OF_YEAR, days)
     return c.timeInMillis
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StreakCalendarSheet(
+    activeDays: Set<Long>,
+    currentStreak: Int,
+    bestStreak: Int,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .padding(bottom = 32.dp),
+        ) {
+            Text(
+                text = "Streak Calendar",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Days you worked out are highlighted",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
+
+            // Summary row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("🔥 $currentStreak", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Orange)
+                    Text("Current", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("🏆 $bestStreak", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Orange)
+                    Text("Best", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            // Calendar grid for the current month
+            val calendar = remember { Calendar.getInstance() }
+            val currentMonth = calendar.get(Calendar.MONTH)
+            val currentYear = calendar.get(Calendar.YEAR)
+
+            Text(
+                text = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(calendar.time),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            // Weekday headers
+            Row(modifier = Modifier.fillMaxWidth()) {
+                listOf("S", "M", "T", "W", "T", "F", "S").forEach { day ->
+                    Text(
+                        text = day,
+                        modifier = Modifier.weight(1f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Calendar days
+            val firstDayCal = Calendar.getInstance().apply {
+                set(currentYear, currentMonth, 1)
+            }
+            val firstDayOfWeek = firstDayCal.get(Calendar.DAY_OF_WEEK) - 1 // 0=Sun
+            val daysInMonth = firstDayCal.getActualMaximum(Calendar.DAY_OF_MONTH)
+
+            val rows = kotlin.math.ceil((firstDayOfWeek + daysInMonth) / 7.0).toInt()
+            var dayCounter = 1 - firstDayOfWeek
+
+            repeat(rows) { row ->
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    repeat(7) { col ->
+                        val dayNum = dayCounter++
+                        if (dayNum in 1..daysInMonth) {
+                            val dayCal = Calendar.getInstance().apply {
+                                set(currentYear, currentMonth, dayNum, 0, 0, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            val dayMs = dayCal.timeInMillis
+                            val isActive = activeDays.contains(dayMs)
+                            val isToday = dayMs == startOfDayMillis(System.currentTimeMillis())
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                                    .padding(2.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when {
+                                            isActive -> Orange
+                                            isToday -> MaterialTheme.colorScheme.surfaceVariant
+                                            else -> Color.Transparent
+                                        }
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = "$dayNum",
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isActive || isToday) FontWeight.Bold else FontWeight.Normal,
+                                    color = when {
+                                        isActive -> Color.White
+                                        isToday -> MaterialTheme.colorScheme.onSurface
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AllSessionsSheet(
+    sessions: List<RecentSessionUiItem>,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+        ) {
+            Text(
+                text = "All Sessions",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "${sessions.size} sessions total",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
+
+            if (sessions.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "No sessions yet",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                androidx.compose.foundation.lazy.LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                ) {
+                    items(sessions.size) { index ->
+                        val session = sessions[index]
+                        val title = session.title?.split('-')?.joinToString(" ") { it.replaceFirstChar(Char::uppercase) } ?: "Workout"
+                        val dateStr = dateFormat.format(Date(session.startedAtEpochMs))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = title,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = dateStr,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "${session.durationMinutes}m",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                if (session.isPartial) {
+                                    Text(
+                                        text = "Partial",
+                                        fontSize = 10.sp,
+                                        color = Orange,
+                                    )
+                                }
+                            }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                    }
+                }
+            }
+        }
+    }
 }

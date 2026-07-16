@@ -60,6 +60,15 @@ private val TextGray    = Color(0xFF888888)
 private val CardWhite   = Color.White
 
 @Composable
+private fun homeBgColor() = MaterialTheme.colorScheme.background
+@Composable
+private fun homeSurfaceColor() = MaterialTheme.colorScheme.surface
+@Composable
+private fun homeTextColor() = MaterialTheme.colorScheme.onBackground
+@Composable
+private fun homeMutedColor() = MaterialTheme.colorScheme.onSurfaceVariant
+
+@Composable
 fun UserHomeScreen(
     navController: NavController,
     onOpenHelp: () -> Unit,
@@ -81,7 +90,7 @@ fun UserHomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgCream)
+            .background(homeBgColor())
             .verticalScroll(rememberScrollState())
             .padding(bottom = 16.dp),
     ) {
@@ -342,7 +351,7 @@ private fun DailyGoalProgressCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardWhite),
+        colors = CardDefaults.cardColors(containerColor = homeSurfaceColor()),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
@@ -587,7 +596,7 @@ private fun RecommendedExerciseCard(
             .width(160.dp)
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardWhite),
+        colors = CardDefaults.cardColors(containerColor = homeSurfaceColor()),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
     ) {
         Column {
@@ -679,7 +688,7 @@ private fun VitalsCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardWhite),
+        colors = CardDefaults.cardColors(containerColor = homeSurfaceColor()),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
         if (!hasData) {

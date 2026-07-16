@@ -51,6 +51,17 @@ private val ChipBorder = Color(0xFFDDDDDD)
 private val CardBg     = Color.White
 
 @Composable
+private fun exercisesBgColor() = MaterialTheme.colorScheme.background
+@Composable
+private fun exercisesSurfaceColor() = MaterialTheme.colorScheme.surface
+@Composable
+private fun exercisesTextColor() = MaterialTheme.colorScheme.onSurface
+@Composable
+private fun exercisesMutedColor() = MaterialTheme.colorScheme.onSurfaceVariant
+@Composable
+private fun exercisesBorderColor() = MaterialTheme.colorScheme.outline
+
+@Composable
 fun ExercisesScreen(
     navController: NavController,
     viewModel: ExercisesViewModel = hiltViewModel(),
@@ -91,7 +102,7 @@ fun ExercisesScreen(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
-            .background(BgColor)
+                .background(exercisesBgColor())
             .statusBarsPadding()
             .padding(horizontal = 20.dp),
         contentPadding = PaddingValues(bottom = 8.dp),
@@ -167,13 +178,13 @@ fun ExercisesScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(28.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = exercisesSurfaceColor(),
+                    unfocusedContainerColor = exercisesSurfaceColor(),
                     focusedBorderColor = TealDark,
-                    unfocusedBorderColor = ChipBorder,
+                    unfocusedBorderColor = exercisesBorderColor(),
                     cursorColor = TealDark,
-                    focusedTextColor = TealDark,
-                    unfocusedTextColor = TealDark,
+                    focusedTextColor = exercisesTextColor(),
+                    unfocusedTextColor = exercisesTextColor(),
                 ),
             )
         }
@@ -257,7 +268,7 @@ fun ExercisesScreen(
                     Text(
                         text = "No exercises found for \"$searchQuery\"",
                         fontSize = 14.sp,
-                        color = GrayText,
+                        color = exercisesMutedColor(),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )
                 }
@@ -299,8 +310,8 @@ private fun FilterChipItem(label: String, selected: Boolean, onClick: () -> Unit
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(50.dp),
-        color = if (selected) TealDark else Color.White,
-        border = if (selected) null else androidx.compose.foundation.BorderStroke(1.dp, ChipBorder),
+        color = if (selected) TealDark else exercisesSurfaceColor(),
+        border = if (selected) null else androidx.compose.foundation.BorderStroke(1.dp, exercisesBorderColor()),
     ) {
         Text(
             label,
@@ -332,7 +343,7 @@ private fun WorkoutCard(
 
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = CardBg,
+                            color = exercisesSurfaceColor(),
         shadowElevation = 3.dp,
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
     ) {
@@ -379,7 +390,7 @@ private fun WorkoutCard(
                 Text(
                     "$difficulty - AI Session",
                     fontSize = 12.sp,
-                    color = GrayText,
+                    color = exercisesMutedColor(),
                 )
             }
 
@@ -405,7 +416,7 @@ private fun WorkoutCard(
 private fun WorkoutCardSkeleton() {
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = CardBg,
+                            color = exercisesSurfaceColor(),
         shadowElevation = 3.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {

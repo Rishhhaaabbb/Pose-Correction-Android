@@ -11,6 +11,7 @@
     <string name="common_chevron_right">›</string>
     <string name="nav_home">होम</string>
     <string name="nav_workout">वर्कआउट</string>
+    <string name="nav_custom_workout">कस्टम</string>
     <string name="nav_stats">आंकड़े</string>
     <string name="nav_profile">प्रोफाइल</string>
     <string name="nav_library">लाइब्रेरी</string>

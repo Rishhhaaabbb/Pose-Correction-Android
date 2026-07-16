@@ -11,6 +11,7 @@
     <string name="common_chevron_right">›</string>
     <string name="nav_home">ಮುಖಪುಟ</string>
     <string name="nav_workout">ವರ್ಕೌಟ್</string>
+    <string name="nav_custom_workout">ಕಸ್ಟಮ್</string>
     <string name="nav_stats">ಅಂಕಿಅಂಶಗಳು</string>
     <string name="nav_profile">ಪ್ರೊಫೈಲ್</string>
     <string name="nav_library">ಲೈಬ್ರರಿ</string>

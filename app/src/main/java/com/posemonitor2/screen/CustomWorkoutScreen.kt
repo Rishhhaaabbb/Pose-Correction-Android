@@ -63,6 +63,15 @@ private val HubOrange = Color(0xFFE85A2E)
 private val HubMuted = Color(0xFF7A7A7A)
 
 @Composable
+private fun hubBgColor() = MaterialTheme.colorScheme.background
+@Composable
+private fun hubSurfaceColor() = MaterialTheme.colorScheme.surface
+@Composable
+private fun hubTextColor() = MaterialTheme.colorScheme.onBackground
+@Composable
+private fun hubMutedColor() = MaterialTheme.colorScheme.onSurfaceVariant
+
+@Composable
 fun CustomWorkoutScreen(
     navController: NavController,
     viewModel: CustomWorkoutViewModel = hiltViewModel(),
@@ -81,7 +90,7 @@ fun CustomWorkoutScreen(
     }
 
     Scaffold(
-        containerColor = HubBg,
+        containerColor = hubBgColor(),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { innerPadding ->
         Column(
@@ -98,14 +107,14 @@ fun CustomWorkoutScreen(
                     Text(
                         text = stringResource(R.string.CustomWorkout_hub_title),
                         style = MaterialTheme.typography.headlineSmall,
-                        color = HubDark,
+                        color = hubTextColor(),
                         fontWeight = FontWeight.ExtraBold,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = stringResource(R.string.CustomWorkout_hub_subtitle),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = HubMuted,
+                        color = hubMutedColor(),
                     )
                 }
                 FilledTonalIconButton(
@@ -228,7 +237,7 @@ private fun CustomWorkoutHubEmptyState(onCreate: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = hubSurfaceColor()),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
         Column(
@@ -270,7 +279,7 @@ private fun CustomWorkoutHubCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = hubSurfaceColor()),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
         Column(

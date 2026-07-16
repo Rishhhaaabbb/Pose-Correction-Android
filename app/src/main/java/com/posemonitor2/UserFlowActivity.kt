@@ -287,6 +287,7 @@ private fun routeToTabRoot(route: String?): String = when {
     route == UserRoute.Exercises.route -> UserRoute.Exercises.route
     route.startsWith("exercise_detail") -> UserRoute.Exercises.route
     route == UserRoute.CustomWorkout.route -> UserRoute.CustomWorkout.route
+    route.startsWith("workout_overview") -> UserRoute.CustomWorkout.route
     route.startsWith(CUSTOM_WORKOUT_EDITOR_ROUTE_PATTERN.substringBefore("{")) -> UserRoute.CustomWorkout.route
     route == UserRoute.Progress.route -> UserRoute.Progress.route
     route == UserRoute.Profile.route -> UserRoute.Profile.route

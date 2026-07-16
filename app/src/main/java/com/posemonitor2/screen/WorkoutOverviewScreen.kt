@@ -3,6 +3,7 @@ package com.posemonitor2.screen
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,12 +33,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -46,10 +50,7 @@ import com.posemonitor2.GraphEntry
 import com.posemonitor2.MainActivity
 import com.posemonitor2.loadAvailableGraphs
 
-private val BgColor = Color(0xFFF4EFE5)
-private val DarkTeal = Color(0xFF0E3E40)
 private val AccentOrange = Color(0xFFE85A2E)
-private val MutedGray = Color(0xFF7A7A7A)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,9 +61,11 @@ fun WorkoutOverviewScreen(
 ) {
     val context = LocalContext.current
     val graphs = remember { loadAvailableGraphs(context) }
+    val uiState by viewModel.uiState.collectAsState()
 
-    val workout = remember(workoutId) { viewModel.getWorkoutById(workoutId) }
-    val exerciseNames = remember(workoutId) { viewModel.getCustomWorkoutExerciseNames(workoutId) ?: emptyList() }
+    // Reactively derive workout data from ViewModel state (which loads asynchronously)
+    val workout = remember(workoutId, uiState) { viewModel.getWorkoutById(workoutId) }
+    val exerciseNames = remember(workoutId, uiState) { viewModel.getCustomWorkoutExerciseNames(workoutId) ?: emptyList() }
 
     val totalReps = remember(exerciseNames, workoutId) {
         exerciseNames.sumOf { name ->
@@ -80,14 +83,14 @@ fun WorkoutOverviewScreen(
     }
 
     Scaffold(
-        containerColor = BgColor,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         text = workout?.title ?: "Workout",
                         fontWeight = FontWeight.Bold,
-                        color = DarkTeal,
+                        color = MaterialTheme.colorScheme.onBackground,
                     )
                 },
                 navigationIcon = {
@@ -95,11 +98,11 @@ fun WorkoutOverviewScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = DarkTeal,
+                            tint = MaterialTheme.colorScheme.onBackground,
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgColor),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
     ) { innerPadding ->
@@ -127,7 +130,7 @@ fun WorkoutOverviewScreen(
                 text = "Exercises",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = DarkTeal,
+                color = MaterialTheme.colorScheme.onBackground,
             )
 
             Spacer(Modifier.height(12.dp))
@@ -145,7 +148,7 @@ fun WorkoutOverviewScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     ) {
                         Row(
@@ -154,19 +157,20 @@ fun WorkoutOverviewScreen(
                                 .padding(horizontal = 16.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            // Number badge
-                            Text(
-                                text = "${index + 1}",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
+                            // Number badge - centered in circle
+                            Box(
                                 modifier = Modifier
                                     .size(28.dp)
                                     .background(AccentOrange, CircleShape),
-                                // center the number
-                            )
-                            // Hack: center the number in the circle
-                            // Actually let's just use a Box approach
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = "${index + 1}",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                )
+                            }
                             Spacer(Modifier.width(14.dp))
 
                             Column(modifier = Modifier.weight(1f)) {
@@ -174,7 +178,7 @@ fun WorkoutOverviewScreen(
                                     text = displayName,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = DarkTeal,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
                                 if (!hasGraph) {
                                     Text(
@@ -265,7 +269,7 @@ private fun SummaryChip(label: String, value: String) {
         Text(
             text = label,
             fontSize = 12.sp,
-            color = MutedGray,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

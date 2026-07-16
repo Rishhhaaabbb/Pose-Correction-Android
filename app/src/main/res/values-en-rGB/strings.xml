@@ -11,6 +11,7 @@
     <string name="common_chevron_right">›</string>
     <string name="nav_home">HOME</string>
     <string name="nav_workout">WORKOUT</string>
+    <string name="nav_custom_workout">CUSTOM</string>
     <string name="nav_stats">STATS</string>
     <string name="nav_profile">PROFILE</string>
     <string name="nav_library">LIBRARY</string>
