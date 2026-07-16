@@ -362,14 +362,15 @@ private fun UserBottomNavBar(navController: NavController, items: List<UserRoute
                 icon  = {
                     Icon(
                         if (selected) when (item) {
-                            UserRoute.Home        -> Icons.Filled.Home
-                            UserRoute.Exercises   -> Icons.Filled.FitnessCenter
-                            UserRoute.Progress    -> Icons.Filled.BarChart
-                            UserRoute.Profile     -> Icons.Filled.Person
-                            UserRoute.Library     -> Icons.Filled.VideoLibrary
-                            UserRoute.Graphs      -> Icons.Filled.AutoGraph
-                            UserRoute.AdminStats  -> Icons.Filled.Analytics
-                            else                  -> item.icon
+                            UserRoute.Home          -> Icons.Filled.Home
+                            UserRoute.Exercises     -> Icons.Filled.FitnessCenter
+                            UserRoute.CustomWorkout -> Icons.Filled.EmojiEvents
+                            UserRoute.Progress      -> Icons.Filled.BarChart
+                            UserRoute.Profile       -> Icons.Filled.Person
+                            UserRoute.Library       -> Icons.Filled.VideoLibrary
+                            UserRoute.Graphs        -> Icons.Filled.AutoGraph
+                            UserRoute.AdminStats    -> Icons.Filled.Analytics
+                            else                    -> item.icon
                         } else item.icon,
                         contentDescription = stringResource(item.labelResId),
                     )
