@@ -799,21 +799,14 @@ private fun BmiDetailDialog(
     onDismiss: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
-        Box(
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
             modifier = Modifier
-                .fillMaxSize()
-                .clickable(enabled = false) { }
-                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(24.dp)),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .padding(24.dp),
         ) {
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-            ) {
                 Column(
                     modifier = Modifier.padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -851,7 +844,6 @@ private fun BmiDetailDialog(
             }
         }
     }
-}
 
 @Composable
 private fun BmiGauge(bmi: Double) {
