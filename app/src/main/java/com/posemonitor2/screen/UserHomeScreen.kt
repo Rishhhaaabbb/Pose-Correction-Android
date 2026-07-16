@@ -33,6 +33,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -836,43 +838,6 @@ private fun BmiDetailDialog(
 
                     BmiGauge(bmi = bmi)
 
-                    Spacer(Modifier.height(20.dp))
-
-                    val bmiCategory = when {
-                        bmi < 18.5 -> stringResource(R.string.home_bmi_underweight)
-                        bmi < 25.0 -> stringResource(R.string.home_bmi_normal)
-                        bmi < 30.0 -> stringResource(R.string.home_bmi_overweight)
-                        else -> stringResource(R.string.home_bmi_obese)
-                    }
-                    val bmiCategoryColor = when {
-                        bmi < 18.5 -> Color(0xFF2196F3)
-                        bmi < 25.0 -> Color(0xFF4CAF50)
-                        bmi < 30.0 -> Color(0xFFFF9800)
-                        else -> Color(0xFFF44336)
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(50.dp),
-                        color = bmiCategoryColor.copy(alpha = 0.12f),
-                    ) {
-                        Text(
-                            text = bmiCategory,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = bmiCategoryColor,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                        )
-                    }
-
-                    Spacer(Modifier.height(16.dp))
-
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                        BmiRangeRow(label = stringResource(R.string.home_bmi_underweight), range = "< 18.5", color = Color(0xFF2196F3), active = bmi < 18.5)
-                        BmiRangeRow(label = stringResource(R.string.home_bmi_normal), range = "18.5 – 24.9", color = Color(0xFF4CAF50), active = bmi in 18.5..<25.0)
-                        BmiRangeRow(label = stringResource(R.string.home_bmi_overweight), range = "25 – 29.9", color = Color(0xFFFF9800), active = bmi in 25.0..<30.0)
-                        BmiRangeRow(label = stringResource(R.string.home_bmi_obese), range = "≥ 30", color = Color(0xFFF44336), active = bmi >= 30.0)
-                    }
-
                     if (weightKg != null && targetWeightKg != null) {
                         Spacer(Modifier.height(16.dp))
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -901,7 +866,7 @@ private fun BmiGauge(bmi: Double) {
     LaunchedEffect(bmi) {
         animProgress.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 800, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            animationSpec = tween(durationMillis = 900, easing = androidx.compose.animation.core.FastOutSlowInEasing),
         )
     }
     LaunchedEffect(bmi) {
@@ -916,38 +881,39 @@ private fun BmiGauge(bmi: Double) {
     LaunchedEffect(bmi) {
         animNumber.animateTo(
             targetValue = clampedBmi.toFloat(),
-            animationSpec = tween(durationMillis = 800, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            animationSpec = tween(durationMillis = 900, easing = androidx.compose.animation.core.FastOutSlowInEasing),
         )
     }
 
     val displayedBmi = animNumber.value
 
+    val segments = listOf(
+        Triple(Color(0xFF2196F3), "Underweight", Pair(180f, 225f)),
+        Triple(Color(0xFF4CAF50), "Normal", Pair(225f, 270f)),
+        Triple(Color(0xFFFF9800), "Overweight", Pair(270f, 315f)),
+        Triple(Color(0xFFF44336), "Obese", Pair(315f, 360f)),
+    )
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp),
+            .height(220.dp),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(130.dp)
+                .height(180.dp)
                 .align(Alignment.Center),
         ) {
-            val strokeWidth = 28.dp.toPx()
+            val strokeWidth = 32.dp.toPx()
             val radius = (size.minDimension - strokeWidth) / 2
             val center = Offset(size.width / 2, size.height)
+            val totalSweep = 180f * animProgress.value
 
-            val arcData = listOf(
-                Triple(Color(0xFF2196F3), 180f, 210f),
-                Triple(Color(0xFF4CAF50), 210f, 240f),
-                Triple(Color(0xFFFF9800), 240f, 270f),
-                Triple(Color(0xFFF44336), 270f, 300f),
-            )
-
-            val totalSweep = 120f * animProgress.value
-
-            for ((color, segStart, segEnd) in arcData) {
+            for ((color, label, range) in segments) {
+                val segStart = range.first
+                val segEnd = range.second
                 val visibleEnd = minOf(segEnd, 180f + totalSweep)
                 val visibleSweep = (visibleEnd - segStart).coerceAtLeast(0f)
 
@@ -957,33 +923,58 @@ private fun BmiGauge(bmi: Double) {
                         startAngle = segStart,
                         sweepAngle = visibleSweep,
                         useCenter = false,
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Butt),
                         topLeft = Offset(center.x - radius, center.y - radius),
                         size = Size(radius * 2, radius * 2),
                     )
                 }
             }
 
-            val needleAngle = 180f + animNeedle.value * 120f
-            val needleLength = radius - 8.dp.toPx()
+            val needleAngle = 180f + animNeedle.value * 180f
+            val needleLength = radius - 2.dp.toPx()
             val needleRad = Math.toRadians(needleAngle.toDouble())
             val needleEnd = Offset(
                 x = center.x + needleLength * cos(needleRad).toFloat(),
                 y = center.y + needleLength * sin(needleRad).toFloat(),
             )
 
-            drawCircle(
-                color = onSurfaceColor,
-                radius = 6.dp.toPx(),
-                center = center,
-            )
             drawLine(
                 color = onSurfaceColor,
                 start = center,
                 end = needleEnd,
-                strokeWidth = 3.dp.toPx(),
+                strokeWidth = 2.5.dp.toPx(),
                 cap = StrokeCap.Round,
             )
+
+            drawCircle(
+                color = onSurfaceColor,
+                radius = 5.dp.toPx(),
+                center = center,
+            )
+            drawCircle(
+                color = Color.White,
+                radius = 2.5.dp.toPx(),
+                center = center,
+            )
+
+            for ((color, label, range) in segments) {
+                val midAngle = Math.toRadians(((range.first + range.second) / 2).toDouble())
+                val labelRadius = radius + strokeWidth / 2 + 14.dp.toPx()
+                val labelX = center.x + labelRadius * cos(midAngle).toFloat()
+                val labelY = center.y + labelRadius * sin(midAngle).toFloat()
+
+                drawIntoCanvas { canvas ->
+                    canvas.nativeCanvas.apply {
+                        val paint = android.graphics.Paint().apply {
+                            this.color = android.graphics.Color.parseColor("#666666")
+                            textSize = 9.dp.toPx()
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            isAntiAlias = true
+                        }
+                        drawText(label, labelX, labelY + 3.dp.toPx(), paint)
+                    }
+                }
+            }
         }
 
         Column(
@@ -992,42 +983,18 @@ private fun BmiGauge(bmi: Double) {
         ) {
             Text(
                 text = String.format("%.1f", displayedBmi),
-                fontSize = 28.sp,
+                fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = "BMI",
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 letterSpacing = 1.sp,
             )
         }
-    }
-}
-
-@Composable
-private fun BmiRangeRow(label: String, range: String, color: Color, active: Boolean) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                if (active) color.copy(alpha = 0.08f) else Color.Transparent,
-                RoundedCornerShape(8.dp)
-            )
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(color),
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(label, fontSize = 13.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-        Text(range, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
