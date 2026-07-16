@@ -1375,12 +1375,27 @@ private fun BarRepCounter(
             ) {
                 // Fractional count: 3/10
                 Row(verticalAlignment = Alignment.Bottom) {
+                    // Animated rep count - scale pop on increment
+                    var lastReps by remember { mutableIntStateOf(repsCompleted) }
+                    val animatedRepScale by animateFloatAsState(
+                        targetValue = if (repsCompleted != lastReps) 1.15f else 1f,
+                        animationSpec = tween(200),
+                        label = "rep_pop"
+                    )
+                    LaunchedEffect(repsCompleted) {
+                        lastReps = repsCompleted
+                    }
                     Text(
                         text = repsCompleted.toString(),
                         fontSize = 48.sp,
                         fontWeight = FontWeight.Light,
                         color = Color.White,
-                        modifier = Modifier.alignByBaseline()
+                        modifier = Modifier
+                            .alignByBaseline()
+                            .graphicsLayer {
+                                scaleX = animatedRepScale
+                                scaleY = animatedRepScale
+                            }
                     )
                     Text(
                         text = "/$totalReps",
@@ -1400,6 +1415,24 @@ private fun BarRepCounter(
                     repeat(totalReps) { index ->
                         val barWidth = 10.dp
                         val barHeight = 40.dp
+
+                        // Animate fill transitions for visual feedback
+                        val animatedFill by animateFloatAsState(
+                            targetValue = when {
+                                index < repsCompleted -> {
+                                    val accuracy = if (index < repHistory.size) repHistory[index].toFloat() else 0.0f
+                                    accuracy.coerceIn(0f, 1f)
+                                }
+                                index == repsCompleted -> holdProgress.coerceIn(0f, 1f)
+                                else -> 0f
+                            },
+                            animationSpec = if (index == repsCompleted) {
+                                tween(durationMillis = 200)
+                            } else {
+                                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+                            },
+                            label = "bar_fill_$index"
+                        )
 
                         Box(
                             modifier = Modifier
@@ -1421,19 +1454,19 @@ private fun BarRepCounter(
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .fillMaxHeight(accuracy.coerceIn(0f, 1.0f))
+                                                .fillMaxHeight(animatedFill)
                                                 .align(Alignment.BottomCenter)
                                                 .background(barColor)
                                         )
                                     }
                                 }
 
-                                // 2. CURRENT REP (Live): Show White with height = holdProgress
+                                // 2. CURRENT REP (Live): Show White with height = holdProgress (animated)
                                 index == repsCompleted -> {
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .fillMaxHeight(holdProgress.coerceIn(0.01f, 1.0f))
+                                            .fillMaxHeight(animatedFill.coerceAtLeast(0.01f))
                                             .align(Alignment.BottomCenter)
                                             .background(Color.White)
                                     )

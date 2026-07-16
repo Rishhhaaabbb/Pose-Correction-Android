@@ -21,6 +21,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.activity.viewModels
@@ -40,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -392,7 +395,12 @@ private fun MainNavigation(
         }
     }
 
-    when (screen) {
+    Crossfade(
+        targetState = screen,
+        animationSpec = tween(durationMillis = 250),
+        label = "screen_transition"
+    ) { currentScreen ->
+    when (currentScreen) {
         Screen.GRAPH_SELECT -> {
             val context = LocalContext.current
             
@@ -505,6 +513,7 @@ private fun MainNavigation(
             }
         }
     }
+    } // end Crossfade
 }
 
 // ── Monitor screen ────────────────────────────────────────────────────────────
@@ -776,6 +785,12 @@ fun MonitorScreen(
     
     LaunchedEffect(sessionCompleted) {
         if (sessionCompleted && !resultAdded) {
+            // Set resultAdded IMMEDIATELY to prevent duplicate calls.
+            // onNext() triggers resetSessionState() which sets sessionCompleted=false,
+            // cancelling this coroutine before the delay completes. If resultAdded
+            // isn't set first, the effect fires again on the next completion.
+            resultAdded = true
+
             val repsDone = if (currentReps > 0) currentReps else targetReps
             val calories = (repsDone * 2.5).toInt()
             val avgAccuracy = if (accuracies.isNotEmpty()) {
@@ -797,11 +812,9 @@ fun MonitorScreen(
                 }
                 onNext(exerciseIndex + 1, result)
             } else if (exerciseList.size > 1) {
-                // If it's a workout (more than 1 exercise), show summary after 2s
                 kotlinx.coroutines.delay(2000)
                 onShowSummary(result)
             }
-            resultAdded = true
         }
     }
 
@@ -1038,25 +1051,18 @@ fun MonitorScreen(
         // ── Top-left quit button ──────────────────────────────────────────────
         // Shows the same "End session?" confirmation dialog as the back press,
         // so the user can't accidentally exit mid-workout with a stray tap.
-        if (!sessionCompleted) {
+        // Fade out when session is completed so it doesn't conflict with the summary.
+        AnimatedVisibility(
+            visible = !sessionCompleted,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(200)),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .statusBarsPadding()
+                .padding(start = 8.dp, top = 4.dp),
+        ) {
             TextButton(
                 onClick = { showEndSessionDialog = true },
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .statusBarsPadding()
-                    .padding(start = 8.dp, top = 4.dp),
-                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xCCFFFFFF)),
-            ) {
-                Text("← Quit", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            }
-        } else {
-            // Session done — quit goes straight home, no confirmation needed.
-            TextButton(
-                onClick = onQuit,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .statusBarsPadding()
-                    .padding(start = 8.dp, top = 4.dp),
                 colors = ButtonDefaults.textButtonColors(contentColor = Color(0xCCFFFFFF)),
             ) {
                 Text("← Quit", fontSize = 13.sp, fontWeight = FontWeight.Medium)
@@ -1081,17 +1087,21 @@ fun MonitorScreen(
         }
 */
 
-        // ── Init error banner ─────────────────────────────────────────────────
-        // Keep an explicit skip control visible during live tracking so the user
+        // ── Skip button — bottom right ────────────────────────────────────────
+        // Keep a skip control visible during live tracking so the user
         // can advance past a pose state that isn't being detected reliably.
-        if (!sessionCompleted) {
+        AnimatedVisibility(
+            visible = !sessionCompleted,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(200)),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
+                .padding(bottom = 28.dp),
+        ) {
             Button(
                 onClick = { viewModel.skipCurrentPose() },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(bottom = 28.dp)
-                    .height(44.dp),
+                modifier = Modifier.height(44.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xCC1F1F1F),
@@ -1194,7 +1204,13 @@ fun MonitorScreen(
         }
 
         // ── Results Overlay ──────────────────────────────────────────────────
-        if (sessionCompleted) {
+        AnimatedVisibility(
+            visible = sessionCompleted,
+            enter = fadeIn(tween(300)) + scaleIn(
+                animationSpec = tween(300),
+                initialScale = 0.9f
+            ),
+        ) {
             // Use viewModel to get exercise name
             val exerciseName = viewModel.getCurrentExerciseName()?.removeSuffix(".json")?.replace("-", " ")?.uppercase() ?: "Exercise"
             
@@ -1263,10 +1279,25 @@ fun MonitorScreen(
                                 color = Color(0xFFE8622E)
                             )
                             Spacer(Modifier.height(4.dp))
+                            // Pulsing countdown
+                            val infiniteTransition = rememberInfiniteTransition(label = "countdown_pulse")
+                            val pulseScale by infiniteTransition.animateFloat(
+                                initialValue = 1f,
+                                targetValue = 1.08f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(500, easing = FastOutSlowInEasing),
+                                    repeatMode = RepeatMode.Reverse
+                                ),
+                                label = "pulse_scale"
+                            )
                             Text(
                                 text = "Starting in $countdownSeconds seconds...",
                                 fontSize = 12.sp,
-                                color = Color(0xFF888888)
+                                color = Color(0xFF888888),
+                                modifier = Modifier.graphicsLayer {
+                                    scaleX = pulseScale
+                                    scaleY = pulseScale
+                                }
                             )
                             Spacer(Modifier.height(16.dp))
                             
@@ -1283,6 +1314,7 @@ fun MonitorScreen(
                                 }
                                 Button(
                                     onClick = { 
+                                        if (resultAdded) return@Button
                                         val repsDone = if (currentReps > 0) currentReps else targetReps
                                         val calories = (repsDone * 2.5).toInt()
                                         val avgAccuracy = if (accuracies.isNotEmpty()) {
@@ -1295,6 +1327,7 @@ fun MonitorScreen(
                                             accuracy = avgAccuracy,
                                             calories = calories
                                         )
+                                        resultAdded = true
                                         onNext(exerciseIndex + 1, result) 
                                     },
                                     modifier = Modifier.weight(1f),
