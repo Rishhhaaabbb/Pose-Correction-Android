@@ -258,6 +258,7 @@ class DebugViewModel @Inject constructor(
                 guidanceDurationSeconds = 2.0,
                 enableAdaptive = true,
                 progressiveTolerance = true,
+                maxReps = targetReps.value,
             ),
             holdTimeOverrideSeconds = sessionHoldDurationSeconds.value,
         )

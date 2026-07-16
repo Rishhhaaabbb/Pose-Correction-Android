@@ -454,16 +454,10 @@ private fun MainNavigation(
                     onQuit = { 
                         viewModel.saveCurrentSessionPartial()
                         viewModel.stopPipeline()
-                        val intent = Intent(context, UserFlowActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                        context.startActivity(intent)
                         (context as? Activity)?.finish()
                     },
                     onFinish = { 
                         viewModel.stopPipeline()
-                        val intent = Intent(context, UserFlowActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                        context.startActivity(intent)
                         (context as? Activity)?.finish()
                     },
                     onNext = { nextIdx, currentResult ->
@@ -477,12 +471,16 @@ private fun MainNavigation(
                                 if (parts.size == 2) parts[0].trim() to (parts[1].trim().toIntOrNull() ?: 10) else null
                             }?.toMap()?.get(nextExercise)
                         } ?: targetReps
-                        val intent = Intent(context, UserFlowActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                            putExtra("TARGET_ROUTE", "exercise_detail/$nextExercise.json/true?workoutId=${workoutId ?: ""}&index=$nextIdx&exerciseList=${exerciseList.joinToString(",")}&targetReps=${nextTargetReps ?: 10}&targetRepsMap=${targetRepsMapStr ?: ""}")
-                        }
-                        context.startActivity(intent)
-                        (context as? Activity)?.finish()
+
+                        // Auto-advance: stay in this activity and load next exercise directly
+                        exerciseIndex = nextIdx
+                        val nextGraphEntry = GraphEntry(
+                            fileName = "$nextExercise.json",
+                            filePath = "assets:$nextExercise.json",
+                            isAsset = true
+                        )
+                        viewModel.setTargetReps(nextTargetReps ?: 10)
+                        selectedGraph = nextGraphEntry
                     },
                     onShowSummary = { finalResult ->
                         sessionResults.add(finalResult)
@@ -493,9 +491,6 @@ private fun MainNavigation(
                 if (showSummary) {
                     BackHandler {
                         viewModel.stopPipeline()
-                        val intent = Intent(context, UserFlowActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                        context.startActivity(intent)
                         (context as? Activity)?.finish()
                     }
                     
@@ -503,9 +498,6 @@ private fun MainNavigation(
                         results = sessionResults,
                         onFinish = {
                             viewModel.stopPipeline()
-                            val intent = Intent(context, UserFlowActivity::class.java)
-                            intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                            context.startActivity(intent)
                             (context as? Activity)?.finish()
                         }
                     )
@@ -585,6 +577,12 @@ fun MonitorScreen(
     var countdownSeconds by remember { mutableIntStateOf(5) }
     val hasNext = exerciseIndex + 1 < exerciseList.size
     var resultAdded by remember { mutableStateOf(false) }
+
+    // Reset countdown and result flag when exercise changes (auto-advance)
+    LaunchedEffect(exerciseIndex) {
+        countdownSeconds = 5
+        resultAdded = false
+    }
 
     // ── End-session confirmation ───────────────────────────────────────────
     var showEndSessionDialog by remember { mutableStateOf(false) }

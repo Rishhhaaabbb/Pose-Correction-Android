@@ -452,7 +452,7 @@ class PoseMonitorEngine(
             currentStateId = currentStateId,
         )
 
-        if (navResult.repCompleted && !skipped) {
+        if (navResult.repCompleted) {
             totalReps++
             val maxReps = config.maxReps
             if (maxReps != null && totalReps >= maxReps) {
