@@ -50,14 +50,9 @@ import com.posemonitor2.onboarding.OnboardingActivity
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.SelfImprovement
 
-private val BgCream     = Color(0xFFF2EEE4)
 private val Yellow      = Color(0xFFE8B840)
 private val Orange      = Color(0xFFE85A2E)
-private val TealDark    = Color(0xFF0A3D3F)
 private val TealChip    = Color(0xFF0D4A4E)
-private val TextDark    = Color(0xFF1A1A1A)
-private val TextGray    = Color(0xFF888888)
-private val CardWhite   = Color.White
 
 @Composable
 private fun homeBgColor() = MaterialTheme.colorScheme.background
@@ -129,7 +124,7 @@ fun UserHomeScreen(
                     text = "Recommended for You",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TealDark,
+                    color = MaterialTheme.colorScheme.primary,
                     fontFamily = FontFamily.Serif,
                 )
                 Text(
@@ -162,7 +157,7 @@ fun UserHomeScreen(
             text = "Quick Actions",
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
-            color = TealDark,
+            color = MaterialTheme.colorScheme.primary,
             fontFamily = FontFamily.Serif,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
@@ -311,7 +306,7 @@ private fun HomeHeader(userName: String, greetingSubtitle: String = "", onOpenHe
                 text = userName,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                color = TealDark,
+                color = MaterialTheme.colorScheme.primary,
                 fontFamily = FontFamily.Serif,
             )
             // 3B. Personalized greeting subtitle
@@ -319,7 +314,7 @@ private fun HomeHeader(userName: String, greetingSubtitle: String = "", onOpenHe
                 Text(
                     text = greetingSubtitle,
                     fontSize = 13.sp,
-                    color = TextGray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
@@ -330,12 +325,12 @@ private fun HomeHeader(userName: String, greetingSubtitle: String = "", onOpenHe
             modifier = Modifier
                 .size(42.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(CardWhite)
+                .background(MaterialTheme.colorScheme.surface)
                 .shadow(2.dp, RoundedCornerShape(12.dp))
                 .clickable { onOpenHelp() },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Default.HelpOutline, contentDescription = stringResource(R.string.home_help_title), tint = TealDark, modifier = Modifier.size(22.dp))
+            Icon(Icons.Default.HelpOutline, contentDescription = stringResource(R.string.home_help_title), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
         }
     }
 }
@@ -365,19 +360,19 @@ private fun DailyGoalProgressCard(
                         text = "Today's Goal",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TealDark,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                     Text(
                         text = "$dailyGoalMinutes min daily practice",
                         fontSize = 12.sp,
-                        color = TextGray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp),
                     )
                 }
                 Text(
                     text = "$todayMinutesDone / $dailyGoalMinutes min",
                     fontSize = 12.sp,
-                    color = TextGray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Spacer(Modifier.height(10.dp))
@@ -388,7 +383,7 @@ private fun DailyGoalProgressCard(
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp)),
                 color = Orange,
-                trackColor = Color(0xFFEEEEEE),
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
         }
     }
@@ -457,7 +452,7 @@ private fun HeroCard(modifier: Modifier = Modifier, onJoinSession: () -> Unit) {
             ) {
                 Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxHeight()) {
                     // Chip
-                    Surface(shape = RoundedCornerShape(6.dp), color = TealDark) {
+                    Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary) {
                         Text(
                             stringResource(R.string.home_ai_active),
                             fontSize = 9.sp,
@@ -473,7 +468,7 @@ private fun HeroCard(modifier: Modifier = Modifier, onJoinSession: () -> Unit) {
                         text = stringResource(R.string.home_hero_title),
                         fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = TealDark,
+                        color = MaterialTheme.colorScheme.primary,
                         fontFamily = FontFamily.Serif,
                         lineHeight = 26.sp,
                     )
@@ -524,7 +519,7 @@ private fun QuickActionsGrid(
     onMyProfile: () -> Unit,
 ) {
     val tiles = listOf(
-        Triple("Start Session",   Icons.Default.PlayArrow,     TealDark),
+        Triple("Start Session",   Icons.Default.PlayArrow,     MaterialTheme.colorScheme.primary),
         Triple("My Progress",     Icons.AutoMirrored.Filled.TrendingUp, Orange),
         Triple("Custom Workout",  Icons.Default.FitnessCenter, Color(0xFF1A646A)),
         Triple("My Profile",      Icons.Default.Person,        Color(0xFF4A3728)),
@@ -619,7 +614,7 @@ private fun RecommendedExerciseCard(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(TealDark),
+                            .background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -640,7 +635,7 @@ private fun RecommendedExerciseCard(
                         .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } },
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TealDark,
+                    color = MaterialTheme.colorScheme.primary,
                     maxLines = 2,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
@@ -669,7 +664,7 @@ private fun RecommendedExerciseCard(
 @Composable
 private fun SectionTitle(title: String, modifier: Modifier = Modifier) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(text = title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextDark, fontFamily = FontFamily.Serif, modifier = Modifier.weight(1f))
+        Text(text = title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontFamily = FontFamily.Serif, modifier = Modifier.weight(1f))
         Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null, tint = Orange, modifier = Modifier.size(22.dp))
     }
 }
@@ -701,7 +696,7 @@ private fun VitalsCard(
                 Text(
                     stringResource(R.string.home_no_stats_yet),
                     fontSize = 14.sp,
-                    color = TextGray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
             }
@@ -731,7 +726,7 @@ private fun VitalsCard(
                         bmi?.let { String.format("%.1f", it) } ?: "--",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextDark
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     if (bmi != null && targetWeightKg != null && weightKg != null) {
                         val progress = calculateProgress(weightKg, targetWeightKg)
@@ -739,23 +734,23 @@ private fun VitalsCard(
                             progress = { progress.coerceIn(0f, 1f) },
                             modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
                             color = Orange,
-                            trackColor = Color(0xFFEEEEEE),
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
                         )
                     }
                 }
 
                 // Weight goal
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.home_weight_goal), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextGray, letterSpacing = 0.8.sp)
+                    Text(stringResource(R.string.home_weight_goal), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.8.sp)
                     if (weightKg != null && targetWeightKg != null) {
                         Text(
                             "${weightKg.toInt()} / ${targetWeightKg.toInt()} kg",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = TextDark
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     } else {
-                        Text("--", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                        Text("--", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
@@ -869,14 +864,14 @@ private fun CustomWorkoutQuickCard(
                 ) {
                     Text(
                         text = stringResource(R.string.home_open_custom_workout_button),
-                        color = TealDark,
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.ExtraBold,
                     )
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = null,
-                        tint = TealDark,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(14.dp),
                     )
                 }
@@ -945,7 +940,7 @@ private fun CustomRoutineCard(modifier: Modifier = Modifier, onStart: () -> Unit
                     modifier = Modifier.size(44.dp).clip(CircleShape).background(Yellow).clickable { onStart() },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = TealDark, modifier = Modifier.size(22.dp))
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                 }
             }
         }
@@ -1021,7 +1016,7 @@ private fun AuraAiCard(modifier: Modifier = Modifier, onStart: () -> Unit) {
                 // Start Session dark pill
                 Surface(
                     shape = RoundedCornerShape(50.dp),
-                    color = TealDark,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable { onStart() },
                 ) {
                     Row(

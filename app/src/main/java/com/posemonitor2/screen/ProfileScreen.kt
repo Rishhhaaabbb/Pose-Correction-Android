@@ -261,7 +261,7 @@ fun ProfileScreen(
                     val heightMetric = convertHeightForDisplay(uiState.heightCm, unitSystem)
                     val weightMetric = convertWeightForDisplay(uiState.weightKg, unitSystem)
                     BodyMetric(label = stringResource(R.string.profile_height_label), value = heightMetric.first, unit = heightMetric.second)
-                    VerticalDivider(modifier = Modifier.height(40.dp), color = Color(0xFFF0F0F0))
+                    VerticalDivider(modifier = Modifier.height(40.dp), color = MaterialTheme.colorScheme.outline)
                     BodyMetric(label = stringResource(R.string.profile_weight_label), value = weightMetric.first, unit = weightMetric.second)
                     VerticalDivider(modifier = Modifier.height(40.dp), color = surfaceVariant)
                     BodyMetric(label = stringResource(R.string.profile_bmi_label), value = uiState.bmi?.toString() ?: "--", unit = "")
@@ -368,7 +368,7 @@ fun ProfileScreen(
                     },
                 )
                 Spacer(Modifier.height(4.dp))
-                HorizontalDivider(color = Color(0xFFF5F5F5))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 Spacer(Modifier.height(4.dp))
                 NotificationToggleRow(
                     label = stringResource(R.string.profile_goal_achievements_label),
@@ -408,11 +408,11 @@ fun ProfileScreen(
                 Text(stringResource(R.string.profile_app_settings_title), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = onBackground)
                 Spacer(Modifier.height(14.dp))
                 LanguageSettingsRow(language = language, navController = navController)
-                HorizontalDivider(color = Color(0xFFF5F5F5))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 UnitsSettingsRow(unitSystem = unitSystem)
-                HorizontalDivider(color = Color(0xFFF5F5F5))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 ThemeSettingsRow(navController = navController)
-                HorizontalDivider(color = Color(0xFFF5F5F5))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 // Edit Questionnaire row
                 Row(
                     modifier = Modifier
@@ -495,7 +495,7 @@ private fun NotificationToggleRow(label: String, checked: Boolean, onToggle: (Bo
         Switch(
             checked = checked,
             onCheckedChange = onToggle,
-            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = MaterialTheme.colorScheme.primary, uncheckedThumbColor = Color.White, uncheckedTrackColor = Color(0xFFCCCCCC)),
+            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = MaterialTheme.colorScheme.primary, uncheckedThumbColor = Color.White, uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant),
         )
     }
 }
@@ -740,7 +740,7 @@ private fun EditProfileDialog(
                         shape = RoundedCornerShape(50),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                     ) {
-                        Text(if (isSaving) stringResource(R.string.profile_saving) else stringResource(R.string.common_save), color = Color(0xFF1A1A1A))
+                        Text(if (isSaving) stringResource(R.string.profile_saving) else stringResource(R.string.common_save), color = Color.White)
                     }
                 }
             }

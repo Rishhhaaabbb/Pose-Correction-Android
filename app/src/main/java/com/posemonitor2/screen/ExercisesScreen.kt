@@ -42,13 +42,8 @@ import kotlinx.coroutines.delay
 import com.posemonitor2.R
 import com.posemonitor2.UserRoute
 
-private val BgColor    = Color(0xFFF4F6F4)
-private val TealDark   = Color(0xFF0D3B34)
 private val Orange     = Color(0xFFE8622E)
 private val Yellow     = Color(0xFFE8B840)
-private val GrayText   = Color(0xFF888888)
-private val ChipBorder = Color(0xFFDDDDDD)
-private val CardBg     = Color.White
 
 @Composable
 private fun exercisesBgColor() = MaterialTheme.colorScheme.background
@@ -119,14 +114,14 @@ fun ExercisesScreen(
                     stringResource(R.string.exercises_title),
                     fontSize = 30.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = TealDark,
+                    color = MaterialTheme.colorScheme.primary,
                 )
 
                 if (userProfile.isAdmin) {
                     Surface(
                         onClick = { navController.navigate(UserRoute.Library.route) },
                         shape = CircleShape,
-                        color = Color(0xFF0A3D3F), // Dark green / TealDark
+                        color = MaterialTheme.colorScheme.primary, // Dark green
                         shadowElevation = 6.dp
                     ) {
                         Box(
@@ -154,13 +149,13 @@ fun ExercisesScreen(
                 onValueChange = { viewModel.onSearchQueryChanged(it) },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = {
-                    Text("Search exercises...", color = GrayText, fontSize = 14.sp)
+                    Text("Search exercises...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                 },
                 leadingIcon = {
                     Icon(
                         Icons.Default.Search,
                         contentDescription = null,
-                        tint = TealDark,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp),
                     )
                 },
@@ -170,7 +165,7 @@ fun ExercisesScreen(
                             Icon(
                                 Icons.Default.Clear,
                                 contentDescription = "Clear search",
-                                tint = GrayText,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -180,9 +175,9 @@ fun ExercisesScreen(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = exercisesSurfaceColor(),
                     unfocusedContainerColor = exercisesSurfaceColor(),
-                    focusedBorderColor = TealDark,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = exercisesBorderColor(),
-                    cursorColor = TealDark,
+                    cursorColor = MaterialTheme.colorScheme.primary,
                     focusedTextColor = exercisesTextColor(),
                     unfocusedTextColor = exercisesTextColor(),
                 ),
@@ -193,7 +188,7 @@ fun ExercisesScreen(
 
         if (uiState.difficulties.isNotEmpty()) {
             item {
-                Text("Difficulty", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrayText, letterSpacing = 1.sp)
+                Text("Difficulty", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
                 Spacer(Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -219,7 +214,7 @@ fun ExercisesScreen(
 
         if (uiState.categories.isNotEmpty()) {
             item {
-                Text("Category", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrayText, letterSpacing = 1.sp)
+                Text("Category", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
                 Spacer(Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -261,7 +256,7 @@ fun ExercisesScreen(
                     Icon(
                         imageVector = Icons.Default.SearchOff,
                         contentDescription = null,
-                        tint = GrayText,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(48.dp),
                     )
                     Spacer(Modifier.height(12.dp))
@@ -310,13 +305,13 @@ private fun FilterChipItem(label: String, selected: Boolean, onClick: () -> Unit
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(50.dp),
-        color = if (selected) TealDark else exercisesSurfaceColor(),
+        color = if (selected) MaterialTheme.colorScheme.primary else exercisesSurfaceColor(),
         border = if (selected) null else androidx.compose.foundation.BorderStroke(1.dp, exercisesBorderColor()),
     ) {
         Text(
             label,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            color = if (selected) Color.White else TealDark,
+            color = if (selected) Color.White else MaterialTheme.colorScheme.primary,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
         )
@@ -384,7 +379,7 @@ private fun WorkoutCard(
                     name,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TealDark,
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(

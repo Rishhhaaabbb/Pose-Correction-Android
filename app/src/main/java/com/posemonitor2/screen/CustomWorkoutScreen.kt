@@ -57,10 +57,7 @@ import com.posemonitor2.R
 import com.posemonitor2.loadAvailableGraphs
 import kotlinx.coroutines.launch
 
-private val HubBg = Color(0xFFF4EFE5)
-private val HubDark = Color(0xFF0E3E40)
 private val HubOrange = Color(0xFFE85A2E)
-private val HubMuted = Color(0xFF7A7A7A)
 
 @Composable
 private fun hubBgColor() = MaterialTheme.colorScheme.background
@@ -250,13 +247,13 @@ private fun CustomWorkoutHubEmptyState(onCreate: () -> Unit) {
             Text(
                 text = stringResource(R.string.CustomWorkout_empty_hub_title),
                 style = MaterialTheme.typography.titleMedium,
-                color = HubDark,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text = stringResource(R.string.CustomWorkout_empty_hub_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
-                color = HubMuted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(
                 onClick = onCreate,
@@ -295,7 +292,7 @@ private fun CustomWorkoutHubCard(
                 Text(
                     text = CustomWorkout.title,
                     style = MaterialTheme.typography.titleLarge,
-                    color = HubDark,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                 )
@@ -313,13 +310,13 @@ private fun CustomWorkoutHubCard(
             Text(
                 text = stringResource(R.string.CustomWorkout_exercises_label),
                 style = MaterialTheme.typography.labelMedium,
-                color = HubDark,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = CustomWorkout.previewText,
                 style = MaterialTheme.typography.bodyMedium,
-                color = HubDark.copy(alpha = 0.8f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                 modifier = Modifier.padding(start = 4.dp),
             )
             Row(
@@ -339,7 +336,7 @@ private fun CustomWorkoutHubCard(
                         CustomWorkout.estimatedMinutes,
                     ),
                     style = MaterialTheme.typography.labelLarge,
-                    color = HubDark,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Medium,
                 )
             }
@@ -390,7 +387,7 @@ private fun CustomWorkoutHubCard(
                     Icon(
                         imageVector = Icons.Default.DeleteOutline,
                         contentDescription = stringResource(R.string.CustomWorkout_card_delete),
-                        tint = Color(0xFF888888),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
