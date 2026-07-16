@@ -148,9 +148,7 @@ fun CustomWorkoutScreen(
                                 CustomWorkout = CustomWorkout,
                                 onStart = {
                                     val exerciseNames = viewModel.getCustomWorkoutExerciseNames(CustomWorkout.id)
-                                    val firstExercise = exerciseNames?.firstOrNull()
-                                    
-                                    if (firstExercise.isNullOrBlank()) {
+                                    if (exerciseNames.isNullOrEmpty()) {
                                         coroutineScope.launch {
                                             snackbarHostState.showSnackbar(
                                                 context.getString(R.string.CustomWorkout_no_exercise_selected)
@@ -158,27 +156,7 @@ fun CustomWorkoutScreen(
                                         }
                                         return@CustomWorkoutHubCard
                                     }
-
-                                    val graphEntry = graphs.firstOrNull { it.fileName == "$firstExercise.json" }
-                                    if (graphEntry == null) {
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar(
-                                                context.getString(R.string.CustomWorkout_missing_graph)
-                                            )
-                                        }
-                                    } else {
-                                        val listStr = exerciseNames.joinToString(",")
-                                        // Get target reps for the first exercise
-                                        val targetRepsForFirstExercise = viewModel.getTargetRepsForExercise(CustomWorkout.id, firstExercise)
-                                        // Get all target reps and create a map string: "exercise1:reps1,exercise2:reps2,..."
-                                        val targetRepsMap = exerciseNames.joinToString(",") { name ->
-                                            val reps = viewModel.getTargetRepsForExercise(CustomWorkout.id, name)
-                                            "$name:$reps"
-                                        }
-                                        navController.navigate(
-                                            "exercise_detail/${graphEntry.fileName}/${graphEntry.isAsset}?workoutId=${CustomWorkout.id}&index=0&exerciseList=$listStr&targetReps=$targetRepsForFirstExercise&targetRepsMap=$targetRepsMap"
-                                        )
-                                    }
+                                    navController.navigate("workout_overview/${CustomWorkout.id}")
                                 },
                                 onEdit = {
                                     navController.navigate(customWorkoutEditorRoute(CustomWorkout.id))

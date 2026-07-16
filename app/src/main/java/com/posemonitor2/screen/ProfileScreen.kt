@@ -387,7 +387,7 @@ fun ProfileScreen(
             Column(modifier = Modifier.padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Your Yoga Profile", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = onBackground, modifier = Modifier.weight(1f))
-                    Text("≡ƒºÿ", fontSize = 20.sp)
+                    Text("\uD83E\uDDD8", fontSize = 20.sp)
                 }
                 Spacer(Modifier.height(12.dp))
                 val qs = uiState.questionnaireSummary

@@ -196,6 +196,17 @@ fun UserFlowNavigation() {
                 CustomWorkoutEditorScreen(navController = navController)
             }
             composable(
+                "workout_overview/{workoutId}",
+                enterTransition = { fadeIn(animationSpec = tween(200)) },
+                exitTransition = { fadeOut(animationSpec = tween(200)) },
+            ) { backStack ->
+                val workoutId = backStack.arguments?.getString("workoutId") ?: return@composable
+                WorkoutOverviewScreen(
+                    workoutId = workoutId,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
                 UserRoute.Progress.route,
                 enterTransition = { fadeIn(animationSpec = tween(150)) },
                 exitTransition = { fadeOut(animationSpec = tween(150)) },

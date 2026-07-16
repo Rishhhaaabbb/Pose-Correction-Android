@@ -87,6 +87,10 @@ class CustomWorkoutViewModel @Inject constructor(
         return CustomWorkout.exerciseTargetReps[exerciseId] ?: DEFAULT_TARGET_REPS
     }
 
+    fun getWorkoutById(workoutId: String): UserCustomWorkout? {
+        return CustomWorkoutsById[workoutId]
+    }
+
     private fun buildDefaultCustomWorkoutExerciseIds(exercises: List<Exercise>): List<String> {
         val exerciseById = exercises.associateBy { it.id }
         val defaults = DEFAULT_CustomWorkout_EXERCISE_IDS.mapNotNull { exerciseById[it]?.id }

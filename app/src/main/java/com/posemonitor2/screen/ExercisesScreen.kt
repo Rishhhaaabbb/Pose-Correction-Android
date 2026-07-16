@@ -377,7 +377,7 @@ private fun WorkoutCard(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "$difficulty ΓÇó AI Session",
+                    "$difficulty - AI Session",
                     fontSize = 12.sp,
                     color = GrayText,
                 )

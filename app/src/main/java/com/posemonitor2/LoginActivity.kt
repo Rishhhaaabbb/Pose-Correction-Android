@@ -680,7 +680,7 @@ private fun ForgotPasswordScreen(
     AuthScaffold {
         // Back link
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onBack() }) {
-            Text("ΓÇ╣ ", fontSize = 18.sp, color = TextOnCard, fontWeight = FontWeight.Bold)
+            Text("\u2190 ", fontSize = 18.sp, color = TextOnCard, fontWeight = FontWeight.Bold)
             Text(stringResource(R.string.login_back_to_login), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextOnCard, letterSpacing = 1.sp)
         }
 
