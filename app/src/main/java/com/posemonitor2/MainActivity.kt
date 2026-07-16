@@ -395,12 +395,7 @@ private fun MainNavigation(
         }
     }
 
-    Crossfade(
-        targetState = screen,
-        animationSpec = tween(durationMillis = 250),
-        label = "screen_transition"
-    ) { currentScreen ->
-    when (currentScreen) {
+    when (screen) {
         Screen.GRAPH_SELECT -> {
             val context = LocalContext.current
             
@@ -491,8 +486,10 @@ private fun MainNavigation(
                         selectedGraph = nextGraphEntry
                     },
                     onShowSummary = { finalResult ->
-                        sessionResults.add(finalResult)
-                        showSummary = true
+                        if (!showSummary) {
+                            sessionResults.add(finalResult)
+                            showSummary = true
+                        }
                     }
                 )
 
@@ -513,7 +510,6 @@ private fun MainNavigation(
             }
         }
     }
-    } // end Crossfade
 }
 
 // ── Monitor screen ────────────────────────────────────────────────────────────

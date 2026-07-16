@@ -293,7 +293,7 @@ private fun UserBottomNavBar(navController: NavController, items: List<UserRoute
     val activeTabRoot  = routeToTabRoot(currentRoute)
 
     var lastClickTime by remember { mutableLongStateOf(0L) }
-    val debounceMs = 200L
+    val debounceMs = 50L
 
     NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
         items.forEach { item ->

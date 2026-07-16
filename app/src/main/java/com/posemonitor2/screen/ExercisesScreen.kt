@@ -69,34 +69,9 @@ fun ExercisesScreen(
     val preloadedThumbnails = uiState.preloadedThumbnails
     val filteredExercises by viewModel.filteredExercises.collectAsState()
     
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val navBackStackEntry = navController.currentBackStackEntry
-    
-    // Create a key that changes on every navigation to force refresh
-    val refreshKey = remember {
-        derivedStateOf {
-            navBackStackEntry?.destination?.route
-        }
-    }.value
-    
-    // Refresh graphs when screen becomes visible (not just on creation)
-    DisposableEffect(lifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            android.util.Log.d("ExercisesScreen", "Lifecycle event: $event")
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                android.util.Log.d("ExercisesScreen", "ON_RESUME - calling refreshGraphs()")
-                viewModel.refreshGraphs()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
-    
-    // Refresh when navigating to this screen or when route changes
-    LaunchedEffect(refreshKey) {
-        android.util.Log.d("ExercisesScreen", "LaunchedEffect triggered for route: $refreshKey")
+
+    LaunchedEffect(Unit) {
         viewModel.refreshGraphs()
     }
 
