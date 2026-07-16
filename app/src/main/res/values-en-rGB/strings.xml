@@ -180,6 +180,11 @@
     <string name="admin_stats_sun">Sun</string>
 
     <string name="home_body_vitals_title">My Body Vitals</string>
+    <string name="home_bmi_detail_title">BMI Details</string>
+    <string name="home_bmi_underweight">Underweight</string>
+    <string name="home_bmi_normal">Normal</string>
+    <string name="home_bmi_overweight">Overweight</string>
+    <string name="home_bmi_obese">Obese</string>
     <string name="home_good_morning">GOOD MORNING</string>
     <string name="home_ai_active">AI ACTIVE</string>
     <string name="home_hero_title">Your\nSmart\nSession</string>
@@ -215,6 +220,7 @@ Real-time posture feedback enabled.</string>
     <string name="progress_daily_streak_title">Daily Streak</string>
     <string name="progress_days_value">%1$d Days</string>
     <string name="progress_keep_streak_alive">Keep the streak alive!</string>
+    <string name="progress_tap_to_view_calendar">Tap to view calendar</string>
     <string name="progress_best_label">BEST</string>
     <string name="progress_days_lower_value">%1$d days</string>
     <string name="progress_recent_sessions_title">Recent Sessions</string>

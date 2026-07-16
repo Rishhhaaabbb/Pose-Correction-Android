@@ -6,9 +6,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -155,7 +158,17 @@ fun UserFlowNavigation() {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            UserBottomNavBar(navController, if (isAdmin) adminBottomNavItems else userBottomNavItems)
+            val backStackEntry by navController.currentBackStackEntryAsState()
+            val currentRoute = backStackEntry?.destination?.route
+            val showOnMainTab = isMainTabRoute(currentRoute)
+
+            AnimatedVisibility(
+                visible = showOnMainTab,
+                enter = slideInVertically(initialOffsetY = { it }),
+                exit = slideOutVertically(targetOffsetY = { it }),
+            ) {
+                UserBottomNavBar(navController, if (isAdmin) adminBottomNavItems else userBottomNavItems)
+            }
         },
     ) { innerPadding ->
 
@@ -295,6 +308,18 @@ private fun routeToTabRoot(route: String?): String = when {
     route == UserRoute.Graphs.route -> UserRoute.Graphs.route
     route == UserRoute.AdminStats.route -> UserRoute.AdminStats.route
     else -> UserRoute.Home.route
+}
+
+private fun isMainTabRoute(route: String?): Boolean = when (route) {
+    UserRoute.Home.route,
+    UserRoute.Exercises.route,
+    UserRoute.CustomWorkout.route,
+    UserRoute.Progress.route,
+    UserRoute.Profile.route,
+    UserRoute.Library.route,
+    UserRoute.Graphs.route,
+    UserRoute.AdminStats.route -> true
+    else -> false
 }
 
 @Composable

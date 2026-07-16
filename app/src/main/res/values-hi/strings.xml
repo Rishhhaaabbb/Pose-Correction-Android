@@ -83,6 +83,11 @@
     <string name="admin_stats_sun">रवि</string>
 
     <string name="home_body_vitals_title">मेरे बॉडी वाइटल्स</string>
+    <string name="home_bmi_detail_title">BMI विवरण</string>
+    <string name="home_bmi_underweight">कम वजन</string>
+    <string name="home_bmi_normal">सामान्य</string>
+    <string name="home_bmi_overweight">अधिक वजन</string>
+    <string name="home_bmi_obese">मोटापा</string>
     <string name="home_good_morning">सुप्रभात</string>
     <string name="home_ai_active">एआई सक्रिय</string>
     <string name="home_hero_title">आपका\nस्मार्ट\nसेशन</string>
@@ -118,6 +123,7 @@
     <string name="progress_daily_streak_title">दैनिक स्ट्रीक</string>
     <string name="progress_days_value">%1$d दिन</string>
     <string name="progress_keep_streak_alive">स्ट्रीक जारी रखें!</string>
+    <string name="progress_tap_to_view_calendar">कैलेंडर देखने के लिए टैप करें</string>
     <string name="progress_best_label">सर्वश्रेष्ठ</string>
     <string name="progress_days_lower_value">%1$d दिन</string>
     <string name="progress_recent_sessions_title">हालिया सेशन्स</string>

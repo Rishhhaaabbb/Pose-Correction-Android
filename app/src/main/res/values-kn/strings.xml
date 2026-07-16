@@ -83,6 +83,11 @@
     <string name="admin_stats_sun">ರವಿ</string>
 
     <string name="home_body_vitals_title">ನನ್ನ ದೇಹದ ವೈಟಲ್ಸ್</string>
+    <string name="home_bmi_detail_title">BMI ವಿವರಗಳು</string>
+    <string name="home_bmi_underweight">ಕಡಿಮೆ ತೂಕ</string>
+    <string name="home_bmi_normal">ಸಾಮಾನ್ಯ</string>
+    <string name="home_bmi_overweight">ಹೆಚ್ಚಿನ ತೂಕ</string>
+    <string name="home_bmi_obese">ಬೊಜ್ಜು</string>
     <string name="home_good_morning">ಶುಭೋದಯ</string>
     <string name="home_ai_active">AI ಸಕ್ರಿಯ</string>
     <string name="home_hero_title">ನಿಮ್ಮ\nಸ್ಮಾರ್ಟ್\nಸೆಷನ್</string>
@@ -118,6 +123,7 @@
     <string name="progress_daily_streak_title">ದೈನಂದಿನ ಸ್ಟ್ರೀಕ್</string>
     <string name="progress_days_value">%1$d ದಿನಗಳು</string>
     <string name="progress_keep_streak_alive">ಸ್ಟ್ರೀಕ್ ಮುಂದುವರಿಸಿ!</string>
+    <string name="progress_tap_to_view_calendar">ಕ್ಯಾಲೆಂಡರ್ ನೋಲಿಕೆಗಾಗಿ ಟ್ಯಾಪ್ ಮಾಡಿ</string>
     <string name="progress_best_label">ಅತ್ಯುತ್ತಮ</string>
     <string name="progress_days_lower_value">%1$d ದಿನಗಳು</string>
     <string name="progress_recent_sessions_title">ಇತ್ತೀಚಿನ ಸೆಷನ್‌ಗಳು</string>

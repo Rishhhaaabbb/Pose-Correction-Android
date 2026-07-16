@@ -4,6 +4,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import android.content.Intent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,13 +26,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,6 +56,8 @@ import com.posemonitor2.R
 import com.posemonitor2.onboarding.OnboardingActivity
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.SelfImprovement
+import kotlin.math.cos
+import kotlin.math.sin
 
 private val Yellow      = Color(0xFFE8B840)
 private val Orange      = Color(0xFFE85A2E)
@@ -72,6 +81,7 @@ fun UserHomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showHelpDialog by remember { mutableStateOf(false) }
+    var showBmiDetail by remember { mutableStateOf(false) }
 
     // Collect navigation events from HomeViewModel (recommended exercise tapped)
     LaunchedEffect(Unit) {
@@ -219,6 +229,7 @@ fun UserHomeScreen(
             weightKg = uiState.weightKg,
             targetWeightKg = uiState.targetWeightKg,
             currentStreak = uiState.currentStreak,
+            onClick = { if (uiState.bmi != null) showBmiDetail = true },
         )
         Spacer(Modifier.height(20.dp))
 
@@ -266,6 +277,15 @@ fun UserHomeScreen(
                 )
             },
             onDismiss = { showHelpDialog = false }
+        )
+    }
+
+    if (showBmiDetail && uiState.bmi != null) {
+        BmiDetailDialog(
+            bmi = uiState.bmi!!,
+            weightKg = uiState.weightKg,
+            targetWeightKg = uiState.targetWeightKg,
+            onDismiss = { showBmiDetail = false },
         )
     }
 }
@@ -677,11 +697,12 @@ private fun VitalsCard(
     weightKg: Double? = null,
     targetWeightKg: Double? = null,
     currentStreak: Int = 0,
+    onClick: () -> Unit = {},
 ) {
     val hasData = bmi != null || weightKg != null || currentStreak > 0
     
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().clickable(enabled = hasData) { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = homeSurfaceColor()),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
@@ -760,6 +781,239 @@ private fun VitalsCard(
 
 private fun calculateProgress(current: Double, target: Double): Float {
     return if (target > 0) (current / target).toFloat() else 0f
+}
+
+@Composable
+private fun BmiDetailDialog(
+    bmi: Double,
+    weightKg: Double?,
+    targetWeightKg: Double?,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(enabled = false) { }
+                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(24.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.home_bmi_detail_title),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    BmiGauge(bmi = bmi)
+
+                    Spacer(Modifier.height(20.dp))
+
+                    val bmiCategory = when {
+                        bmi < 18.5 -> stringResource(R.string.home_bmi_underweight)
+                        bmi < 25.0 -> stringResource(R.string.home_bmi_normal)
+                        bmi < 30.0 -> stringResource(R.string.home_bmi_overweight)
+                        else -> stringResource(R.string.home_bmi_obese)
+                    }
+                    val bmiCategoryColor = when {
+                        bmi < 18.5 -> Color(0xFF2196F3)
+                        bmi < 25.0 -> Color(0xFF4CAF50)
+                        bmi < 30.0 -> Color(0xFFFF9800)
+                        else -> Color(0xFFF44336)
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(50.dp),
+                        color = bmiCategoryColor.copy(alpha = 0.12f),
+                    ) {
+                        Text(
+                            text = bmiCategory,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = bmiCategoryColor,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        BmiRangeRow(label = stringResource(R.string.home_bmi_underweight), range = "< 18.5", color = Color(0xFF2196F3), active = bmi < 18.5)
+                        BmiRangeRow(label = stringResource(R.string.home_bmi_normal), range = "18.5 – 24.9", color = Color(0xFF4CAF50), active = bmi in 18.5..<25.0)
+                        BmiRangeRow(label = stringResource(R.string.home_bmi_overweight), range = "25 – 29.9", color = Color(0xFFFF9800), active = bmi in 25.0..<30.0)
+                        BmiRangeRow(label = stringResource(R.string.home_bmi_obese), range = "≥ 30", color = Color(0xFFF44336), active = bmi >= 30.0)
+                    }
+
+                    if (weightKg != null && targetWeightKg != null) {
+                        Spacer(Modifier.height(16.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        Spacer(Modifier.height(12.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(stringResource(R.string.home_current_status), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${weightKg.toInt()} / ${targetWeightKg.toInt()} kg", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BmiGauge(bmi: Double) {
+    val clampedBmi = bmi.coerceIn(10.0, 40.0)
+    val normalizedPos = ((clampedBmi - 10.0) / 30.0).toFloat()
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+
+    val gaugeColors = listOf(
+        Color(0xFF2196F3),
+        Color(0xFF4CAF50),
+        Color(0xFFFF9800),
+        Color(0xFFF44336),
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(160.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .align(Alignment.Center),
+        ) {
+            val strokeWidth = 28.dp.toPx()
+            val radius = (size.minDimension - strokeWidth) / 2
+            val center = Offset(size.width / 2, size.height)
+            val rect = Rect(center, radius)
+
+            drawArc(
+                color = Color(0xFF2196F3),
+                startAngle = 180f,
+                sweepAngle = 30f,
+                useCenter = false,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                topLeft = Offset(center.x - radius, center.y - radius),
+                size = Size(radius * 2, radius * 2),
+            )
+            drawArc(
+                color = Color(0xFF4CAF50),
+                startAngle = 210f,
+                sweepAngle = 30f,
+                useCenter = false,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                topLeft = Offset(center.x - radius, center.y - radius),
+                size = Size(radius * 2, radius * 2),
+            )
+            drawArc(
+                color = Color(0xFFFF9800),
+                startAngle = 240f,
+                sweepAngle = 30f,
+                useCenter = false,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                topLeft = Offset(center.x - radius, center.y - radius),
+                size = Size(radius * 2, radius * 2),
+            )
+            drawArc(
+                color = Color(0xFFF44336),
+                startAngle = 270f,
+                sweepAngle = 30f,
+                useCenter = false,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                topLeft = Offset(center.x - radius, center.y - radius),
+                size = Size(radius * 2, radius * 2),
+            )
+
+            val needleAngle = 180f + normalizedPos * 120f
+            val needleLength = radius - 8.dp.toPx()
+            val needleRad = Math.toRadians(needleAngle.toDouble())
+            val needleEnd = Offset(
+                x = center.x + needleLength * cos(needleRad).toFloat(),
+                y = center.y + needleLength * sin(needleRad).toFloat(),
+            )
+
+            drawCircle(
+                color = onSurfaceColor,
+                radius = 6.dp.toPx(),
+                center = center,
+            )
+            drawLine(
+                color = onSurfaceColor,
+                start = center,
+                end = needleEnd,
+                strokeWidth = 3.dp.toPx(),
+                cap = StrokeCap.Round,
+            )
+        }
+
+        Column(
+            modifier = Modifier.align(Alignment.BottomCenter),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = String.format("%.1f", bmi),
+                fontSize = 28.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "BMI",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 1.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BmiRangeRow(label: String, range: String, color: Color, active: Boolean) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                if (active) color.copy(alpha = 0.08f) else Color.Transparent,
+                RoundedCornerShape(8.dp)
+            )
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(color),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(label, fontSize = 13.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+        Text(range, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @Composable

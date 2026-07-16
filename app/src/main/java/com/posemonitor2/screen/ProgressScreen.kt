@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material3.*
@@ -17,6 +18,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -359,6 +361,25 @@ fun ProgressScreen(
                     fontSize = 13.sp,
                     color = Color(0xCCFFFFFF),
                 )
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.alpha(0.8f),
+                ) {
+                    Text(
+                        stringResource(R.string.progress_tap_to_view_calendar),
+                        fontSize = 11.sp,
+                        color = Color.White,
+                        letterSpacing = 0.5.sp,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
             }
 
             // Best badge — top right
