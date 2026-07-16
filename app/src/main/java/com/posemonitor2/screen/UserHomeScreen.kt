@@ -43,6 +43,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -888,68 +894,77 @@ private fun BmiGauge(bmi: Double) {
     val normalizedPos = ((clampedBmi - 10.0) / 30.0).toFloat()
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
 
-    val gaugeColors = listOf(
-        Color(0xFF2196F3),
-        Color(0xFF4CAF50),
-        Color(0xFFFF9800),
-        Color(0xFFF44336),
-    )
+    val animProgress = remember { Animatable(0f) }
+    val animNeedle = remember { Animatable(0f) }
+    val animNumber = remember { Animatable(0f) }
+
+    LaunchedEffect(bmi) {
+        animProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 800, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        )
+    }
+    LaunchedEffect(bmi) {
+        animNeedle.animateTo(
+            targetValue = normalizedPos,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow,
+            ),
+        )
+    }
+    LaunchedEffect(bmi) {
+        animNumber.animateTo(
+            targetValue = clampedBmi.toFloat(),
+            animationSpec = tween(durationMillis = 800, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        )
+    }
+
+    val displayedBmi = animNumber.value
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(160.dp),
+            .height(180.dp),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(120.dp)
+                .height(130.dp)
                 .align(Alignment.Center),
         ) {
             val strokeWidth = 28.dp.toPx()
             val radius = (size.minDimension - strokeWidth) / 2
             val center = Offset(size.width / 2, size.height)
-            val rect = Rect(center, radius)
 
-            drawArc(
-                color = Color(0xFF2196F3),
-                startAngle = 180f,
-                sweepAngle = 30f,
-                useCenter = false,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                topLeft = Offset(center.x - radius, center.y - radius),
-                size = Size(radius * 2, radius * 2),
-            )
-            drawArc(
-                color = Color(0xFF4CAF50),
-                startAngle = 210f,
-                sweepAngle = 30f,
-                useCenter = false,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                topLeft = Offset(center.x - radius, center.y - radius),
-                size = Size(radius * 2, radius * 2),
-            )
-            drawArc(
-                color = Color(0xFFFF9800),
-                startAngle = 240f,
-                sweepAngle = 30f,
-                useCenter = false,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                topLeft = Offset(center.x - radius, center.y - radius),
-                size = Size(radius * 2, radius * 2),
-            )
-            drawArc(
-                color = Color(0xFFF44336),
-                startAngle = 270f,
-                sweepAngle = 30f,
-                useCenter = false,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                topLeft = Offset(center.x - radius, center.y - radius),
-                size = Size(radius * 2, radius * 2),
+            val arcData = listOf(
+                Triple(Color(0xFF2196F3), 180f, 210f),
+                Triple(Color(0xFF4CAF50), 210f, 240f),
+                Triple(Color(0xFFFF9800), 240f, 270f),
+                Triple(Color(0xFFF44336), 270f, 300f),
             )
 
-            val needleAngle = 180f + normalizedPos * 120f
+            val totalSweep = 120f * animProgress.value
+
+            for ((color, segStart, segEnd) in arcData) {
+                val visibleEnd = minOf(segEnd, 180f + totalSweep)
+                val visibleSweep = (visibleEnd - segStart).coerceAtLeast(0f)
+
+                if (visibleSweep > 0f) {
+                    drawArc(
+                        color = color,
+                        startAngle = segStart,
+                        sweepAngle = visibleSweep,
+                        useCenter = false,
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                        topLeft = Offset(center.x - radius, center.y - radius),
+                        size = Size(radius * 2, radius * 2),
+                    )
+                }
+            }
+
+            val needleAngle = 180f + animNeedle.value * 120f
             val needleLength = radius - 8.dp.toPx()
             val needleRad = Math.toRadians(needleAngle.toDouble())
             val needleEnd = Offset(
@@ -976,7 +991,7 @@ private fun BmiGauge(bmi: Double) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = String.format("%.1f", bmi),
+                text = String.format("%.1f", displayedBmi),
                 fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface,
