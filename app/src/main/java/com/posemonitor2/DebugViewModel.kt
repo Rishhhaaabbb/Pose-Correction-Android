@@ -115,6 +115,9 @@ class DebugViewModel @Inject constructor(
     // Tracks the historical accuracy of each completed rep [0.0 - 1.0]
     val completedRepAccuracies = MutableStateFlow<List<Double>>(emptyList())
 
+    // Tracks how many reps were skipped (accuracy forced to 0 via skip button)
+    val skippedRepCount = MutableStateFlow(0)
+
     // Live rolling accuracy for the current rep [0.0 - 1.0], updated every frame.
     // Drives the PerformanceAccuracyBar height so the bar reflects real-time form.
     val liveRepAccuracy = MutableStateFlow(0f)
@@ -199,6 +202,7 @@ class DebugViewModel @Inject constructor(
         lastRepsCompleted = 0
         skipUsedInCurrentRep = false
         completedRepAccuracies.value = emptyList()
+        skippedRepCount.value = 0
         liveRepAccuracy.value = 0f
     }
 
@@ -244,6 +248,7 @@ class DebugViewModel @Inject constructor(
         currentRepCorrectCount = 0
         skipUsedInCurrentRep = false
         completedRepAccuracies.value = emptyList()
+        skippedRepCount.value = 0
 
         val app = getApplication<Application>()
         val graph = runCatching { loadGraph(app, graphEntry) }.getOrElse { e ->
@@ -466,6 +471,7 @@ class DebugViewModel @Inject constructor(
         if (status.repsCompleted < lastRepsCompleted) {
             lastRepsCompleted = status.repsCompleted
             completedRepAccuracies.value = emptyList()
+            skippedRepCount.value = 0
             currentRepFrameCount = 0
             currentRepCorrectCount = 0
             skipUsedInCurrentRep = false
@@ -484,6 +490,9 @@ class DebugViewModel @Inject constructor(
             
             Log.d("RepTracker", "Rep completed: #$lastRepsCompleted → accuracy=${"%.2f".format(accuracy * 100)}%")
             completedRepAccuracies.value = completedRepAccuracies.value + accuracy
+            if (skipUsedInCurrentRep) {
+                skippedRepCount.value = skippedRepCount.value + 1
+            }
             
             // Advance counter and reset for next rep
             lastRepsCompleted++

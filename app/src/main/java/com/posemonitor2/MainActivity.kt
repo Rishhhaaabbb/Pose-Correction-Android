@@ -66,7 +66,8 @@ data class ExerciseResult(
     val repsDone: Int,
     val targetReps: Int,
     val accuracy: Int,
-    val calories: Int
+    val calories: Int,
+    val skippedReps: Int = 0
 ) : java.io.Serializable
 
 @AndroidEntryPoint
@@ -420,6 +421,7 @@ private fun MainNavigation(
                 val currentReps by viewModel.currentRepCount.collectAsStateWithLifecycle()
                 val targetReps by viewModel.targetReps.collectAsStateWithLifecycle()
                 val accuracies by viewModel.completedRepAccuracies.collectAsStateWithLifecycle()
+                val skippedReps by viewModel.skippedRepCount.collectAsStateWithLifecycle()
                 val frameStatus by viewModel.frameStatus.collectAsStateWithLifecycle()
                 val cameraPermissionGranted by viewModel.cameraPermissionGranted.collectAsStateWithLifecycle()
 
@@ -555,6 +557,7 @@ fun MonitorScreen(
     val guidancePreview by viewModel.guidancePreviewState.collectAsStateWithLifecycle()
     val deviations      by viewModel.lastDeviations.collectAsStateWithLifecycle()
     val repHistory      by viewModel.completedRepAccuracies.collectAsStateWithLifecycle()
+    val skippedReps     by viewModel.skippedRepCount.collectAsStateWithLifecycle()
     val liveAccuracy    by viewModel.liveRepAccuracy.collectAsStateWithLifecycle()
     val liveFps         by viewModel.liveFps.collectAsStateWithLifecycle()
     val liveFeatureCount by viewModel.liveFeatureCount.collectAsStateWithLifecycle()
@@ -788,7 +791,8 @@ fun MonitorScreen(
             resultAdded = true
 
             val repsDone = if (currentReps > 0) currentReps else targetReps
-            val calories = (repsDone * 2.5).toInt()
+            val effectiveReps = (repsDone - skippedReps).coerceAtLeast(0)
+            val calories = (effectiveReps * 2.5).toInt()
             val avgAccuracy = if (accuracies.isNotEmpty()) {
                 (accuracies.sum() / accuracies.size * 100).toInt()
             } else 0
@@ -798,7 +802,8 @@ fun MonitorScreen(
                 repsDone = repsDone,
                 targetReps = targetReps,
                 accuracy = avgAccuracy,
-                calories = calories
+                calories = calories,
+                skippedReps = skippedReps
             )
 
             if (hasNext) {
@@ -1239,7 +1244,7 @@ fun MonitorScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            if (exerciseList.size > 1) "Workout Accomplished!" else "Exercise Completed!",
+                            if (exerciseList.size > 1) "Up Next!" else "Exercise Completed!",
                             fontSize = 28.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color(0xFF0D3B34)
@@ -1312,7 +1317,8 @@ fun MonitorScreen(
                                     onClick = { 
                                         if (resultAdded) return@Button
                                         val repsDone = if (currentReps > 0) currentReps else targetReps
-                                        val calories = (repsDone * 2.5).toInt()
+                                        val effectiveReps = (repsDone - skippedReps).coerceAtLeast(0)
+                                        val calories = (effectiveReps * 2.5).toInt()
                                         val avgAccuracy = if (accuracies.isNotEmpty()) {
                                             (accuracies.sum() / accuracies.size * 100).toInt()
                                         } else 0
@@ -1321,7 +1327,8 @@ fun MonitorScreen(
                                             repsDone = repsDone,
                                             targetReps = targetReps,
                                             accuracy = avgAccuracy,
-                                            calories = calories
+                                            calories = calories,
+                                            skippedReps = skippedReps
                                         )
                                         resultAdded = true
                                         onNext(exerciseIndex + 1, result) 
@@ -1388,7 +1395,8 @@ fun MonitorScreen(
                                 Button(
                                     onClick = {
                                         val repsDone = if (currentReps > 0) currentReps else targetReps
-                                        val calories = (repsDone * 2.5).toInt()
+                                        val effectiveReps = (repsDone - skippedReps).coerceAtLeast(0)
+                                        val calories = (effectiveReps * 2.5).toInt()
                                         val avgAccuracy = if (accuracies.isNotEmpty()) {
                                             (accuracies.sum() / accuracies.size * 100).toInt()
                                         } else 0
@@ -1398,6 +1406,7 @@ fun MonitorScreen(
                                             targetReps = targetReps,
                                             accuracy = avgAccuracy,
                                             calories = calories,
+                                            skippedReps = skippedReps,
                                         )
                                         onShowSummary(result)
                                     },
@@ -1437,6 +1446,7 @@ fun CustomWorkoutSummaryOverlay(
 ) {
     val totalCalories = results.sumOf { it.calories }
     val totalReps = results.sumOf { it.repsDone }
+    val totalSkipped = results.sumOf { it.skippedReps }
     val avgAccuracy = if (results.isNotEmpty()) results.sumOf { it.accuracy } / results.size else 0
 
     Box(
@@ -1496,6 +1506,9 @@ fun CustomWorkoutSummaryOverlay(
                         SummaryStatCircle("Cals", "$totalCalories", Color(0xFFFF9800))
                         SummaryStatCircle("Acc", "$avgAccuracy%", Color(0xFF4CAF50))
                         SummaryStatCircle("Reps", "$totalReps", Color(0xFF2196F3))
+                        if (totalSkipped > 0) {
+                            SummaryStatCircle("Skipped", "$totalSkipped", Color(0xFF9E9E9E))
+                        }
                     }
 
                     Spacer(Modifier.height(32.dp))
@@ -1525,8 +1538,9 @@ fun CustomWorkoutSummaryOverlay(
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
+                            val skippedText = if (result.skippedReps > 0) " • ${result.skippedReps} skipped" else ""
                             Text(
-                                "${result.repsDone}/${result.targetReps} reps • ${result.accuracy}% accuracy",
+                                "${result.repsDone}/${result.targetReps} reps • ${result.accuracy}% accuracy$skippedText",
                                 fontSize = 12.sp,
                                 color = Color.Gray
                             )
