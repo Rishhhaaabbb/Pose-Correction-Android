@@ -33,6 +33,7 @@ import androidx.navigation.NavController
 
 import androidx.compose.ui.res.stringResource
 import com.posemonitor2.R
+import com.posemonitor2.UserRoute
 
 @Composable
 fun AdminStatsScreen(
@@ -60,7 +61,7 @@ fun AdminStatsScreen(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { navController.popBackStack() }) {
+            IconButton(onClick = { navController.popBackStack(UserRoute.Home.route, inclusive = false) }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = tealColor)
             }
             Text(

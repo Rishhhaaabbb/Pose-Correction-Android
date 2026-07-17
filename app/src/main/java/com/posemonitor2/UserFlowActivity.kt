@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -306,20 +307,13 @@ private fun routeToTabRoot(route: String?): String = when {
     route == UserRoute.Profile.route -> UserRoute.Profile.route
     route == UserRoute.Library.route -> UserRoute.Library.route
     route == UserRoute.Graphs.route -> UserRoute.Graphs.route
-    route == UserRoute.AdminStats.route -> UserRoute.AdminStats.route
+    route == UserRoute.AdminStats.route -> UserRoute.Home.route
     else -> UserRoute.Home.route
 }
 
-private fun isMainTabRoute(route: String?): Boolean = when (route) {
-    UserRoute.Home.route,
-    UserRoute.Exercises.route,
-    UserRoute.CustomWorkout.route,
-    UserRoute.Progress.route,
-    UserRoute.Profile.route,
-    UserRoute.Library.route,
-    UserRoute.Graphs.route,
-    UserRoute.AdminStats.route -> true
-    else -> false
+private fun isMainTabRoute(route: String?): Boolean {
+    val tabRoot = routeToTabRoot(route)
+    return userBottomNavItems.any { it.route == tabRoot } || adminBottomNavItems.any { it.route == tabRoot }
 }
 
 @Composable
@@ -348,14 +342,17 @@ private fun UserBottomNavBar(navController: NavController, items: List<UserRoute
                             navController.popBackStack(item.route, inclusive = false)
                         }
                     } else {
-                        // Switch to any tab — save/restore state so each tab
-                        // remembers its scroll position and back stack
-                        navController.navigate(item.route) {
-                            popUpTo(navController.graph.startDestinationId) {
-                                saveState = true
+                        // Switch to any tab — try popBackStack first (most reliable),
+                        // fall back to navigate if the destination isn't in the stack
+                        val popped = navController.popBackStack(item.route, inclusive = false)
+                        if (!popped) {
+                            navController.navigate(item.route) {
+                                popUpTo(navController.graph.startDestinationId) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                            launchSingleTop = true
-                            restoreState = true
                         }
                     }
                 },
@@ -375,7 +372,7 @@ private fun UserBottomNavBar(navController: NavController, items: List<UserRoute
                         contentDescription = stringResource(item.labelResId),
                     )
                 },
-                label  = { Text(stringResource(item.labelResId)) },
+                label  = { Text(stringResource(item.labelResId), fontSize = 10.sp, maxLines = 1) },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor   = Color(0xFFE85A2E),
                     selectedTextColor   = Color(0xFFE85A2E),

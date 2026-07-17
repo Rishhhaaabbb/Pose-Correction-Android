@@ -1,11 +1,10 @@
-// app/src/main/java/com/posemonitor2/GraphGenerationActivity.kt
-
 package com.posemonitor2
 
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,11 +15,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -54,78 +55,115 @@ class GraphGenerationActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GraphGenerationScreen(viewModel: GraphGenerationViewModel) {
+    val context = LocalContext.current
+    val activity = context as? ComponentActivity
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var pendingVideoUri by remember { mutableStateOf<String?>(null) }
+    var showVisualization by remember { mutableStateOf(false) }
+
+    BackHandler {
+        if (showVisualization) {
+            showVisualization = false
+        } else {
+            activity?.finish()
+        }
+    }
 
     val videoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: android.net.Uri? ->
         if (uri != null) {
             pendingVideoUri = uri.toString()
-            // Ensure we're in idle state when video is selected
             viewModel.reset()
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF0F0F0F)),
-        contentAlignment = Alignment.Center,
-    ) {
-        when {
-            // Show settings when video is selected and not processing
-            pendingVideoUri != null && uiState is GenerationUiState.Idle -> {
-                Box(modifier = Modifier.padding(24.dp)) {
-                    SettingsContent(
-                        videoUri = pendingVideoUri!!,
-                        onConfirm = { config, graphName ->
-                            viewModel.startGeneration(
-                                videoUri  = pendingVideoUri!!,
-                                config    = config,
-                                graphName = graphName,
-                            )
-                        },
-                        onBack = { 
-                            pendingVideoUri = null
-                            viewModel.reset()
-                        },
-                    )
-                }
-            }
-
-            // Show processing/success/error states
-            uiState !is GenerationUiState.Idle -> {
-                when (val state = uiState) {
-                    is GenerationUiState.Processing -> {
-                        Box(modifier = Modifier.padding(24.dp)) {
-                            ProcessingContent(state)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { },
+                navigationIcon = {
+                    IconButton(onClick = {
+                        if (showVisualization) {
+                            showVisualization = false
+                        } else {
+                            activity?.finish()
                         }
-                    }
-                    is GenerationUiState.Success -> {
-                        SuccessContent(
-                            state = state,
-                            onGenerateAnother = { pendingVideoUri = null; viewModel.reset() }
+                    }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurface,
                         )
                     }
-                    is GenerationUiState.Error -> {
-                        Box(modifier = Modifier.padding(24.dp)) {
-                            ErrorContent(
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentAlignment = Alignment.Center,
+        ) {
+            when {
+                pendingVideoUri != null && uiState is GenerationUiState.Idle -> {
+                    Box(modifier = Modifier.padding(24.dp)) {
+                        SettingsContent(
+                            videoUri = pendingVideoUri!!,
+                            onConfirm = { config, graphName ->
+                                viewModel.startGeneration(
+                                    videoUri  = pendingVideoUri!!,
+                                    config    = config,
+                                    graphName = graphName,
+                                )
+                            },
+                            onBack = {
+                                pendingVideoUri = null
+                                viewModel.reset()
+                            },
+                        )
+                    }
+                }
+
+                uiState !is GenerationUiState.Idle -> {
+                    when (val state = uiState) {
+                        is GenerationUiState.Processing -> {
+                            Box(modifier = Modifier.padding(24.dp)) {
+                                ProcessingContent(state)
+                            }
+                        }
+                        is GenerationUiState.Success -> {
+                            SuccessContent(
                                 state = state,
-                                onRetry = { pendingVideoUri = null; viewModel.reset() }
+                                showVisualization = showVisualization,
+                                onToggleVisualization = { showVisualization = it },
+                                onGenerateAnother = { pendingVideoUri = null; viewModel.reset() }
                             )
                         }
+                        is GenerationUiState.Error -> {
+                            Box(modifier = Modifier.padding(24.dp)) {
+                                ErrorContent(
+                                    state = state,
+                                    onRetry = { pendingVideoUri = null; viewModel.reset() }
+                                )
+                            }
+                        }
+                        else -> {}
                     }
-                    else -> {}
                 }
-            }
 
-            // Show initial idle screen
-            else -> {
-                Box(modifier = Modifier.padding(24.dp)) {
-                    IdleContent(onPickVideo = { videoPicker.launch("video/*") })
+                else -> {
+                    Box(modifier = Modifier.padding(24.dp)) {
+                        IdleContent(onPickVideo = { videoPicker.launch("video/*") })
+                    }
                 }
             }
         }
@@ -136,21 +174,25 @@ fun GraphGenerationScreen(viewModel: GraphGenerationViewModel) {
 
 @Composable
 private fun IdleContent(onPickVideo: () -> Unit) {
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val primary = MaterialTheme.colorScheme.primary
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        Text(stringResource(R.string.gg_title), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(stringResource(R.string.gg_title), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = onSurface)
         Text(
             stringResource(R.string.gg_subtitle),
-            fontSize = 15.sp, color = Color(0xFF9E9E9E), textAlign = TextAlign.Center, lineHeight = 22.sp,
+            fontSize = 15.sp, color = onSurfaceVariant, textAlign = TextAlign.Center, lineHeight = 22.sp,
         )
         Spacer(Modifier.height(8.dp))
         Button(
             onClick = onPickVideo,
             modifier = Modifier.fillMaxWidth().height(56.dp),
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3), contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = primary, contentColor = MaterialTheme.colorScheme.onPrimary),
         ) {
             Text(stringResource(R.string.gg_choose_video), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         }
@@ -166,6 +208,13 @@ fun SettingsContent(
     onBack: () -> Unit,
 ) {
     val defaults = GeneratorConfig.DEFAULT
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val outline = MaterialTheme.colorScheme.outline
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val primary = MaterialTheme.colorScheme.primary
+    val error = MaterialTheme.colorScheme.error
+
     var graphName           by remember { mutableStateOf("") }
     var stabilityThreshold  by remember { mutableStateOf(defaults.stabilityThreshold.toString()) }
     var minHoldFrames       by remember { mutableStateOf(defaults.minHoldFrames.toString()) }
@@ -177,62 +226,64 @@ fun SettingsContent(
     var validationError     by remember { mutableStateOf<String?>(null) }
     val validationErrorMessage = stringResource(R.string.gg_validation_error)
 
+    val textFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = primary,
+        unfocusedBorderColor = outline,
+        focusedTextColor = onSurface,
+        unfocusedTextColor = onSurface,
+        cursorColor = primary,
+        focusedPlaceholderColor = onSurfaceVariant.copy(alpha = 0.5f),
+        unfocusedPlaceholderColor = onSurfaceVariant.copy(alpha = 0.5f),
+    )
+
     Column(
         modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(R.string.gg_settings_title), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(stringResource(R.string.gg_settings_title), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = onSurface)
         Text(
             "Video: ${Uri.parse(videoUri).lastPathSegment ?: videoUri}",
-            fontSize = 13.sp, color = Color(0xFF9E9E9E),
+            fontSize = 13.sp, color = onSurfaceVariant,
         )
 
         Spacer(Modifier.height(4.dp))
 
-        // ── Graph name ────────────────────────────────────────────────────────
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(R.string.gg_graph_name), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White)
+            Text(stringResource(R.string.gg_graph_name), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = onSurface)
             Text(
                 stringResource(R.string.gg_graph_name_hint),
-                fontSize = 12.sp, color = Color(0xFF757575),
+                fontSize = 12.sp, color = onSurfaceVariant,
             )
             OutlinedTextField(
                 value = graphName,
                 onValueChange = { graphName = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                placeholder = { Text(stringResource(R.string.gg_graph_name_placeholder), color = Color(0xFF555555)) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF2196F3),
-                    unfocusedBorderColor = Color(0xFF424242),
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    cursorColor = Color(0xFF2196F3),
-                ),
+                placeholder = { Text(stringResource(R.string.gg_graph_name_placeholder)) },
+                colors = textFieldColors,
                 shape = RoundedCornerShape(8.dp),
             )
         }
 
-        HorizontalDivider(color = Color(0xFF2A2A2A))
+        HorizontalDivider(color = outline.copy(alpha = 0.3f))
 
-        // ── Advanced parameters ───────────────────────────────────────────────
         ParamField("Stability Threshold", "Max feature distance to stay in same segment (default: 0.12)",
             stabilityThreshold, { stabilityThreshold = it }, KeyboardType.Decimal)
         ParamField("Min Hold Frames", "Minimum frames a pose must be held (default: 18)",
             minHoldFrames, { minHoldFrames = it }, KeyboardType.Number)
-        ParamField("Skip Frames", "Process every Nth frame — 1 = all frames (default: 1)",
+        ParamField("Skip Frames", "Process every Nth frame \u2014 1 = all frames (default: 1)",
             skipFrames, { skipFrames = it }, KeyboardType.Number)
         ParamField("Smoothing Window", "Rolling average window size (default: 7)",
             smoothingWindow, { smoothingWindow = it }, KeyboardType.Number)
         ParamField("Transition Buffer", "Frames skipped at segment boundaries (default: 3)",
             transitionBuffer, { transitionBuffer = it }, KeyboardType.Number)
-        ParamField("Tolerance Multiplier", "Feature tolerance = std × this value (default: 2.0)",
+        ParamField("Tolerance Multiplier", "Feature tolerance = std \u00d7 this value (default: 2.0)",
             toleranceMultiplier, { toleranceMultiplier = it }, KeyboardType.Decimal)
-        ParamField("Confidence Threshold", "Min keypoint confidence 0.0–1.0 (default: 0.6)",
+        ParamField("Confidence Threshold", "Min keypoint confidence 0.0\u20131.0 (default: 0.6)",
             confidenceThreshold, { confidenceThreshold = it }, KeyboardType.Decimal)
 
         if (validationError != null) {
-            Text(validationError!!, fontSize = 13.sp, color = Color(0xFFEF5350))
+            Text(validationError!!, fontSize = 13.sp, color = error)
         }
 
         Spacer(Modifier.height(8.dp))
@@ -242,8 +293,7 @@ fun SettingsContent(
                 onClick = onBack,
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-            ) { Text(stringResource(R.string.common_back), fontSize = 15.sp, color = Color.White) }
+            ) { Text(stringResource(R.string.common_back), fontSize = 15.sp) }
 
             Button(
                 onClick = {
@@ -260,7 +310,7 @@ fun SettingsContent(
                 },
                 modifier = Modifier.weight(2f).height(52.dp),
                 shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3), contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(containerColor = primary, contentColor = MaterialTheme.colorScheme.onPrimary),
             ) { Text(stringResource(R.string.gg_start_generation), fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
         }
 
@@ -272,6 +322,11 @@ fun SettingsContent(
 
 @Composable
 private fun ProcessingContent(state: GenerationUiState.Processing) {
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val primary = MaterialTheme.colorScheme.primary
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -280,18 +335,18 @@ private fun ProcessingContent(state: GenerationUiState.Processing) {
         CircularProgressIndicator(
             progress = { state.progressFraction },
             modifier = Modifier.size(80.dp),
-            color = Color(0xFF2196F3),
+            color = primary,
             strokeWidth = 6.dp,
         )
-        Text(state.message, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-        Text(state.detail, fontSize = 13.sp, color = Color(0xFF9E9E9E), textAlign = TextAlign.Center)
+        Text(state.message, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = onSurface)
+        Text(state.detail, fontSize = 13.sp, color = onSurfaceVariant, textAlign = TextAlign.Center)
         LinearProgressIndicator(
             progress = { state.progressFraction },
             modifier = Modifier.fillMaxWidth().height(6.dp),
-            color = Color(0xFF2196F3),
-            trackColor = Color(0xFF2A2A2A),
+            color = primary,
+            trackColor = surfaceVariant,
         )
-        Text("${"%.0f".format(state.progressFraction * 100)}%", fontSize = 13.sp, color = Color(0xFF9E9E9E))
+        Text("${"%.0f".format(state.progressFraction * 100)}%", fontSize = 13.sp, color = onSurfaceVariant)
     }
 }
 
@@ -300,41 +355,28 @@ private fun ProcessingContent(state: GenerationUiState.Processing) {
 @Composable
 private fun SuccessContent(
     state: GenerationUiState.Success,
+    showVisualization: Boolean,
+    onToggleVisualization: (Boolean) -> Unit,
     onGenerateAnother: () -> Unit,
 ) {
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val surface = MaterialTheme.colorScheme.surface
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val primary = MaterialTheme.colorScheme.primary
+
     val graph = remember(state.outputPath) {
         runCatching {
             PoseGraph.fromJson(File(state.outputPath).readText(Charsets.UTF_8))
         }.getOrNull()
     }
 
-    var showVisualization by remember { mutableStateOf(false) }
     val fileName = remember(state.outputPath) {
         state.outputPath.substringAfterLast("/").substringBeforeLast(".")
     }
 
     if (showVisualization && graph != null) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF1A1A1A))
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                TextButton(onClick = { showVisualization = false }) {
-                    Text(stringResource(R.string.common_back_arrow), color = Color(0xFF2196F3), fontSize = 15.sp)
-                }
-                Text(
-                    text = stringResource(R.string.gg_graph_visualization),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                )
-            }
-            PoseGraphVisualizationScreen(graph = graph)
-        }
+        PoseGraphVisualizationScreen(graph = graph)
     } else {
         Column(
             modifier = Modifier
@@ -344,12 +386,12 @@ private fun SuccessContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("✅", fontSize = 56.sp)
-            Text(stringResource(R.string.gg_generated_title), fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("\u2705", fontSize = 56.sp)
+            Text(stringResource(R.string.gg_generated_title), fontSize = 26.sp, fontWeight = FontWeight.Bold, color = onSurface)
 
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = Color(0xFF1A1A1A),
+                color = surfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
@@ -364,21 +406,20 @@ private fun SuccessContent(
 
             Spacer(Modifier.height(4.dp))
 
-            // Always show View Graph button
             Button(
                 onClick = {
                     if (graph != null) {
-                        showVisualization = true
+                        onToggleVisualization(true)
                     }
                 },
                 enabled = graph != null,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF37474F),
-                    contentColor = Color.White,
-                    disabledContainerColor = Color(0xFF2A2A2A),
-                    disabledContentColor = Color(0xFF666666)
+                    containerColor = surfaceVariant,
+                    contentColor = onSurface,
+                    disabledContainerColor = surfaceVariant.copy(alpha = 0.5f),
+                    disabledContentColor = onSurfaceVariant.copy(alpha = 0.5f),
                 ),
             ) {
                 Text(stringResource(R.string.gg_view_graph), fontSize = 15.sp, fontWeight = FontWeight.Medium)
@@ -388,7 +429,7 @@ private fun SuccessContent(
                 onClick = onGenerateAnother,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3), contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(containerColor = primary, contentColor = MaterialTheme.colorScheme.onPrimary),
             ) {
                 Text(stringResource(R.string.gg_generate_another), fontSize = 15.sp)
             }
@@ -400,25 +441,30 @@ private fun SuccessContent(
 
 @Composable
 private fun ErrorContent(state: GenerationUiState.Error, onRetry: () -> Unit) {
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val error = MaterialTheme.colorScheme.error
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Text("❌", fontSize = 56.sp)
-        Text(stringResource(R.string.gg_failed_title), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFF1A1A1A), modifier = Modifier.fillMaxWidth()) {
+        Text("\u274C", fontSize = 56.sp)
+        Text(stringResource(R.string.gg_failed_title), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = onSurface)
+        Surface(shape = RoundedCornerShape(12.dp), color = surfaceVariant, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(state.reason.replace("_", " "), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFEF5350))
+                Text(state.reason.replace("_", " "), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = error)
                 Spacer(Modifier.height(8.dp))
-                Text(state.detail, fontSize = 13.sp, color = Color(0xFF9E9E9E), lineHeight = 20.sp)
+                Text(state.detail, fontSize = 13.sp, color = onSurfaceVariant, lineHeight = 20.sp)
             }
         }
         Button(
             onClick = onRetry,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF424242), contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = surfaceVariant, contentColor = onSurface),
         ) { Text(stringResource(R.string.common_try_again), fontSize = 15.sp) }
     }
 }
@@ -433,9 +479,14 @@ private fun ParamField(
     onValueChange: (String) -> Unit,
     keyboardType: KeyboardType,
 ) {
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val outline = MaterialTheme.colorScheme.outline
+    val primary = MaterialTheme.colorScheme.primary
+
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White)
-        Text(description, fontSize = 12.sp, color = Color(0xFF757575))
+        Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = onSurface)
+        Text(description, fontSize = 12.sp, color = onSurfaceVariant)
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
@@ -443,11 +494,11 @@ private fun ParamField(
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFF2196F3),
-                unfocusedBorderColor = Color(0xFF424242),
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                cursorColor = Color(0xFF2196F3),
+                focusedBorderColor = primary,
+                unfocusedBorderColor = outline,
+                focusedTextColor = onSurface,
+                unfocusedTextColor = onSurface,
+                cursorColor = primary,
             ),
             shape = RoundedCornerShape(8.dp),
         )
@@ -456,9 +507,12 @@ private fun ParamField(
 
 @Composable
 private fun StatRow(label: String, value: String) {
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val onSurface = MaterialTheme.colorScheme.onSurface
+
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, fontSize = 13.sp, color = Color(0xFF9E9E9E))
-        Text(value, fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Medium)
+        Text(label, fontSize = 13.sp, color = onSurfaceVariant)
+        Text(value, fontSize = 13.sp, color = onSurface, fontWeight = FontWeight.Medium)
     }
 }
 

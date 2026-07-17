@@ -28,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -319,7 +320,7 @@ fun ProfileScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     uiState.preferredExercises.take(3).forEach { pref ->
                         Surface(shape = RoundedCornerShape(8.dp), color = surfaceVariant) {
-                            Text(pref, fontSize = 13.sp, color = onBackground, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+                            Text(pref, fontSize = 13.sp, color = onBackground, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
                         }
                     }
                 }

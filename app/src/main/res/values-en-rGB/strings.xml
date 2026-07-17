@@ -166,8 +166,8 @@
     <string name="admin_stats_namaste">Namaste, Admin</string>
     <string name="admin_stats_total_users">TOTAL USERS</string>
     <string name="admin_stats_new_members">NEW MEMBERS</string>
-    <string name="admin_stats_live_users">LIVE USERS</string>
-    <string name="admin_stats_live_now">Live Now</string>
+    <string name="admin_stats_live_users">ACTIVE THIS WEEK</string>
+    <string name="admin_stats_live_now">Past 7 Days</string>
     <string name="admin_stats_community_growth">Community\nGrowth</string>
     <string name="admin_stats_week">Week</string>
     <string name="admin_stats_month">Month</string>

@@ -282,15 +282,46 @@ fun CustomWorkoutEditorScreen(
                 }
             }
 
+            Spacer(Modifier.height(10.dp))
+
+            Surface(
+                onClick = { showAddSheet = true },
+                shape = RoundedCornerShape(14.dp),
+                color = tealColor.copy(alpha = 0.10f),
+                border = BorderStroke(1.dp, tealColor.copy(alpha = 0.3f)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        tint = tealColor,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    Text(
+                        text = stringResource(R.string.CustomWorkout_add_exercise),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = tealColor,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
 
             Button(
                 onClick = {
                     coroutineScope.launch {
                         viewModel.saveCustomWorkout()
-                        snackbarHostState.showSnackbar(
-                            context.getString(R.string.CustomWorkout_saved_message)
-                        )
+                        navController.previousBackStackEntry?.savedStateHandle?.set("workout_saved", true)
+                        navController.popBackStack()
                     }
                 },
                 modifier = Modifier

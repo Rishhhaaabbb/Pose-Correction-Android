@@ -30,58 +30,61 @@ class AdminStatsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                // Log current auth state
-                val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
-                android.util.Log.d("AdminStatsViewModel", "=== AUTH STATE ===")
-                android.util.Log.d("AdminStatsViewModel", "Current user: ${currentUser?.email}")
-                android.util.Log.d("AdminStatsViewModel", "User UID: ${currentUser?.uid}")
-                android.util.Log.d("AdminStatsViewModel", "Is anonymous: ${currentUser?.isAnonymous}")
-                
-                // 1. Total Users from Firestore (NO FALLBACK)
-                android.util.Log.d("AdminStatsViewModel", "=== FETCHING FROM FIRESTORE ===")
+                // 1. Total Users from Firestore
                 val profilesSnapshot = firestore.collection("profiles").get().await()
                 val totalUsers = profilesSnapshot.size()
-                android.util.Log.d("AdminStatsViewModel", "✓ Firestore profiles count: $totalUsers")
                 
                 // 2. Total Workout Sessions (completed) from Firestore
                 val sessionsSnapshot = firestore.collection("workout_sessions")
                     .whereEqualTo("status", "COMPLETED")
                     .get().await()
                 val totalSessions = sessionsSnapshot.size()
-                android.util.Log.d("AdminStatsViewModel", "✓ Firestore total sessions: $totalSessions")
                 
-                // 3. Recent sessions (last 24 hours) from Firestore
-                val oneDayAgo = System.currentTimeMillis() - (24 * 60 * 60 * 1000)
-                val recentSnapshot = firestore.collection("workout_sessions")
-                    .whereGreaterThan("ended_at", oneDayAgo)
+                // 3. Active users in the last 7 days (unique user IDs)
+                val sevenDaysAgo = System.currentTimeMillis() - (7L * 24 * 60 * 60 * 1000)
+                val weekSnapshot = firestore.collection("workout_sessions")
+                    .whereGreaterThan("ended_at", sevenDaysAgo)
                     .get().await()
-                val recentSessions = recentSnapshot.size()
-                android.util.Log.d("AdminStatsViewModel", "✓ Firestore recent sessions (24h): $recentSessions")
+                val activeUserIds = weekSnapshot.documents.mapNotNull { doc ->
+                    doc.getString("user_id")
+                }.toSet()
+                val activeThisWeek = activeUserIds.size
 
-                // 4. Growth Data
-                val growthData = listOf(0.8f, 0.9f, 0.85f, 0.5f, 0.2f, 0.8f, 0.3f)
+                // 4. New members this week (profiles created in last 7 days)
+                val newMembersSnapshot = firestore.collection("profiles")
+                    .whereGreaterThan("created_at", sevenDaysAgo)
+                    .get().await()
+                val newMembers = newMembersSnapshot.size()
 
-                android.util.Log.d("AdminStatsViewModel", "=== FINAL STATS ===")
-                android.util.Log.d("AdminStatsViewModel", "Users: $totalUsers, Sessions: $totalSessions, Recent: $recentSessions")
+                // 5. Weekly growth data: sessions per day over last 7 days
+                val dayMillis = 24L * 60 * 60 * 1000
+                val todayStart = System.currentTimeMillis() - (System.currentTimeMillis() % dayMillis)
+                val growthData = (6 downTo 0).map { daysAgo ->
+                    val dayStart = todayStart - (daysAgo * dayMillis)
+                    val dayEnd = dayStart + dayMillis
+                    val daySessions = weekSnapshot.documents.count { doc ->
+                        val endedAt = doc.getLong("ended_at") ?: 0L
+                        endedAt in dayStart until dayEnd
+                    }
+                    // Normalize to 0..1 relative to peak
+                    daySessions.toFloat()
+                }
+                val peak = growthData.maxOrNull()?.coerceAtLeast(1f) ?: 1f
+                val normalizedGrowth = growthData.map { it / peak }
 
                 _uiState.value = AdminStatsUiState(
                     totalUsers = totalUsers,
-                    newMembers = recentSessions,
-                    liveUsers = totalSessions,
-                    growthData = growthData,
+                    newMembers = newMembers,
+                    liveUsers = activeThisWeek,
+                    growthData = normalizedGrowth,
                     isLoading = false
                 )
             } catch (e: Exception) {
-                android.util.Log.e("AdminStatsViewModel", "=== FIRESTORE ERROR ===")
-                android.util.Log.e("AdminStatsViewModel", "Error type: ${e.javaClass.simpleName}")
-                android.util.Log.e("AdminStatsViewModel", "Error message: ${e.message}")
-                android.util.Log.e("AdminStatsViewModel", "Full error:", e)
-                
                 _uiState.value = AdminStatsUiState(
                     totalUsers = 0,
                     newMembers = 0,
                     liveUsers = 0,
-                    growthData = listOf(0.8f, 0.9f, 0.85f, 0.5f, 0.2f, 0.8f, 0.3f),
+                    growthData = emptyList(),
                     isLoading = false
                 )
             }

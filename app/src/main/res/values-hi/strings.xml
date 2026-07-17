@@ -69,8 +69,8 @@
     <string name="admin_stats_namaste">नमस्ते, एडमिन</string>
     <string name="admin_stats_total_users">कुल उपयोगकर्ता</string>
     <string name="admin_stats_new_members">नए सदस्य</string>
-    <string name="admin_stats_live_users">लाइव उपयोगकर्ता</string>
-    <string name="admin_stats_live_now">अभी लाइव</string>
+    <string name="admin_stats_live_users">इस सप्ताह सक्रिय</string>
+    <string name="admin_stats_live_now">पिछले 7 दिन</string>
     <string name="admin_stats_community_growth">कम्युनिटी\nग्रोथ</string>
     <string name="admin_stats_week">सप्ताह</string>
     <string name="admin_stats_month">महीना</string>

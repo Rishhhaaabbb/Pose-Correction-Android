@@ -86,6 +86,13 @@ fun CustomWorkoutScreen(
         snackbarHostState.showSnackbar(message)
     }
 
+    LaunchedEffect(Unit) {
+        val saved = navController.currentBackStackEntry?.savedStateHandle?.remove<Boolean>("workout_saved")
+        if (saved == true) {
+            snackbarHostState.showSnackbar(context.getString(R.string.CustomWorkout_saved_message))
+        }
+    }
+
     Scaffold(
         containerColor = hubBgColor(),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },

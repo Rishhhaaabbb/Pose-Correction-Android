@@ -1,5 +1,3 @@
-// app/src/main/java/com/posemonitor2/screen/ExerciseDetailScreen.kt
-
 package com.posemonitor2.screen
 
 import android.content.Intent
@@ -22,6 +20,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -66,13 +65,12 @@ fun ExerciseDetailScreen(
     var holdPreset by rememberSaveable(fileName) { mutableStateOf(HoldPreset.DEFAULT) }
     var holdInputError by rememberSaveable(fileName) { mutableStateOf<String?>(null) }
     var defaultHoldDuration by remember(fileName) { mutableStateOf(2.0) }
-    
-    // Auto-start flag for custom workout mode
+
     val isCustomWorkoutMode = targetReps != null
     var hasAutoStarted by rememberSaveable(fileName, targetReps) { mutableStateOf(false) }
 
     BackHandler { onBack() }
-    
+
     val videoAssetPath = fileName.removeSuffix(".json") + ".mp4"
     val displayName = fileName.removeSuffix(".json").replace("-", " ").uppercase()
     val requiredOrientation = remember(fileName) {
@@ -107,6 +105,17 @@ fun ExerciseDetailScreen(
         }
     }
 
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val bgColor = MaterialTheme.colorScheme.background
+    val cardBg = if (isDark) Color(0xFF162D30) else Color(0xFFD0ECE5)
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val onBgColor = MaterialTheme.colorScheme.onBackground
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val primaryColor = if (isDark) Color(0xFF80CBC4) else Color(0xFF1A6B5A)
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val subtleColor = if (isDark) Color(0xFF162D30).copy(alpha = 0.5f) else Color(0xFFD0ECE5).copy(alpha = 0.5f)
+
     LaunchedEffect(videoAssetPath) {
         try {
             val retriever = MediaMetadataRetriever()
@@ -139,29 +148,29 @@ fun ExerciseDetailScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F2628))
+            .background(bgColor)
             .verticalScroll(rememberScrollState())
-            .padding(24.dp)
-            .navigationBarsPadding(),
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().statusBarsPadding(),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = onBgColor)
             }
-            Text(stringResource(R.string.exercise_detail_title), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.exercise_detail_title), color = onBgColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
 
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(16.dp))
 
-        // ── Tutorial Preview Card (Image 1 logic) ────────────────────────────
         Surface(
             modifier = Modifier.fillMaxWidth().height(280.dp),
             shape = RoundedCornerShape(32.dp),
-            color = Color(0x33FFFFFF),
+            color = cardBg,
             onClick = {
                 if (placementConfirmed) {
                     showTutorialDialog = true
@@ -169,7 +178,6 @@ fun ExerciseDetailScreen(
             }
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                // Background Thumbnail
                 thumbnail?.let {
                     Image(
                         bitmap = it.asImageBitmap(),
@@ -177,7 +185,6 @@ fun ExerciseDetailScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
-                    // Dark overlay for legibility
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -191,7 +198,7 @@ fun ExerciseDetailScreen(
                     verticalArrangement = Arrangement.Center
                 ) {
                     Surface(
-                        color = Color(0xFFE8622E),
+                        color = secondaryColor,
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.padding(bottom = 16.dp)
                     ) {
@@ -203,22 +210,22 @@ fun ExerciseDetailScreen(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                         )
                     }
-                    
+
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
                         modifier = Modifier
                             .size(72.dp)
-                            .background(Color.White, RoundedCornerShape(12.dp))
+                            .background(surfaceColor, RoundedCornerShape(12.dp))
                             .padding(12.dp),
-                        tint = Color(0xFF0D3B34)
+                        tint = primaryColor
                     )
-                    
+
                     Spacer(Modifier.height(16.dp))
-                    
+
                     Text(
                         text = "WATCH TUTORIAL",
-                        color = Color.White,
+                        color = onBgColor,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = 1.sp
@@ -231,7 +238,7 @@ fun ExerciseDetailScreen(
 
         Text(
             text = displayName,
-            color = Color.White,
+            color = onBgColor,
             fontSize = 32.sp,
             fontWeight = FontWeight.ExtraBold,
             letterSpacing = 2.sp
@@ -241,7 +248,7 @@ fun ExerciseDetailScreen(
 
         Text(
             text = stringResource(R.string.exercise_detail_description),
-            color = Color(0xAAFFFFFF),
+            color = mutedColor,
             fontSize = 14.sp,
             lineHeight = 22.sp,
             textAlign = TextAlign.Center
@@ -252,7 +259,7 @@ fun ExerciseDetailScreen(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            color = Color(0x1AFFFFFF),
+            color = cardBg,
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -261,17 +268,17 @@ fun ExerciseDetailScreen(
                 ) {
                     Text(
                         text = "PHONE PLACEMENT",
-                        color = Color.White,
+                        color = onBgColor,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                     )
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = Color(0x33E8622E),
+                        color = secondaryColor.copy(alpha = 0.2f),
                     ) {
                         Text(
                             text = orientationLabel,
-                            color = Color(0xFFFFB79E),
+                            color = secondaryColor,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -283,7 +290,7 @@ fun ExerciseDetailScreen(
 
                 Text(
                     text = placementInstructions,
-                    color = Color(0xE6FFFFFF),
+                    color = onSurfaceColor.copy(alpha = 0.9f),
                     fontSize = 13.sp,
                     lineHeight = 19.sp,
                 )
@@ -295,7 +302,7 @@ fun ExerciseDetailScreen(
                     shape = RoundedCornerShape(12.dp),
                     enabled = !placementConfirmed,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (placementConfirmed) Color(0x3355CC88) else Color(0xFF1E6E60),
+                        containerColor = if (placementConfirmed) primaryColor.copy(alpha = 0.2f) else primaryColor,
                         contentColor = Color.White,
                     ),
                     modifier = Modifier.fillMaxWidth(),
@@ -314,12 +321,12 @@ fun ExerciseDetailScreen(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            color = Color(0x1AFFFFFF),
+            color = cardBg,
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "HOLD DURATION",
-                    color = Color.White,
+                    color = onBgColor,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                 )
@@ -328,7 +335,7 @@ fun ExerciseDetailScreen(
 
                 Text(
                     text = "Default from exercise graph: ${"%.1f".format(defaultHoldDuration)}s",
-                    color = Color(0xCCFFFFFF),
+                    color = mutedColor,
                     fontSize = 12.sp,
                 )
 
@@ -336,7 +343,7 @@ fun ExerciseDetailScreen(
                     Spacer(Modifier.height(6.dp))
                     Text(
                         text = it,
-                        color = Color(0xFFFFD6C5),
+                        color = secondaryColor,
                         fontSize = 12.sp,
                         lineHeight = 18.sp,
                     )
@@ -363,12 +370,12 @@ fun ExerciseDetailScreen(
                                     HoldPreset.TEN -> "10 counts"
                                     HoldPreset.TWENTY_ONE -> "21 counts"
                                 }
-                                Text(text, color = if (selected) Color.White else Color(0xFFBDBDBD))
+                                Text(text, color = if (selected) Color.White else mutedColor)
                             },
                             colors = FilterChipDefaults.filterChipColors(
                                 containerColor = Color.Transparent,
-                                labelColor = Color(0xFFBDBDBD),
-                                selectedContainerColor = Color(0xFFE8622E),
+                                labelColor = mutedColor,
+                                selectedContainerColor = secondaryColor,
                                 selectedLabelColor = Color.White,
                             ),
                             modifier = Modifier.height(40.dp)
@@ -380,11 +387,8 @@ fun ExerciseDetailScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        // Quick-rep buttons removed per user request.
-
         Spacer(Modifier.height(16.dp))
 
-        // Keep the manual Start button which opens the rep-count dialog (Default behavior)
         Button(
             onClick = {
                 if (!placementConfirmed) {
@@ -392,7 +396,6 @@ fun ExerciseDetailScreen(
                     return@Button
                 }
                 if (isCustomWorkoutMode) {
-                    // Custom workout mode: auto-start with target reps
                     startExerciseSession(
                         context = context,
                         fileName = fileName,
@@ -406,14 +409,13 @@ fun ExerciseDetailScreen(
                         targetRepsMap = targetRepsMap,
                     )
                 } else {
-                    // Default/manual flow: show rep dialog
                     showRepDialog = true
                 }
             },
             modifier = Modifier.fillMaxWidth().height(64.dp),
             shape = RoundedCornerShape(16.dp),
             enabled = placementConfirmed,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8622E), contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = secondaryColor, contentColor = Color.White),
         ) {
             Text(
                 text = if (isCustomWorkoutMode) {
@@ -441,27 +443,27 @@ fun ExerciseDetailScreen(
 
     if (!placementConfirmed) {
         Dialog(onDismissRequest = {}) {
-            Surface(shape = RoundedCornerShape(16.dp), color = Color(0xFF1B2628)) {
+            Surface(shape = RoundedCornerShape(16.dp), color = surfaceColor) {
                 Column(
                     modifier = Modifier.padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
                         text = "Switch phone orientation first",
-                        color = Color.White,
+                        color = onSurfaceColor,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                     )
                     Text(
                         text = placementInstructions,
-                        color = Color(0xE6FFFFFF),
+                        color = onSurfaceColor.copy(alpha = 0.9f),
                         fontSize = 13.sp,
                         lineHeight = 19.sp,
                     )
                     Button(
                         onClick = { placementConfirmed = true },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8622E)),
+                        colors = ButtonDefaults.buttonColors(containerColor = secondaryColor),
                     ) {
                         Text("Got it, continue", color = Color.White)
                     }
@@ -526,10 +528,17 @@ private fun RepCountDialog(
     var repCount by remember { mutableStateOf("10") }
     var isError by remember { mutableStateOf(false) }
 
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val outlineColor = MaterialTheme.colorScheme.outline
+    val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = Color.White,
+            color = surfaceColor,
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
@@ -539,7 +548,7 @@ private fun RepCountDialog(
                     text = "Set Rep Count",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0D3B34)
+                    color = primaryColor
                 )
 
                 Spacer(Modifier.height(16.dp))
@@ -547,7 +556,7 @@ private fun RepCountDialog(
                 Text(
                     text = "How many reps do you want to do?",
                     fontSize = 14.sp,
-                    color = Color(0xFF888888)
+                    color = mutedColor
                 )
 
                 Spacer(Modifier.height(20.dp))
@@ -563,6 +572,15 @@ private fun RepCountDialog(
                     singleLine = true,
                     isError = isError,
                     supportingText = if (isError) {{ Text("Please enter a valid number") }} else null,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = onSurfaceColor,
+                        unfocusedTextColor = onSurfaceColor,
+                        cursorColor = secondaryColor,
+                        focusedBorderColor = secondaryColor,
+                        unfocusedBorderColor = outlineColor,
+                        focusedLabelColor = secondaryColor,
+                        unfocusedLabelColor = mutedColor,
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -588,7 +606,7 @@ private fun RepCountDialog(
                             }
                         },
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8622E))
+                        colors = ButtonDefaults.buttonColors(containerColor = secondaryColor)
                     ) {
                         Text("Start", color = Color.White)
                     }

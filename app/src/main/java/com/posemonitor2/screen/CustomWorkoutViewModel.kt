@@ -15,7 +15,7 @@ import javax.inject.Inject
 @HiltViewModel
 class CustomWorkoutViewModel @Inject constructor(
     private val exerciseRepository: ExerciseRepository,
-    private val CustomWorkoutStore: CustomWorkoutStore,
+    val CustomWorkoutStore: CustomWorkoutStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CustomWorkoutUiState(isLoading = true))

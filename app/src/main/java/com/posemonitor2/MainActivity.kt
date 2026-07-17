@@ -586,6 +586,24 @@ fun MonitorScreen(
     val hasNext = exerciseIndex + 1 < exerciseList.size
     var resultAdded by remember { mutableStateOf(false) }
 
+    // ── First-up countdown: shown before the first exercise in a multi-exercise workout ──
+    var showFirstUpCountdown by remember { mutableStateOf(
+        exerciseList.size > 1 && exerciseIndex == 0
+    ) }
+    var firstUpCountdownSeconds by remember { mutableIntStateOf(5) }
+
+    // Timer for first-up countdown
+    LaunchedEffect(showFirstUpCountdown) {
+        if (showFirstUpCountdown) {
+            firstUpCountdownSeconds = 5
+            while (firstUpCountdownSeconds > 0) {
+                kotlinx.coroutines.delay(1000)
+                firstUpCountdownSeconds--
+            }
+            showFirstUpCountdown = false
+        }
+    }
+
     // Reset countdown and result flag when exercise changes (auto-advance)
     LaunchedEffect(exerciseIndex) {
         countdownSeconds = 5
@@ -784,12 +802,6 @@ fun MonitorScreen(
     
     LaunchedEffect(sessionCompleted) {
         if (sessionCompleted && !resultAdded) {
-            // Set resultAdded IMMEDIATELY to prevent duplicate calls.
-            // onNext() triggers resetSessionState() which sets sessionCompleted=false,
-            // cancelling this coroutine before the delay completes. If resultAdded
-            // isn't set first, the effect fires again on the next completion.
-            resultAdded = true
-
             val repsDone = if (currentReps > 0) currentReps else targetReps
             val effectiveReps = (repsDone - skippedReps).coerceAtLeast(0)
             val calories = (effectiveReps * 2.5).toInt()
@@ -811,10 +823,16 @@ fun MonitorScreen(
                     kotlinx.coroutines.delay(1000)
                     countdownSeconds--
                 }
-                onNext(exerciseIndex + 1, result)
+                if (!resultAdded) {
+                    resultAdded = true
+                    onNext(exerciseIndex + 1, result)
+                }
             } else if (exerciseList.size > 1) {
                 kotlinx.coroutines.delay(2000)
-                onShowSummary(result)
+                if (!resultAdded) {
+                    resultAdded = true
+                    onShowSummary(result)
+                }
             }
         }
     }
@@ -1204,6 +1222,86 @@ fun MonitorScreen(
             }
         }
 
+        // ── First-up countdown overlay ─────────────────────────────────────
+        // Shown before the first exercise in a multi-exercise custom workout.
+        // Camera/model loads during the countdown.
+        AnimatedVisibility(
+            visible = showFirstUpCountdown,
+            enter = fadeIn(tween(300)),
+            exit = fadeOut(tween(500)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xDD000000)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    // Exercise name
+                    val firstUpName = if (exerciseList.isNotEmpty()) {
+                        exerciseList[0].replace("-", " ").uppercase()
+                    } else ""
+
+                    Text(
+                        text = "FIRST UP",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF888888),
+                        letterSpacing = 3.sp,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = firstUpName,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(32.dp))
+
+                    // Countdown circle
+                    val infiniteTransition = rememberInfiniteTransition(label = "first_up_pulse")
+                    val pulseScale by infiniteTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.15f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(500, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse,
+                        ),
+                        label = "pulse",
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .graphicsLayer {
+                                scaleX = pulseScale
+                                scaleY = pulseScale
+                            }
+                            .background(Color(0xFFE8622E), RoundedCornerShape(50.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "$firstUpCountdownSeconds",
+                            fontSize = 42.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
+                        )
+                    }
+
+                    Spacer(Modifier.height(24.dp))
+                    Text(
+                        text = "Get ready!",
+                        fontSize = 14.sp,
+                        color = Color(0xFFAAAAAA),
+                    )
+                }
+            }
+        }
+
         // ── Results Overlay ──────────────────────────────────────────────────
         AnimatedVisibility(
             visible = sessionCompleted,
@@ -1212,230 +1310,151 @@ fun MonitorScreen(
                 initialScale = 0.9f
             ),
         ) {
-            // Use viewModel to get exercise name
             val exerciseName = viewModel.getCurrentExerciseName()?.removeSuffix(".json")?.replace("-", " ")?.uppercase() ?: "Exercise"
-            
-            // Use targetReps since currentReps may be 0 at this point
             val repsDone = if (currentReps > 0) currentReps else targetReps
-            
-            // Calculate calories based on exercise (using default 2.5 cal/rep)
-            val calories = (repsDone * 2.5).toInt()
-            
+            val effectiveReps = (repsDone - skippedReps).coerceAtLeast(0)
+            val calories = (effectiveReps * 2.5).toInt()
             val avgAccuracy = if (accuracies.isNotEmpty()) {
                 (accuracies.sum() / accuracies.size * 100).toInt()
             } else 0
+
+            val surfaceColor = MaterialTheme.colorScheme.surface
+            val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+            val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xDD000000))
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                    .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
                     shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
-                    modifier = Modifier.widthIn(max = 500.dp).wrapContentHeight()
+                    color = surfaceColor,
+                    modifier = Modifier.widthIn(max = 440.dp)
                 ) {
                     Column(
-                        modifier = Modifier
-                            .padding(horizontal = 24.dp, vertical = 16.dp)
-                            .verticalScroll(rememberScrollState()),
+                        modifier = Modifier.padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            if (exerciseList.size > 1) "Up Next!" else "Exercise Completed!",
-                            fontSize = 28.sp,
+                            text = if (hasNext) "Exercise Complete!" else "All Done!",
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF0D3B34)
+                            color = onSurfaceColor
                         )
-                        
-                        Spacer(Modifier.height(8.dp))
-                        
-                        Text(
-                            exerciseName,
-                            fontSize = 16.sp,
-                            color = Color(0xFF888888)
-                        )
-                        
-                        Spacer(Modifier.height(24.dp))
-                        
+                        Spacer(Modifier.height(2.dp))
+                        Text(exerciseName, fontSize = 13.sp, color = mutedColor)
+
+                        Spacer(Modifier.height(20.dp))
+
+                        // Stats row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
-                            ResultStatItem("Reps", "$repsDone/$targetReps")
-                            ResultStatItem("Accuracy", "$avgAccuracy%")
-                            ResultStatItem("Calories", "$calories")
+                            ResultStatItem("Reps", "$repsDone/$targetReps", onSurfaceColor, mutedColor)
+                            ResultStatItem("Acc", "$avgAccuracy%", onSurfaceColor, mutedColor)
+                            ResultStatItem("Cal", "$calories", onSurfaceColor, mutedColor)
+                            if (skippedReps > 0) {
+                                ResultStatItem("Skip", "$skippedReps", onSurfaceColor, mutedColor)
+                            }
                         }
-                        
-                        Spacer(Modifier.height(24.dp))
-                        
+
+                        Spacer(Modifier.height(20.dp))
+
                         if (hasNext) {
                             val nextExercise = exerciseList[exerciseIndex + 1].replace("-", " ").uppercase()
-                            Text(
-                                text = "Next up: $nextExercise",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFE8622E)
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            // Pulsing countdown
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text("UP NEXT", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer, letterSpacing = 1.sp)
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(nextExercise, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                }
+                            }
+                            Spacer(Modifier.height(12.dp))
+
                             val infiniteTransition = rememberInfiniteTransition(label = "countdown_pulse")
                             val pulseScale by infiniteTransition.animateFloat(
-                                initialValue = 1f,
-                                targetValue = 1.08f,
-                                animationSpec = infiniteRepeatable(
-                                    animation = tween(500, easing = FastOutSlowInEasing),
-                                    repeatMode = RepeatMode.Reverse
-                                ),
+                                initialValue = 1f, targetValue = 1.08f,
+                                animationSpec = infiniteRepeatable(tween(500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
                                 label = "pulse_scale"
                             )
                             Text(
-                                text = "Starting in $countdownSeconds seconds...",
-                                fontSize = 12.sp,
-                                color = Color(0xFF888888),
-                                modifier = Modifier.graphicsLayer {
-                                    scaleX = pulseScale
-                                    scaleY = pulseScale
-                                }
+                                text = "Starting in $countdownSeconds...",
+                                fontSize = 13.sp, color = mutedColor,
+                                modifier = Modifier.graphicsLayer { scaleX = pulseScale; scaleY = pulseScale }
                             )
                             Spacer(Modifier.height(16.dp))
-                            
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = onFinish,
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(16.dp),
-                                ) {
-                                    Text("End Workout", fontWeight = FontWeight.Bold)
+
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                OutlinedButton(onClick = onFinish, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(14.dp)) {
+                                    Text("End Workout", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
-                                Button(
-                                    onClick = { 
-                                        if (resultAdded) return@Button
-                                        val repsDone = if (currentReps > 0) currentReps else targetReps
-                                        val effectiveReps = (repsDone - skippedReps).coerceAtLeast(0)
-                                        val calories = (effectiveReps * 2.5).toInt()
-                                        val avgAccuracy = if (accuracies.isNotEmpty()) {
-                                            (accuracies.sum() / accuracies.size * 100).toInt()
-                                        } else 0
-                                        val result = ExerciseResult(
-                                            name = viewModel.getCurrentExerciseName() ?: "Exercise",
-                                            repsDone = repsDone,
-                                            targetReps = targetReps,
-                                            accuracy = avgAccuracy,
-                                            calories = calories,
-                                            skippedReps = skippedReps
-                                        )
-                                        resultAdded = true
-                                        onNext(exerciseIndex + 1, result) 
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8622E))
-                                ) {
-                                    Text("Next", fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        } else {
-                            if (exerciseList.size <= 1) {
-                                // ── Single exercise: Save / Discard ───────────────
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = "Save this session to your history?",
-                                    fontSize = 13.sp,
-                                    color = Color(0xFF888888),
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                )
-                                Spacer(Modifier.height(16.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                ) {
-                                    OutlinedButton(
-                                        onClick = {
-                                            viewModel.discardLastSession()
-                                            onFinish()
-                                        },
-                                        modifier = Modifier.weight(1f).height(52.dp),
-                                        shape = RoundedCornerShape(16.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(
-                                            contentColor = Color(0xFFCC3333),
-                                        ),
-                                        border = BorderStroke(
-                                            1.dp, Color(0xFFCC3333)
-                                        ),
-                                    ) {
-                                        Text(
-                                            "Discard",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp,
-                                        )
-                                    }
-                                    Button(
-                                        onClick = onFinish,
-                                        modifier = Modifier.weight(1f).height(52.dp),
-                                        shape = RoundedCornerShape(16.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = Color(0xFFE8622E),
-                                        ),
-                                    ) {
-                                        Text(
-                                            "Save",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp,
-                                        )
-                                    }
-                                }
-                            } else {
-                                // ── Multi-exercise: See Summary ───────────────────
                                 Button(
                                     onClick = {
-                                        val repsDone = if (currentReps > 0) currentReps else targetReps
-                                        val effectiveReps = (repsDone - skippedReps).coerceAtLeast(0)
-                                        val calories = (effectiveReps * 2.5).toInt()
-                                        val avgAccuracy = if (accuracies.isNotEmpty()) {
-                                            (accuracies.sum() / accuracies.size * 100).toInt()
-                                        } else 0
-                                        val result = ExerciseResult(
-                                            name = viewModel.getCurrentExerciseName() ?: "Exercise",
-                                            repsDone = repsDone,
-                                            targetReps = targetReps,
-                                            accuracy = avgAccuracy,
-                                            calories = calories,
-                                            skippedReps = skippedReps,
-                                        )
-                                        onShowSummary(result)
+                                        if (resultAdded) return@Button
+                                        val result = ExerciseResult(exerciseName, repsDone, targetReps, avgAccuracy, calories, skippedReps)
+                                        resultAdded = true
+                                        onNext(exerciseIndex + 1, result)
                                     },
-                                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFFE8622E),
-                                    ),
+                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8622E))
                                 ) {
-                                    Text(
-                                        "See Summary",
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold,
-                                    )
+                                    Text("Next", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
                                 }
                             }
-                        }
+                        } else if (exerciseList.size <= 1) {
+                            Spacer(Modifier.height(4.dp))
+                            Text("Save this session to your history?", fontSize = 13.sp, color = mutedColor)
+                            Spacer(Modifier.height(16.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                OutlinedButton(
+                                    onClick = { viewModel.discardLastSession(); onFinish() },
+                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFCC3333)),
+                                    border = BorderStroke(1.dp, Color(0xFFCC3333)),
+                                ) { Text("Discard", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                                Button(
+                                    onClick = onFinish,
+                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8622E)),
+                                ) { Text("Save", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White) }
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    val result = ExerciseResult(exerciseName, repsDone, targetReps, avgAccuracy, calories, skippedReps)
+                                    onShowSummary(result)
+                                },
+                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8622E)),
+                            ) { Text("See Summary", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White) }
                         }
                     }
                 }
             }
         }
     }
+}
 
 @Composable
-private fun ResultStatItem(label: String, value: String) {
+private fun ResultStatItem(label: String, value: String, valueColor: Color = Color(0xFF0D3B34), labelColor: Color = Color(0xFF888888)) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0D3B34))
-        Text(label, fontSize = 14.sp, color = Color(0xFF888888))
+        Text(value, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = valueColor)
+        Text(label, fontSize = 12.sp, color = labelColor)
     }
 }
 
@@ -1458,23 +1477,10 @@ fun CustomWorkoutSummaryOverlay(
     ) {
         Surface(
             shape = RoundedCornerShape(28.dp),
-            color = Color.White,
+            color = MaterialTheme.colorScheme.surface,
             modifier = Modifier.widthIn(max = 500.dp).fillMaxHeight()
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                // Close button in top right
-                IconButton(
-                    onClick = onFinish,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                ) {
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Default.Close,
-                        contentDescription = "Close Summary",
-                        tint = Color.Gray
-                    )
-                }
 
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -1486,13 +1492,13 @@ fun CustomWorkoutSummaryOverlay(
                         "Workout Accomplished!",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF0D3B34)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     
                     Text(
                         "Great job! You've finished all exercises.",
                         fontSize = 14.sp,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
                     )
 
@@ -1570,16 +1576,17 @@ fun CustomWorkoutSummaryOverlay(
 
 @Composable
 private fun SummaryStatCircle(label: String, value: String, color: Color) {
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
                 .size(64.dp)
-                .background(color.copy(alpha = 0.1f), RoundedCornerShape(32.dp)),
+                .background(surfaceVariant, RoundedCornerShape(32.dp)),
             contentAlignment = Alignment.Center
         ) {
             Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = color)
         }
         Spacer(Modifier.height(4.dp))
-        Text(label, fontSize = 12.sp, color = Color.Gray)
+        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

@@ -1,11 +1,10 @@
-// app/src/main/java/com/posemonitor2/HomeActivity.kt
-
 package com.posemonitor2
 
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,7 +16,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -35,7 +33,6 @@ import java.io.File
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.posemonitor2.auth.AuthViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import kotlinx.coroutines.launch
@@ -56,8 +53,6 @@ class HomeActivity : ComponentActivity() {
         }
     }
 }
-
-// ── Navigation ────────────────────────────────────────────────────────────────
 
 private sealed class HomeScreen {
     object Home : HomeScreen()
@@ -85,11 +80,10 @@ private fun HomeNav() {
     val scope = rememberCoroutineScope()
 
     when (val s = screen) {
-        is HomeScreen.Home -> HomeScreen(
+        is HomeScreen.Home -> HomeScreenContent(
             onViewGraphs = { screen = HomeScreen.GraphList },
             onLogout = {
                 scope.launch {
-                    // Sign out Google client so the account chooser shows next sign-in
                     runCatching {
                         val webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
                         if (webClientId.isNotBlank()) {
@@ -115,17 +109,20 @@ private fun HomeNav() {
     }
 }
 
-// ── Home ──────────────────────────────────────────────────────────────────────
-
 @Composable
-private fun HomeScreen(onViewGraphs: () -> Unit, onLogout: () -> Unit) {
+private fun HomeScreenContent(onViewGraphs: () -> Unit, onLogout: () -> Unit) {
     val context = LocalContext.current
     BackHandler { onLogout() }
+
+    val surface = MaterialTheme.colorScheme.surface
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0F0F))
+            .background(MaterialTheme.colorScheme.background)
             .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -143,12 +140,12 @@ private fun HomeScreen(onViewGraphs: () -> Unit, onLogout: () -> Unit) {
                         text = stringResource(R.string.admin_home_title),
                         fontSize = 34.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = onSurface,
                     )
                     Text(
                         text = stringResource(R.string.admin_home_subtitle),
                         fontSize = 15.sp,
-                        color = Color(0xFF9E9E9E),
+                        color = onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
                 }
@@ -156,7 +153,7 @@ private fun HomeScreen(onViewGraphs: () -> Unit, onLogout: () -> Unit) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Logout,
                         contentDescription = "Logout",
-                        tint = Color.White
+                        tint = onSurfaceVariant,
                     )
                 }
             }
@@ -167,7 +164,7 @@ private fun HomeScreen(onViewGraphs: () -> Unit, onLogout: () -> Unit) {
                 title = stringResource(R.string.admin_generate_graph_title),
                 description = stringResource(R.string.admin_generate_graph_desc),
                 buttonLabel = stringResource(R.string.gg_choose_video),
-                buttonColor = Color(0xFF2196F3),
+                buttonColor = MaterialTheme.colorScheme.primary,
                 onClick = {
                     context.startActivity(
                         Intent(context, GraphGenerationActivity::class.java)
@@ -179,7 +176,7 @@ private fun HomeScreen(onViewGraphs: () -> Unit, onLogout: () -> Unit) {
                 title = stringResource(R.string.admin_start_monitoring_title),
                 description = stringResource(R.string.admin_start_monitoring_desc),
                 buttonLabel = stringResource(R.string.admin_open_camera),
-                buttonColor = Color(0xFF4CAF50),
+                buttonColor = MaterialTheme.colorScheme.tertiary,
                 onClick = {
                     context.startActivity(
                         Intent(context, MainActivity::class.java)
@@ -191,14 +188,12 @@ private fun HomeScreen(onViewGraphs: () -> Unit, onLogout: () -> Unit) {
                 title = stringResource(R.string.admin_view_graphs_title),
                 description = stringResource(R.string.admin_view_graphs_desc),
                 buttonLabel = stringResource(R.string.admin_view_graphs_title),
-                buttonColor = Color(0xFF9C27B0),
+                buttonColor = MaterialTheme.colorScheme.secondary,
                 onClick = onViewGraphs,
             )
         }
     }
 }
-
-// ── Graph list ────────────────────────────────────────────────────────────────
 
 @Composable
 private fun GraphListScreen(
@@ -208,10 +203,16 @@ private fun GraphListScreen(
     val context = LocalContext.current
     val graphs = remember { loadAvailableGraphs(context) }
 
+    val surface = MaterialTheme.colorScheme.surface
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val outline = MaterialTheme.colorScheme.outline
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0F0F))
+            .background(MaterialTheme.colorScheme.background)
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -222,13 +223,13 @@ private fun GraphListScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             TextButton(onClick = onBack) {
-                Text(stringResource(R.string.common_back_arrow), color = Color(0xFF9E9E9E), fontSize = 14.sp)
+                Text(stringResource(R.string.common_back_arrow), color = onSurfaceVariant, fontSize = 14.sp)
             }
             Text(
                 stringResource(R.string.admin_pose_graphs_title),
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = onSurface,
             )
         }
 
@@ -241,17 +242,17 @@ private fun GraphListScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text("📂", fontSize = 48.sp)
+                    Text("\uD83D\uDCC2", fontSize = 48.sp)
                     Text(
                         stringResource(R.string.admin_no_graphs_yet),
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
+                        color = onSurface,
                     )
                     Text(
                         stringResource(R.string.admin_generate_graph_first_home),
                         fontSize = 14.sp,
-                        color = Color(0xFF9E9E9E),
+                        color = onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         lineHeight = 20.sp,
                     )
@@ -269,17 +270,21 @@ private fun GraphListScreen(
 
 @Composable
 private fun GraphBrowseCard(entry: GraphEntry, onClick: () -> Unit) {
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF1A1A1A), RoundedCornerShape(10.dp))
+            .background(surfaceVariant, RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text(
-            text = if (entry.isAsset) "📦" else "📊",
+            text = if (entry.isAsset) "\uD83D\uDCE6" else "\uD83D\uDCCA",
             fontSize = 24.sp,
         )
         Column(modifier = Modifier.weight(1f)) {
@@ -287,19 +292,17 @@ private fun GraphBrowseCard(entry: GraphEntry, onClick: () -> Unit) {
                 text = entry.fileName.removeSuffix(".json"),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                color = onSurface,
             )
             Text(
                 text = if (entry.isAsset) stringResource(R.string.gs_bundled) else stringResource(R.string.admin_generated),
                 fontSize = 12.sp,
-                color = Color(0xFF757575),
+                color = onSurfaceVariant,
             )
         }
-        Text(stringResource(R.string.common_chevron_right), fontSize = 20.sp, color = Color(0xFF555555))
+        Text(stringResource(R.string.common_chevron_right), fontSize = 20.sp, color = onSurfaceVariant)
     }
 }
-
-// ── Graph viewer ──────────────────────────────────────────────────────────────
 
 @Composable
 private fun GraphViewScreen(entry: GraphEntry, onBack: () -> Unit) {
@@ -316,24 +319,29 @@ private fun GraphViewScreen(entry: GraphEntry, onBack: () -> Unit) {
         }.getOrNull()
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF5F5F5))) {
-        // Top bar
+    val surface = MaterialTheme.colorScheme.surface
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val error = MaterialTheme.colorScheme.error
+    val primary = MaterialTheme.colorScheme.primary
+
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF1A1A1A))
+                .background(surface)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             TextButton(onClick = onBack) {
-                Text(stringResource(R.string.common_back_arrow), color = Color(0xFF2196F3), fontSize = 15.sp)
+                Text(stringResource(R.string.common_back_arrow), color = primary, fontSize = 15.sp)
             }
             Text(
                 text = entry.fileName.removeSuffix(".json"),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                color = onSurface,
             )
         }
 
@@ -345,17 +353,17 @@ private fun GraphViewScreen(entry: GraphEntry, onBack: () -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text("⚠️", fontSize = 48.sp)
+                    Text("\u26A0\uFE0F", fontSize = 48.sp)
                     Text(
                         stringResource(R.string.admin_failed_load_graph),
                         fontSize = 16.sp,
-                        color = Color(0xFFEF5350),
+                        color = error,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
                         entry.filePath,
                         fontSize = 12.sp,
-                        color = Color(0xFF757575),
+                        color = onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
                 }
@@ -364,19 +372,21 @@ private fun GraphViewScreen(entry: GraphEntry, onBack: () -> Unit) {
     }
 }
 
-// ── Home card ─────────────────────────────────────────────────────────────────
-
 @Composable
 private fun HomeCard(
     title: String,
     description: String,
     buttonLabel: String,
-    buttonColor: Color,
+    buttonColor: androidx.compose.ui.graphics.Color,
     onClick: () -> Unit,
 ) {
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFF1A1A1A),
+        color = surfaceVariant,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -387,12 +397,12 @@ private fun HomeCard(
                 text = title,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                color = onSurface,
             )
             Text(
                 text = description,
                 fontSize = 13.sp,
-                color = Color(0xFF9E9E9E),
+                color = onSurfaceVariant,
                 lineHeight = 20.sp,
             )
             Button(

@@ -71,7 +71,7 @@ private fun graphColors(): GraphColors {
         nodeBorder = if (isDark) Color(0xFFB2DFDB) else Color(0xFF2D5A5E),
         edge       = if (isDark) Color(0xFFB2DFDB) else Color(0xFF2D5A5E),
         labelBg    = if (isDark) Color(0xFF2E4444) else Color.White,
-        labelText  = Color.White,   // always white — visible on both dark bg and light bg with border
+        labelText  = if (isDark) Color.White else Color(0xFF1A1A1A),
         teal       = if (isDark) Color(0xFF80CBC4) else Color(0xFF2D5A5E),
         surface    = scheme.surface,
         onSurface  = scheme.onSurface,

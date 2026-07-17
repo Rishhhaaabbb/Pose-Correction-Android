@@ -52,9 +52,9 @@ fun GraphSelectorScreen(
     deleteTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
-            containerColor = Color(0xFF1E1E1E),
-            titleContentColor = Color.White,
-            textContentColor = Color(0xFFCCCCCC),
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             title = { Text("Delete Graph", fontWeight = FontWeight.SemiBold) },
             text = {
                 Text("Are you sure you want to delete \"${target.fileName.removeSuffix(".json")}\"?")
@@ -111,7 +111,7 @@ fun GraphSelectorScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0F0F)),
+            .background(MaterialTheme.colorScheme.background),
     ) {
         Column(
             modifier = Modifier
@@ -125,12 +125,12 @@ fun GraphSelectorScreen(
                 stringResource(R.string.gs_select_exercise),
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
             )
             Text(
                 stringResource(R.string.gs_choose_graph_subtitle),
                 fontSize = 14.sp,
-                color = Color(0xFF9E9E9E),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Spacer(Modifier.height(8.dp))
@@ -151,12 +151,12 @@ fun GraphSelectorScreen(
                             stringResource(R.string.gs_no_graphs_found),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onBackground,
                         )
                         Text(
                             stringResource(R.string.gs_generate_graph_first),
                             fontSize = 14.sp,
-                            color = Color(0xFF9E9E9E),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             lineHeight = 20.sp,
                         )
@@ -192,8 +192,8 @@ fun GraphSelectorScreen(
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF2196F3),
-                    disabledContainerColor = Color(0xFF2A2A2A),
-                    disabledContentColor = Color(0xFF555555),
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 ),
             ) {
                 Text(
@@ -220,21 +220,21 @@ private fun RenameDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF1E1E1E),
-        titleContentColor = Color.White,
-        textContentColor = Color(0xFFCCCCCC),
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         title = { Text(stringResource(R.string.gs_rename_graph), fontWeight = FontWeight.SemiBold) },
         text = {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
                 singleLine = true,
-                placeholder = { Text(stringResource(R.string.gs_graph_name_placeholder), color = Color(0xFF666666)) },
+                placeholder = { Text(stringResource(R.string.gs_graph_name_placeholder), color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color(0xFF2196F3),
-                    unfocusedBorderColor = Color(0xFF444444),
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                     cursorColor = Color(0xFF2196F3),
                 ),
                 modifier = Modifier.fillMaxWidth(),
@@ -266,8 +266,8 @@ private fun GraphEntryCard(
     onLongClick: (() -> Unit)?,
     onDelete: (() -> Unit)? = null,
 ) {
-    val borderColor = if (isSelected) Color(0xFF2196F3) else Color(0xFF2A2A2A)
-    val bgColor     = if (isSelected) Color(0xFF0D2A3E) else Color(0xFF1A1A1A)
+    val borderColor = if (isSelected) Color(0xFF2196F3) else MaterialTheme.colorScheme.outline
+    val bgColor     = if (isSelected) Color(0xFF0D2A3E) else MaterialTheme.colorScheme.surface
 
     Row(
         modifier = Modifier
@@ -296,7 +296,7 @@ private fun GraphEntryCard(
                 text = entry.fileName.removeSuffix(".json"),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = when {
@@ -304,7 +304,7 @@ private fun GraphEntryCard(
                     else -> stringResource(R.string.gs_generated_hold_rename)
                 },
                 fontSize = 12.sp,
-                color = Color(0xFF757575),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -321,7 +321,7 @@ private fun GraphEntryCard(
             Box(
                 modifier = Modifier
                     .size(22.dp)
-                    .border(1.5.dp, Color(0xFF555555), RoundedCornerShape(11.dp)),
+                    .border(1.5.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(11.dp)),
             )
         }
     }

@@ -143,6 +143,30 @@ class CustomWorkoutStore @Inject constructor(
         return "My CustomWorkout ${customCount + 1}"
     }
 
+    fun renameExercise(oldName: String, newName: String) {
+        storeScope.launch {
+            val allWorkouts = _customWorkouts.value
+            for (workout in allWorkouts) {
+                val oldIndex = workout.exerciseIds.indexOf(oldName)
+                if (oldIndex == -1) continue
+                val updatedIds = workout.exerciseIds.toMutableList()
+                updatedIds[oldIndex] = newName
+                val updatedReps = workout.exerciseTargetReps.toMutableMap()
+                val reps = updatedReps.remove(oldName)
+                if (reps != null) {
+                    updatedReps[newName] = reps
+                }
+                val now = System.currentTimeMillis()
+                val updated = workout.copy(
+                    exerciseIds = updatedIds.distinct(),
+                    exerciseTargetReps = sanitizeTargets(updatedIds, updatedReps),
+                    updatedAtEpochMs = now,
+                )
+                customWorkoutDao.upsert(updated.toEntity())
+            }
+        }
+    }
+
     private fun sanitizeTargets(
         exerciseIds: List<String>,
         targetMap: Map<String, Int>,

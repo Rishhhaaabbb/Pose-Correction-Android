@@ -496,7 +496,7 @@ private fun HeroCard(modifier: Modifier = Modifier, onJoinSession: () -> Unit) {
                         text = stringResource(R.string.home_hero_title),
                         fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = Color(0xFF0D3B34),
                         fontFamily = FontFamily.Serif,
                         lineHeight = 26.sp,
                     )

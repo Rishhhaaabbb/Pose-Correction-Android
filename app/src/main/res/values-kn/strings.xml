@@ -69,8 +69,8 @@
     <string name="admin_stats_namaste">ನಮಸ್ಕಾರ, ಅಡ್ಮಿನ್</string>
     <string name="admin_stats_total_users">ಒಟ್ಟು ಬಳಕೆದಾರರು</string>
     <string name="admin_stats_new_members">ಹೊಸ ಸದಸ್ಯರು</string>
-    <string name="admin_stats_live_users">ಲೈವ್ ಬಳಕೆದಾರರು</string>
-    <string name="admin_stats_live_now">ಈಗ ಲೈವ್</string>
+    <string name="admin_stats_live_users">ಈ ವಾರ ಸಕ್ರಿಯ</string>
+    <string name="admin_stats_live_now">ಕಳೆದ 7 ದಿನ</string>
     <string name="admin_stats_community_growth">ಸಮುದಾಯದ\nಬೆಳವಣಿಗೆ</string>
     <string name="admin_stats_week">ವಾರ</string>
     <string name="admin_stats_month">ತಿಂಗಳು</string>

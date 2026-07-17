@@ -25,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -36,6 +38,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.delay
@@ -409,9 +417,30 @@ private fun WorkoutCard(
 
 @Composable
 private fun WorkoutCardSkeleton() {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val shimmerX by infiniteTransition.animateFloat(
+        initialValue = -300f,
+        targetValue = 1200f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "shimmer_x",
+    )
+
+    val shimmerBrush = Brush.linearGradient(
+        colors = listOf(
+            Color(0xFFE8E8E8),
+            Color(0xFFF5F5F5),
+            Color(0xFFE8E8E8),
+        ),
+        start = Offset(shimmerX - 200f, 0f),
+        end = Offset(shimmerX + 200f, 0f),
+    )
+
     Surface(
         shape = RoundedCornerShape(16.dp),
-                            color = exercisesSurfaceColor(),
+        color = exercisesSurfaceColor(),
         shadowElevation = 3.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -423,7 +452,7 @@ private fun WorkoutCardSkeleton() {
                 modifier = Modifier
                     .size(80.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFFE0E0E0)),
+                    .background(shimmerBrush),
             )
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -432,7 +461,7 @@ private fun WorkoutCardSkeleton() {
                         .width(40.dp)
                         .height(12.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xFFE0E0E0))
+                        .background(shimmerBrush)
                 )
                 Spacer(Modifier.height(8.dp))
                 Box(
@@ -440,7 +469,7 @@ private fun WorkoutCardSkeleton() {
                         .width(160.dp)
                         .height(22.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xFFE0E0E0))
+                        .background(shimmerBrush)
                 )
                 Spacer(Modifier.height(8.dp))
                 Box(
@@ -448,7 +477,7 @@ private fun WorkoutCardSkeleton() {
                         .width(100.dp)
                         .height(14.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xFFE0E0E0))
+                        .background(shimmerBrush)
                 )
             }
             Spacer(Modifier.width(14.dp))
@@ -456,7 +485,7 @@ private fun WorkoutCardSkeleton() {
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFE0E0E0)),
+                    .background(shimmerBrush),
             )
         }
     }

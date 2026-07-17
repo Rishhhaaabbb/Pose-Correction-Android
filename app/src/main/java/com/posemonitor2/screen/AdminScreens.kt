@@ -4,6 +4,7 @@ package com.posemonitor2.screen
 
 import android.content.Context
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
@@ -55,7 +57,7 @@ fun LibraryScreen(
     ) { uri: Uri? ->
         if (uri != null) {
             android.util.Log.d("LibraryScreen", "Video selected: $uri")
-            viewModel.reset()  // Ensure clean state
+            viewModel.reset()
             pendingVideoUri = uri
             android.util.Log.d("LibraryScreen", "State reset, pendingVideoUri set")
         }
@@ -72,6 +74,15 @@ fun LibraryScreen(
     }
 
     var showError by remember { mutableStateOf<String?>(null) }
+    var showVisualization by remember { mutableStateOf(false) }
+
+    val bg = MaterialTheme.colorScheme.background
+    val surface = MaterialTheme.colorScheme.surface
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val primary = MaterialTheme.colorScheme.primary
+    val error = MaterialTheme.colorScheme.error
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
 
     if (showError != null) {
         AlertDialog(
@@ -86,13 +97,67 @@ fun LibraryScreen(
         )
     }
 
-    Box(
+    BackHandler(enabled = showVisualization) {
+        showVisualization = false
+    }
+
+    if (showVisualization) {
+        val vizGraph = remember(uiState) {
+            val st = uiState
+            if (st is GenerationUiState.Success) {
+                runCatching {
+                    PoseGraph.fromJson(File(st.outputPath).readText(Charsets.UTF_8))
+                }.getOrNull()
+            } else null
+        }
+        Box(modifier = Modifier.fillMaxSize().background(bg)) {
+            if (vizGraph != null) {
+                PoseGraphVisualizationScreen(graph = vizGraph)
+            }
+            IconButton(
+                onClick = { showVisualization = false },
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(8.dp)
+                    .align(Alignment.TopStart),
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = onSurface,
+                )
+            }
+        }
+    } else {
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF2EEE4))
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
+            .background(bg)
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = {
+                if (showVisualization) showVisualization = false
+                else navController.popBackStack()
+            }) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = onSurface,
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
         when (val state = uiState) {
             is GenerationUiState.Idle -> {
                 android.util.Log.d("LibraryScreen", "State is Idle, pendingVideoUri=$pendingVideoUri")
@@ -105,21 +170,21 @@ fun LibraryScreen(
                             text = "Admin Video Library",
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0A3D3F)
+                            color = onSurface
                         )
                         Text(
                             text = "Upload or record an exercise video to automatically generate a pose graph.",
                             fontSize = 14.sp,
-                            color = Color(0xFF888888),
+                            color = onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 32.dp),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
-                        
+
                         Button(
                             onClick = { videoPicker.launch("video/*") },
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D4A4E))
+                            colors = ButtonDefaults.buttonColors(containerColor = primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                         ) {
                             Icon(Icons.Default.FileUpload, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
@@ -143,8 +208,8 @@ fun LibraryScreen(
                             },
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(12.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0D4A4E)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF0D4A4E))
+                            border = androidx.compose.foundation.BorderStroke(1.dp, primary),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = primary)
                         ) {
                             Icon(Icons.Default.CameraAlt, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
@@ -152,7 +217,6 @@ fun LibraryScreen(
                         }
                     }
                 } else {
-                    // Show full parameter settings
                     android.util.Log.d("LibraryScreen", "Showing SettingsContent")
                     SettingsContent(
                         videoUri = pendingVideoUri.toString(),
@@ -163,7 +227,7 @@ fun LibraryScreen(
                                 graphName = graphName
                             )
                         },
-                        onBack = { 
+                        onBack = {
                             pendingVideoUri = null
                             viewModel.reset()
                         }
@@ -174,58 +238,36 @@ fun LibraryScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(progress = { state.progressFraction })
                     Spacer(Modifier.height(16.dp))
-                    Text(state.message, fontWeight = FontWeight.Bold)
-                    Text(state.detail, fontSize = 12.sp, color = Color.Gray)
+                    Text(state.message, fontWeight = FontWeight.Bold, color = onSurface)
+                    Text(state.detail, fontSize = 12.sp, color = onSurfaceVariant)
                 }
             }
             is GenerationUiState.Success -> {
                 val fileName = remember(state.outputPath) {
                     state.outputPath.substringAfterLast("/").substringBeforeLast(".")
                 }
-                
+
                 val graph = remember(state.outputPath) {
                     runCatching {
                         PoseGraph.fromJson(File(state.outputPath).readText(Charsets.UTF_8))
                     }.getOrNull()
                 }
-                
-                var showVisualization by remember { mutableStateOf(false) }
-                
+
                 if (showVisualization && graph != null) {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color(0xFF1A1A1A))
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            TextButton(onClick = { showVisualization = false }) {
-                                Text("← Back", color = Color(0xFF2196F3), fontSize = 15.sp)
-                            }
-                            Text(
-                                text = "Graph Visualization",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White,
-                            )
-                        }
-                        PoseGraphVisualizationScreen(graph = graph)
-                    }
+                    PoseGraphVisualizationScreen(graph = graph)
                 } else {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("✅ Success!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
-                        Text("Graph saved to library.", fontSize = 14.sp)
-                        
+                        Text("\u2705 Success!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = primary)
+                        Text("Graph saved to library.", fontSize = 14.sp, color = onSurfaceVariant)
+
                         Spacer(Modifier.height(16.dp))
-                        
+
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFF5F5F5),
+                            color = surfaceVariant,
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                         ) {
                             Column(
@@ -236,28 +278,28 @@ fun LibraryScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("Filename", fontSize = 13.sp, color = Color.Gray)
-                                    Text(fileName, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                    Text("Filename", fontSize = 13.sp, color = onSurfaceVariant)
+                                    Text(fileName, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = onSurface)
                                 }
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("States", fontSize = 13.sp, color = Color.Gray)
-                                    Text("${state.numStates}", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                    Text("States", fontSize = 13.sp, color = onSurfaceVariant)
+                                    Text("${state.numStates}", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = onSurface)
                                 }
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("Valid Frames", fontSize = 13.sp, color = Color.Gray)
-                                    Text("${state.numFrames}", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                    Text("Valid Frames", fontSize = 13.sp, color = onSurfaceVariant)
+                                    Text("${state.numFrames}", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = onSurface)
                                 }
                             }
                         }
-                        
+
                         Spacer(Modifier.height(16.dp))
-                        
+
                         Button(
                             onClick = {
                                 if (graph != null) {
@@ -268,25 +310,22 @@ fun LibraryScreen(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(52.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF37474F),
-                                contentColor = Color.White,
-                                disabledContainerColor = Color(0xFF2A2A2A),
-                                disabledContentColor = Color(0xFF666666)
+                                containerColor = surfaceVariant,
+                                contentColor = onSurface,
+                                disabledContainerColor = surfaceVariant.copy(alpha = 0.5f),
+                                disabledContentColor = onSurfaceVariant.copy(alpha = 0.5f),
                             ),
                         ) {
                             Text("View Graph", fontSize = 15.sp, fontWeight = FontWeight.Medium)
                         }
-                        
+
                         Spacer(Modifier.height(8.dp))
-                        
+
                         Button(
                             onClick = { viewModel.reset() },
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(52.dp),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF2196F3),
-                                contentColor = Color.White
-                            ),
+                            colors = ButtonDefaults.buttonColors(containerColor = primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                         ) {
                             Text("Generate Another", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                         }
@@ -295,8 +334,8 @@ fun LibraryScreen(
             }
             is GenerationUiState.Error -> {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("❌ Error", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Red)
-                    Text(state.detail, fontSize = 14.sp)
+                    Text("\u274C Error", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = error)
+                    Text(state.detail, fontSize = 14.sp, color = onSurface)
                     Spacer(Modifier.height(24.dp))
                     Button(onClick = { viewModel.reset() }) {
                         Text("Try Again")
@@ -305,11 +344,14 @@ fun LibraryScreen(
             }
         }
     }
+    }
+    }
 }
 
 @Composable
 fun GraphsScreen(
-    navController: NavController
+    navController: NavController,
+    customWorkoutViewModel: CustomWorkoutViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     var graphs by remember { mutableStateOf(loadAvailableGraphs(context)) }
@@ -317,19 +359,22 @@ fun GraphsScreen(
     var graphPendingDelete by remember { mutableStateOf<GraphEntry?>(null) }
     var graphPendingRename by remember { mutableStateOf<GraphEntry?>(null) }
     var confirmDeleteVisible by remember { mutableStateOf(false) }
-    
-    // Refresh graphs when returning to this screen
+
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val surface = MaterialTheme.colorScheme.surface
+    val primary = MaterialTheme.colorScheme.primary
+    val error = MaterialTheme.colorScheme.error
+
     DisposableEffect(Unit) {
         onDispose {
-            // Reload graphs when leaving to ensure fresh state on return
             graphs = loadAvailableGraphs(context)
         }
     }
-    
-    // Rename dialog
+
     graphPendingRename?.let { entry ->
         var newName by remember { mutableStateOf(entry.fileName.removeSuffix(".json")) }
-        
+
         AlertDialog(
             onDismissRequest = { graphPendingRename = null },
             title = { Text("Rename Graph") },
@@ -350,6 +395,7 @@ fun GraphsScreen(
                             val oldFile = File(entry.filePath)
                             val newFile = File(oldFile.parent, "$trimmed.json")
                             if (oldFile.renameTo(newFile)) {
+                                customWorkoutViewModel.CustomWorkoutStore.renameExercise(entry.fileName.removeSuffix(".json"), trimmed)
                                 graphs = loadAvailableGraphs(context)
                             }
                         }
@@ -368,7 +414,6 @@ fun GraphsScreen(
         )
     }
 
-    // Delete confirmation dialog
     if (confirmDeleteVisible && graphPendingDelete != null) {
         AlertDialog(
             onDismissRequest = {
@@ -393,7 +438,7 @@ fun GraphsScreen(
                         confirmDeleteVisible = false
                     }
                 ) {
-                    Text("Delete", color = Color(0xFFE85A2E))
+                    Text("Delete", color = error)
                 }
             },
             dismissButton = {
@@ -408,6 +453,9 @@ fun GraphsScreen(
     }
 
     if (selectedGraph != null) {
+        BackHandler {
+            selectedGraph = null
+        }
         val entry = selectedGraph!!
         val graph = remember(entry) {
             runCatching {
@@ -420,21 +468,21 @@ fun GraphsScreen(
             }.getOrNull()
         }
 
-        Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+        Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = { selectedGraph = null }) {
-                    Text("← Back")
+                    Text("← Back", color = primary)
                 }
-                Text(entry.fileName.removeSuffix(".json"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(entry.fileName.removeSuffix(".json"), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
             }
             if (graph != null) {
                 PoseGraphVisualizationScreen(graph = graph)
             } else {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Failed to load graph", color = Color.Red)
+                    Text("Failed to load graph", color = error)
                 }
             }
         }
@@ -442,7 +490,7 @@ fun GraphsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF2EEE4))
+                .background(MaterialTheme.colorScheme.background)
                 .padding(16.dp)
         ) {
             Row(
@@ -454,12 +502,11 @@ fun GraphsScreen(
                     "Pose Graphs Library",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0A3D3F)
+                    color = MaterialTheme.colorScheme.onBackground
                 )
 
                 if (graphPendingDelete != null) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Rename button (only for non-assets)
                         if (!graphPendingDelete!!.isAsset) {
                             IconButton(
                                 onClick = {
@@ -468,14 +515,13 @@ fun GraphsScreen(
                                 }
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Add, // Using Add as placeholder for rename/edit
+                                    imageVector = Icons.Default.Add,
                                     contentDescription = "Rename Graph",
-                                    tint = Color(0xFF2196F3)
+                                    tint = primary
                                 )
                             }
                         }
-                        
-                        // Delete button
+
                         IconButton(
                             onClick = {
                                 if (graphPendingDelete != null) {
@@ -486,7 +532,7 @@ fun GraphsScreen(
                             Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = "Delete Graph",
-                                tint = Color(0xFFE85A2E)
+                                tint = error
                             )
                         }
                     }
@@ -495,7 +541,7 @@ fun GraphsScreen(
 
             if (graphs.isEmpty()) {
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    Text("No graphs yet. Generate some from the Library tab.", color = Color.Gray)
+                    Text("No graphs yet. Generate some from the Library tab.", color = onSurfaceVariant)
                 }
             } else {
                 LazyColumn(
@@ -509,7 +555,7 @@ fun GraphsScreen(
                                 .fillMaxWidth()
                                 .border(
                                     width = if (isPendingDelete) 2.dp else 0.dp,
-                                    color = if (isPendingDelete) Color(0xFFE85A2E) else Color.Transparent,
+                                    color = if (isPendingDelete) error else Color.Transparent,
                                     shape = RoundedCornerShape(12.dp)
                                 )
                                 .combinedClickable(
@@ -527,18 +573,18 @@ fun GraphsScreen(
                                     }
                                 ),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isPendingDelete) Color(0xFFFFF3E0) else Color.White
+                                containerColor = if (isPendingDelete) error.copy(alpha = 0.1f) else surface
                             )
                         ) {
                             Row(
                                 modifier = Modifier.padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(if (entry.isAsset) "📦" else "📊", fontSize = 24.sp)
+                                Text(if (entry.isAsset) "\uD83D\uDCE6" else "\uD83D\uDCCA", fontSize = 24.sp)
                                 Spacer(Modifier.width(16.dp))
                                 Column {
-                                    Text(entry.fileName.removeSuffix(".json"), fontWeight = FontWeight.Bold)
-                                    Text(if (entry.isAsset) "System Provided" else "Generated", fontSize = 12.sp, color = Color.Gray)
+                                    Text(entry.fileName.removeSuffix(".json"), fontWeight = FontWeight.Bold, color = onSurface)
+                                    Text(if (entry.isAsset) "System Provided" else "Generated", fontSize = 12.sp, color = onSurfaceVariant)
                                 }
                             }
                         }

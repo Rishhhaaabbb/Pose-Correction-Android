@@ -70,8 +70,7 @@ class OnboardingActivity : ComponentActivity() {
         val mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_INTRO
 
         setContent {
-            // Onboarding is a pre-login screen — always light theme
-            PoseMonitor2Theme(darkTheme = false, dynamicColor = false) {
+            PoseMonitorAppTheme {
                 when (mode) {
                     MODE_FULL_TOUR -> FullTourScreen(onClose = { finish() })
                     else -> IntroOnboardingEntry(
@@ -279,30 +278,14 @@ private fun OnboardingCarouselScreen(
 
     Surface(modifier = Modifier.fillMaxSize().systemBarsPadding(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 Button(
                     onClick = onSkipped,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4DFFFF)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8622E)),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                 ) {
-                    Text("Skip")
-                }
-
-                if (!isLastPage) {
-                    Button(
-                        onClick = {
-                            // Reset to first page and replay from beginning
-                            scope.launch { pagerState.animateScrollToPage(0) }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xDDFFFFFF)),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    ) {
-                        Icon(Icons.Default.Help, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Learn More")
-                    }
+                    Text("Skip", color = Color.White)
                 }
             }
 
@@ -322,7 +305,7 @@ private fun OnboardingCarouselScreen(
                             .width(if (index == pagerState.currentPage) 22.dp else 8.dp)
                             .height(8.dp)
                             .background(
-                                if (index == pagerState.currentPage) Color(0xFFE8622E) else Color(0x4488A0A0),
+                                if (index == pagerState.currentPage) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                                 RoundedCornerShape(100.dp),
                             ),
                     )
@@ -334,20 +317,19 @@ private fun OnboardingCarouselScreen(
             if (isLastPage) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = dontShowAgain, onCheckedChange = { dontShowAgain = it })
-                    Text(text = "Don't show again", color = Color.White)
+                    Text(text = "Don't show again", color = MaterialTheme.colorScheme.onBackground)
                 }
                 Spacer(Modifier.height(8.dp))
                 
                 // Full App Tour button on last page
-                Button(
+                OutlinedButton(
                     onClick = onLearnMore,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xDDFFFFFF)),
                 ) {
-                    Icon(Icons.Default.Help, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Help, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onBackground)
                     Spacer(Modifier.width(8.dp))
-                    Text("View Full App Tour", fontWeight = FontWeight.SemiBold)
+                    Text("View Full App Tour", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
                 }
                 Spacer(Modifier.height(8.dp))
             }
@@ -475,17 +457,17 @@ private fun FullTourScreen(onClose: () -> Unit) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(Color(0xFF0A3D3F))
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Full App Tour", color = MaterialTheme.colorScheme.onPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("Full App Tour", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Button(
                     onClick = onClose,
                     shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                ) { Text("Close", color = MaterialTheme.colorScheme.onSecondary) }
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8622E))
+                ) { Text("Close", color = Color.White) }
             }
 
             HorizontalPager(
@@ -556,7 +538,7 @@ private fun FullTourScreen(onClose: () -> Unit) {
                             .width(if (index == pagerState.currentPage) 22.dp else 8.dp)
                             .height(8.dp)
                             .background(
-                                if (index == pagerState.currentPage) Color(0xFFE8622E) else Color(0x4488A0A0),
+                                if (index == pagerState.currentPage) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                                 RoundedCornerShape(100.dp),
                             ),
                     )

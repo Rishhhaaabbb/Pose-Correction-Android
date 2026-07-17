@@ -19,7 +19,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.FitnessCenter
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -29,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -38,10 +42,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -49,8 +53,6 @@ import androidx.navigation.NavController
 import com.posemonitor2.GraphEntry
 import com.posemonitor2.MainActivity
 import com.posemonitor2.loadAvailableGraphs
-
-private val AccentOrange = Color(0xFFE85A2E)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,14 +65,11 @@ fun WorkoutOverviewScreen(
     val graphs = remember { loadAvailableGraphs(context) }
     val uiState by viewModel.uiState.collectAsState()
 
-    // Reactively derive workout data from ViewModel state (which loads asynchronously)
     val workout = remember(workoutId, uiState) { viewModel.getWorkoutById(workoutId) }
     val exerciseNames = remember(workoutId, uiState) { viewModel.getCustomWorkoutExerciseNames(workoutId) ?: emptyList() }
 
     val totalReps = remember(exerciseNames, workoutId) {
-        exerciseNames.sumOf { name ->
-            viewModel.getTargetRepsForExercise(workoutId, name)
-        }
+        exerciseNames.sumOf { name -> viewModel.getTargetRepsForExercise(workoutId, name) }
     }
 
     val estimatedMinutes = remember(exerciseNames, totalReps) {
@@ -82,6 +81,16 @@ fun WorkoutOverviewScreen(
         }
     }
 
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val surface = MaterialTheme.colorScheme.surface
+    val secondary = MaterialTheme.colorScheme.secondary
+    val onSecondary = MaterialTheme.colorScheme.onSecondary
+    val error = MaterialTheme.colorScheme.error
+    val primary = MaterialTheme.colorScheme.primary
+    val onPrimary = MaterialTheme.colorScheme.onPrimary
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -90,7 +99,9 @@ fun WorkoutOverviewScreen(
                     Text(
                         text = workout?.title ?: "Workout",
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 },
                 navigationIcon = {
@@ -98,7 +109,7 @@ fun WorkoutOverviewScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onBackground,
+                            tint = onSurface,
                         )
                     }
                 },
@@ -112,30 +123,52 @@ fun WorkoutOverviewScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp),
         ) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
 
-            // Summary row
-            Row(
+            // ── Hero summary card ────────────────────────────────────────
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = surfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                SummaryChip(label = "Exercises", value = "${exerciseNames.size}")
-                SummaryChip(label = "Total Reps", value = "$totalReps")
-                SummaryChip(label = "Est. Time", value = "${estimatedMinutes}m")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 20.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    SummaryItem(
+                        icon = Icons.Outlined.FitnessCenter,
+                        value = "${exerciseNames.size}",
+                        label = "Exercises",
+                        accentColor = primary,
+                    )
+                    SummaryItem(
+                        icon = Icons.Outlined.FitnessCenter,
+                        value = "$totalReps",
+                        label = "Total Reps",
+                        accentColor = secondary,
+                    )
+                    SummaryItem(
+                        icon = Icons.Outlined.Schedule,
+                        value = "${estimatedMinutes}m",
+                        label = "Est. Time",
+                        accentColor = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
 
             Text(
                 text = "Exercises",
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = onSurface,
             )
 
             Spacer(Modifier.height(12.dp))
 
-            // Exercise list
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -145,31 +178,41 @@ fun WorkoutOverviewScreen(
                     val displayName = name.split('-').joinToString(" ") { it.replaceFirstChar(Char::uppercase) }
                     val hasGraph = graphs.any { it.fileName == "$name.json" }
 
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
+                    Surface(
                         shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        color = surface,
+                        tonalElevation = 1.dp,
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                                .padding(horizontal = 14.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            // Number badge - centered in circle
+                            // Step number
                             Box(
                                 modifier = Modifier
-                                    .size(28.dp)
-                                    .background(AccentOrange, CircleShape),
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(if (hasGraph) primary else surfaceVariant),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Text(
-                                    text = "${index + 1}",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                )
+                                if (hasGraph) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = onPrimary,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                } else {
+                                    Text(
+                                        text = "${index + 1}",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = onSurfaceVariant,
+                                    )
+                                }
                             }
                             Spacer(Modifier.width(14.dp))
 
@@ -178,31 +221,40 @@ fun WorkoutOverviewScreen(
                                     text = displayName,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    color = onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
-                                if (!hasGraph) {
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = if (hasGraph) "$reps reps" else "Graph not available",
+                                    fontSize = 12.sp,
+                                    color = if (hasGraph) onSurfaceVariant else error,
+                                )
+                            }
+
+                            if (hasGraph) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = secondary.copy(alpha = 0.12f),
+                                ) {
                                     Text(
-                                        text = "Graph not available",
-                                        fontSize = 11.sp,
-                                        color = Color(0xFFCC3333),
+                                        text = "$reps reps",
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = secondary,
                                     )
                                 }
                             }
-
-                            Text(
-                                text = "$reps reps",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = AccentOrange,
-                            )
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
-            // Start Session button
+            // ── Start Session button ─────────────────────────────────────
             val allGraphsAvailable = exerciseNames.all { name ->
                 graphs.any { it.fileName == "$name.json" }
             }
@@ -236,7 +288,7 @@ fun WorkoutOverviewScreen(
                     .fillMaxWidth()
                     .height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentOrange),
+                colors = ButtonDefaults.buttonColors(containerColor = primary, contentColor = onPrimary),
                 enabled = exerciseNames.isNotEmpty() && allGraphsAvailable,
             ) {
                 Icon(
@@ -244,7 +296,7 @@ fun WorkoutOverviewScreen(
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(10.dp))
                 Text(
                     text = "Start Session",
                     fontSize = 17.sp,
@@ -258,18 +310,33 @@ fun WorkoutOverviewScreen(
 }
 
 @Composable
-private fun SummaryChip(label: String, value: String) {
+private fun SummaryItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String,
+    label: String,
+    accentColor: androidx.compose.ui.graphics.Color,
+) {
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = accentColor,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(Modifier.height(6.dp))
         Text(
             text = value,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = AccentOrange,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = onSurface,
         )
         Text(
             text = label,
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 11.sp,
+            color = onSurfaceVariant,
         )
     }
 }
