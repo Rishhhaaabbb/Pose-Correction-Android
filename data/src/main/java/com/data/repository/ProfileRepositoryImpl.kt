@@ -46,6 +46,30 @@ class ProfileRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun patchProfileFields(userId: String, fields: Map<String, Any?>): Result<Unit> =
+        runCatching {
+            val now = System.currentTimeMillis()
+
+            val existing = profileDao.getProfile(userId)
+            if (existing != null) {
+                profileDao.patchQuestionnaireFields(
+                    userId = userId,
+                    heightCm = fields["height_cm"] as? Int ?: existing.heightCm,
+                    weightKg = fields["weight_kg"] as? Double ?: existing.weightKg,
+                    fitnessGoal = fields["fitness_goal"] as? String ?: existing.fitnessGoal,
+                    ageGroup = fields["age_group"] as? String ?: existing.ageGroup,
+                    gender = fields["gender"] as? String ?: existing.gender,
+                    experienceLevel = fields["experience_level"] as? String ?: existing.experienceLevel,
+                    focusAreas = fields["focus_areas"] as? String ?: existing.focusAreas,
+                    updatedAt = now,
+                )
+            }
+
+            runCatching {
+                firebaseRemoteClient.patchProfileFields(userId, fields)
+            }
+        }
+
     private suspend fun enqueueProfileUpsert(profile: UserProfile, now: Long, reason: String) {
         syncQueueDao.insert(
             SyncQueueEntity(

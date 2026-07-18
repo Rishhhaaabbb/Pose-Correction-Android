@@ -59,6 +59,18 @@ class FirebaseRemoteClient @Inject constructor(
         Log.i(TAG, "upsertProfile: succeeded — id=${dto.id}")
     }
 
+    /** Patch only specific fields in the profile document without touching others. */
+    suspend fun patchProfileFields(userId: String, fields: Map<String, Any?>) {
+        requireFirebaseAuth()
+        val cleaned = fields.filterValues { it != null }
+        if (cleaned.isEmpty()) return
+        Log.d(TAG, "patchProfileFields: userId=$userId, fields=${cleaned.keys}")
+        profiles.document(userId)
+            .set(cleaned, SetOptions.merge())
+            .await()
+        Log.i(TAG, "patchProfileFields: succeeded — userId=$userId")
+    }
+
     // ── Workout Sessions ──────────────────────────────────────────────────
 
     suspend fun insertSession(dto: FirestoreSessionDto) {

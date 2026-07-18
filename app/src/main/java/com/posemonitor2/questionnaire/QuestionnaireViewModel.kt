@@ -261,13 +261,10 @@ class QuestionnaireViewModel @Inject constructor(
 
     // ΓöÇΓöÇ Submit ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
     //
-    // Note: We intentionally do NOT call profileRepository.upsertProfile here.
-    // All questionnaire fields are persisted in OnboardingResponse (both local Room
-    // and Firestore). ProfileRepositoryImpl.refreshProfile() syncs from Firestore,
-    // so the profile will pick up these fields on the next sync cycle. This avoids
-    // the display-name-clobbering issue that would arise from passing an empty
-    // displayName to upsertProfile (Room replaces the whole row, unlike Firestore's
-    // SetOptions.merge()).
+    // We call profileRepository.patchProfileFields() instead of upsertProfile()
+    // to avoid the display-name-clobbering issue (Room replaces the whole row).
+    // patchProfileFields uses SetOptions.merge() on Firestore and a targeted
+    // SQL UPDATE on Room, so only the questionnaire-relevant fields are touched.
 
     fun submitAnswers(userId: String) {
         val answers = _uiState.value.answers
@@ -294,6 +291,17 @@ class QuestionnaireViewModel @Inject constructor(
             )
             onboardingRepository.saveAnswers(response)
                 .onSuccess {
+                    val now = System.currentTimeMillis()
+                    profileRepository.patchProfileFields(userId, mapOf(
+                        "height_cm" to answers.heightCm,
+                        "weight_kg" to answers.weightKg,
+                        "fitness_goal" to answers.goal,
+                        "age_group" to answers.ageGroup,
+                        "gender" to answers.gender,
+                        "experience_level" to answers.experienceLevel,
+                        "focus_areas" to answers.focusAreas.joinToString(",").ifEmpty { null },
+                        "updated_at" to now,
+                    ))
                     _uiState.update { it.copy(isLoading = false, isSaved = true) }
                 }
                 .onFailure { err ->

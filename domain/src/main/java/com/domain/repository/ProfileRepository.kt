@@ -9,4 +9,7 @@ interface ProfileRepository {
     suspend fun refreshProfile(userId: String): Result<Unit>
 
     suspend fun upsertProfile(profile: UserProfile): Result<Unit>
+
+    /** Patch only specific fields in the remote profile without touching others. */
+    suspend fun patchProfileFields(userId: String, fields: Map<String, Any?>): Result<Unit>
 }
