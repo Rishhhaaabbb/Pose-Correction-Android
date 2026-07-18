@@ -165,8 +165,8 @@ class ProfileViewModel @Inject constructor(
             ?: "User"
 
         val memberSince = memberSinceText(sessions)
-        val heightCm = profile?.heightCm
-        val weightKg = profile?.weightKg
+        val heightCm = profile?.heightCm ?: onboarding?.heightCm
+        val weightKg = profile?.weightKg ?: onboarding?.weightKg
         val bmi = calculateBmi(heightCm, weightKg)
 
         val sessionsLast7 = sessionsLastDays(sessions, 7)
@@ -209,10 +209,10 @@ class ProfileViewModel @Inject constructor(
             heightCm = heightCm,
             weightKg = weightKg,
             bmi = bmi,
-            focusArea = profile?.fitnessGoal?.takeIf(String::isNotBlank) ?: "General Fitness",
+            focusArea = profile?.fitnessGoal?.takeIf(String::isNotBlank) ?: onboarding?.goal?.takeIf(String::isNotBlank) ?: "General Fitness",
             weeklyGoalSessions = weeklyGoalSessions,
             goalProgressPercent = weeklyProgress,
-            targetWeightKg = profile?.targetWeightKg,
+            targetWeightKg = profile?.targetWeightKg ?: onboarding?.weightKg,
             preferredExercises = preferredExercises,
             sessionLengthText = if (avgSessionMinutes > 0) "$avgSessionMinutes min" else "Not enough data",
             difficultyText = when {
