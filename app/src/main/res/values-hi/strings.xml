@@ -41,6 +41,9 @@
     <string name="profile_app_settings_title">ऐप सेटिंग्स</string>
     <string name="profile_signing_out">साइन आउट हो रहा है...</string>
     <string name="profile_log_out">लॉग आउट</string>
+    <string name="profile_delete_account">खाता हटाएं</string>
+    <string name="profile_delete_account_confirm">यह आपके खाते और सभी संबंधित डेटा को स्थायी रूप से हटा देगा। यह क्रिया पूर्ववत नहीं की जा सकती।</string>
+    <string name="profile_delete_account_confirm_yes">हटाएं</string>
     <string name="profile_edit_title">प्रोफाइल संपादित करें</string>
     <string name="profile_edit_name">नाम</string>
     <string name="profile_edit_height_cm">लंबाई (सेमी)</string>

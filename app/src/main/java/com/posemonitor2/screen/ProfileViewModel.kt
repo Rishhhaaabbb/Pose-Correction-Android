@@ -13,6 +13,7 @@ import com.domain.usecase.ObserveWorkoutSessionsUseCase
 import com.domain.usecase.RefreshProfileUseCase
 import com.domain.usecase.RestoreSessionUseCase
 import com.domain.usecase.SignOutUseCase
+import com.domain.usecase.DeleteAccountUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +33,7 @@ import kotlin.math.roundToInt
 class ProfileViewModel @Inject constructor(
     private val restoreSessionUseCase: RestoreSessionUseCase,
     private val signOutUseCase: SignOutUseCase,
+    private val deleteAccountUseCase: DeleteAccountUseCase,
     private val ensureProfileUseCase: EnsureProfileUseCase,
     private val refreshProfileUseCase: RefreshProfileUseCase,
     private val observeAuthSessionUseCase: ObserveAuthSessionUseCase,
@@ -149,6 +151,19 @@ class ProfileViewModel @Inject constructor(
                 }
                 .onFailure {
                     _uiState.update { it.copy(isLoading = false) }
+                }
+        }
+    }
+
+    fun deleteAccount() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            deleteAccountUseCase()
+                .onSuccess {
+                    _uiState.update { it.copy(isLoading = false, deleteCompleted = true) }
+                }
+                .onFailure { error ->
+                    _uiState.update { it.copy(isLoading = false, deleteError = error.message ?: "Failed to delete account") }
                 }
         }
     }
@@ -297,6 +312,8 @@ data class ProfileUiState(
     val saveCompleted: Boolean = false,
     val saveErrorMessage: String? = null,
     val signOutCompleted: Boolean = false,
+    val deleteCompleted: Boolean = false,
+    val deleteError: String? = null,
     val profileImageUri: String? = null,
     val questionnaireSummary: QuestionnaireSummary? = null,
 )

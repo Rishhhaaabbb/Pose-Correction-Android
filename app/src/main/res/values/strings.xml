@@ -148,6 +148,9 @@
     <string name="profile_app_settings_title">App Settings</string>
     <string name="profile_signing_out">Signing out...</string>
     <string name="profile_log_out">Log Out</string>
+    <string name="profile_delete_account">Delete Account</string>
+    <string name="profile_delete_account_confirm">This will permanently delete your account and all associated data. This action cannot be undone.</string>
+    <string name="profile_delete_account_confirm_yes">Delete</string>
     <string name="profile_edit_title">Edit Profile</string>
     <string name="profile_edit_name">Name</string>
     <string name="profile_edit_height_cm">Height (cm)</string>

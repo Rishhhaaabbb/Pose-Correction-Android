@@ -103,11 +103,34 @@ fun ProfileScreen(
         showEditDialog = true
     }
 
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     LaunchedEffect(uiState.signOutCompleted) {
         if (uiState.signOutCompleted) {
             // Sign out Google Sign-In client so the account picker shows next time.
             // This clears the cached Google account — without this, the SDK
             // silently re-selects the last account and skips the chooser.
+            runCatching {
+                val webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
+                if (webClientId.isNotBlank()) {
+                    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                        .requestEmail()
+                        .requestIdToken(webClientId)
+                        .build()
+                    GoogleSignIn.getClient(context, gso).signOut().await()
+                }
+            }
+            val intent = Intent(context, LoginActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            context.startActivity(intent)
+            (context as? Activity)?.finish()
+            profileViewModel.clearSignOutSignal()
+        }
+    }
+
+    LaunchedEffect(uiState.deleteCompleted) {
+        if (uiState.deleteCompleted) {
             runCatching {
                 val webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
                 if (webClientId.isNotBlank()) {
@@ -441,7 +464,32 @@ fun ProfileScreen(
             Text(if (uiState.isLoading) stringResource(R.string.profile_signing_out) else stringResource(R.string.profile_log_out), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = secondary)
         }
 
+        Spacer(Modifier.height(16.dp))
+
+        // Delete Account
+        Box(modifier = Modifier.fillMaxWidth().clickable(enabled = !uiState.isLoading) { showDeleteConfirm = true }, contentAlignment = Alignment.Center) {
+            Text(stringResource(R.string.profile_delete_account), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFFD32F2F))
+        }
+
         Spacer(Modifier.height(32.dp))
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(stringResource(R.string.profile_delete_account)) },
+            text = { Text(stringResource(R.string.profile_delete_account_confirm)) },
+            confirmButton = {
+                TextButton(onClick = { showDeleteConfirm = false; profileViewModel.deleteAccount() }) {
+                    Text(stringResource(R.string.profile_delete_account_confirm_yes), color = Color(0xFFD32F2F))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
     }
 }
 

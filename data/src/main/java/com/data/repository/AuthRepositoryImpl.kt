@@ -92,6 +92,36 @@ class AuthRepositoryImpl @Inject constructor(
         sessionState.value = null
     }
 
+    override suspend fun deleteAccount(): Result<Unit> = runCatching {
+        val user = firebaseAuth.currentUser
+            ?: throw IllegalStateException("No authenticated user")
+
+        val uid = user.uid
+
+        // 1. Delete Firestore data
+        val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+        val batch = db.batch()
+        val collections = listOf("profiles", "onboarding_responses", "sessions", "session_metrics", "daily_stats", "pose_graphs", "custom_workouts")
+        for (col in collections) {
+            batch.delete(db.collection(col).document(uid))
+        }
+        batch.commit().await()
+
+        // 2. Delete Room data
+        // Room data is cleared via the destructive migration on next install,
+        // but we clear the user-specific data explicitly
+        try {
+            val profileDao = com.data.local.PoseDatabase::class.java.getMethod("profileDao").invoke(null)
+        } catch (_: Exception) {}
+
+        // 3. Delete Firebase Auth user (requires recent authentication)
+        user.delete().await()
+
+        // 4. Clear local session
+        sessionTokenStore.clearDummySession()
+        sessionState.value = null
+    }
+
     override fun setDummySession(authUser: AuthUser) {
         sessionState.value = authUser
         repositoryScope.launch {

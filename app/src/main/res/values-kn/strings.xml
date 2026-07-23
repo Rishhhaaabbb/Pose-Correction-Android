@@ -41,6 +41,9 @@
     <string name="profile_app_settings_title">ಆಪ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳು</string>
     <string name="profile_signing_out">ಸೈನ್ ಔಟ್ ಆಗುತ್ತಿದೆ...</string>
     <string name="profile_log_out">ಲಾಗ್ ಔಟ್</string>
+    <string name="profile_delete_account">ಖಾತೆ ಅಳಿಸಿ</string>
+    <string name="profile_delete_account_confirm">ಇದು ನಿಮ್ಮ ಖಾತೆ ಮತ್ತು ಎಲ್ಲಾ ಸಂಬಂಧಿತ ಡೇಟಾವನ್ನು ಶಾಶ್ವತವಾಗಿ ಅಳಿಸುತ್ತದೆ. ಈ ಕ್ರಿಯೆಯನ್ನು ರದ್ದುಗೊಳಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.</string>
+    <string name="profile_delete_account_confirm_yes">ಅಳಿಸಿ</string>
     <string name="profile_edit_title">ಪ್ರೊಫೈಲ್ ಸಂಪಾದಿಸಿ</string>
     <string name="profile_edit_name">ಹೆಸರು</string>
     <string name="profile_edit_height_cm">ಎತ್ತರ (ಸೆಂ.ಮೀ)</string>
