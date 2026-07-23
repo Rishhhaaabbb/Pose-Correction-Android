@@ -20,6 +20,7 @@ import com.posemonitor2.ui.theme.PoseMonitor2Theme
 import com.posemonitor2.ui.theme.PoseMonitorAppTheme
 import dagger.hilt.android.AndroidEntryPoint
 import com.domain.repository.AuthRepository
+import com.domain.repository.ProfileRepository
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -31,6 +32,9 @@ class QuestionnaireActivity : ComponentActivity() {
 
     @Inject
     lateinit var authRepository: AuthRepository
+
+    @Inject
+    lateinit var profileRepository: ProfileRepository
 
     private var showDisclaimer by mutableStateOf(false)
     private var pendingMode by mutableStateOf("")
@@ -66,6 +70,13 @@ class QuestionnaireActivity : ComponentActivity() {
                         confirmText = getString(com.posemonitor2.R.string.disclaimer_acknowledge),
                         onConfirm = {
                             showDisclaimer = false
+                            if (currentUserId.isNotBlank()) {
+                                lifecycleScope.launch {
+                                    profileRepository.patchProfileFields(currentUserId, mapOf(
+                                        "disclaimer_acknowledged_at" to System.currentTimeMillis(),
+                                    ))
+                                }
+                            }
                             navigateToMain(currentUserId)
                         },
                     )
