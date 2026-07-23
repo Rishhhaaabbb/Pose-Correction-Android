@@ -15,6 +15,7 @@ import com.data.local.dao.SessionDao
 import com.data.local.dao.SessionMetricDao
 import com.data.local.dao.SyncQueueDao
 import com.data.remote.firebase.FirebaseRemoteClient
+import com.data.repository.AdminStatsRepositoryImpl
 import com.data.repository.AuthRepositoryImpl
 import com.data.repository.DailyStatsRepositoryImpl
 import com.data.repository.ExerciseRepositoryImpl
@@ -23,6 +24,7 @@ import com.data.repository.PoseGraphRepositoryImpl
 import com.data.repository.ProfileRepositoryImpl
 import com.data.repository.SessionMetricsRepositoryImpl
 import com.data.repository.WorkoutSessionRepositoryImpl
+import com.domain.repository.AdminStatsRepository
 import com.domain.repository.AuthRepository
 import com.domain.repository.DailyStatsRepository
 import com.domain.repository.ExerciseRepository
@@ -147,4 +149,8 @@ abstract class DataBindsModule {
     @Binds
     @Singleton
     abstract fun bindOnboardingRepository(impl: OnboardingRepositoryImpl): OnboardingRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAdminStatsRepository(impl: AdminStatsRepositoryImpl): AdminStatsRepository
 }
