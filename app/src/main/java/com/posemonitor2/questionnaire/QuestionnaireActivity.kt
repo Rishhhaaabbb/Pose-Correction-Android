@@ -10,9 +10,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import com.posemonitor2.UserFlowActivity
 import com.posemonitor2.onboarding.OnboardingManager
+import com.posemonitor2.ui.components.DisclaimerDialog
 import com.posemonitor2.ui.theme.PoseMonitor2Theme
 import com.posemonitor2.ui.theme.PoseMonitorAppTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -28,6 +31,9 @@ class QuestionnaireActivity : ComponentActivity() {
 
     @Inject
     lateinit var authRepository: AuthRepository
+
+    private var showDisclaimer by mutableStateOf(false)
+    private var pendingMode by mutableStateOf("")
 
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -46,16 +52,24 @@ class QuestionnaireActivity : ComponentActivity() {
             val authUser = authRepository.observeSession().firstOrNull()
             val userId = authUser?.id ?: return@launch
             viewModel.setUserId(userId)
-            // Edit mode pre-population is now handled by LaunchedEffect(userId)
-            // inside QuestionnaireFlow so that it runs on the correct Compose thread
-            // and reacts to userId becoming available after composition starts.
         }
 
         setContent {
-            // Questionnaire runs before the user is fully in the app — always light theme
             PoseMonitor2Theme(darkTheme = false, dynamicColor = false) {
                 val uiState by viewModel.uiState.collectAsState()
                 val currentUserId = uiState.userId ?: ""
+
+                if (showDisclaimer) {
+                    DisclaimerDialog(
+                        title = getString(com.posemonitor2.R.string.disclaimer_title),
+                        body = getString(com.posemonitor2.R.string.disclaimer_body),
+                        confirmText = getString(com.posemonitor2.R.string.disclaimer_acknowledge),
+                        onConfirm = {
+                            showDisclaimer = false
+                            navigateToMain(currentUserId)
+                        },
+                    )
+                }
 
                 QuestionnaireFlow(
                     viewModel = viewModel,
@@ -64,38 +78,19 @@ class QuestionnaireActivity : ComponentActivity() {
                     onDismiss = { finish() },
                     onSkipped = {
                         if (mode == MODE_FIRST_RUN) {
-                            // Treat skip the same as completed for routing purposes:
-                            // mark locally so we don't keep asking, reset tour so it shows
-                            if (currentUserId.isNotBlank()) {
-                                OnboardingManager(this@QuestionnaireActivity)
-                                    .markQuestionnaireCompleted(currentUserId)
-                            }
-                            OnboardingManager(this@QuestionnaireActivity).resetOnboarding()
-                            startActivity(
-                                Intent(this@QuestionnaireActivity, UserFlowActivity::class.java).apply {
-                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                                }
-                            )
+                            pendingMode = "skip"
+                            showDisclaimer = true
+                        } else {
+                            finish()
                         }
-                        finish()
                     },
                     onCompleted = {
                         if (mode == MODE_FIRST_RUN) {
-                            // Mark per-user questionnaire flag (fast path for future logins)
-                            if (currentUserId.isNotBlank()) {
-                                OnboardingManager(this@QuestionnaireActivity)
-                                    .markQuestionnaireCompleted(currentUserId)
-                            }
-                            // Reset the onboarding-seen flag so the app tour
-                            // carousel shows automatically on first entry to UserFlowActivity.
-                            OnboardingManager(this@QuestionnaireActivity).resetOnboarding()
-                            startActivity(
-                                Intent(this@QuestionnaireActivity, UserFlowActivity::class.java).apply {
-                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                                }
-                            )
+                            pendingMode = "completed"
+                            showDisclaimer = true
+                        } else {
+                            finish()
                         }
-                        finish()
                     },
                     onRequestCameraPermission = {
                         cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
@@ -103,6 +98,20 @@ class QuestionnaireActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    private fun navigateToMain(currentUserId: String) {
+        if (currentUserId.isNotBlank()) {
+            OnboardingManager(this@QuestionnaireActivity)
+                .markQuestionnaireCompleted(currentUserId)
+        }
+        OnboardingManager(this@QuestionnaireActivity).resetOnboarding()
+        startActivity(
+            Intent(this@QuestionnaireActivity, UserFlowActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+        )
+        finish()
     }
 
     companion object {

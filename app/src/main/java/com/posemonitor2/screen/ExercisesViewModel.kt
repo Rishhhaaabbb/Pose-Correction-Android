@@ -12,6 +12,7 @@ import com.domain.model.UserProfile
 import com.domain.repository.ExerciseRepository
 import com.domain.usecase.ObserveAuthSessionUseCase
 import com.domain.usecase.ObserveProfileUseCase
+import com.domain.usecase.FetchUserRoleUseCase
 import com.domain.usecase.RestoreSessionUseCase
 import com.posemonitor2.loadAvailableGraphs
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -38,6 +39,7 @@ class ExercisesViewModel @Inject constructor(
     private val restoreSessionUseCase: RestoreSessionUseCase,
     private val observeAuthSessionUseCase: ObserveAuthSessionUseCase,
     private val observeProfileUseCase: ObserveProfileUseCase,
+    private val fetchUserRoleUseCase: FetchUserRoleUseCase,
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(ExercisesUiState())
@@ -135,6 +137,7 @@ class ExercisesViewModel @Inject constructor(
                         flowOf(ProfileInfo())
                     } else {
                         combine(observeProfileUseCase(userId), flowOf(authUser)) { profile, auth ->
+                            val isAdmin = fetchUserRoleUseCase(auth.id) == "admin"
                             ProfileInfo(
                                 displayName = profile?.displayName?.takeIf(String::isNotBlank)
                                     ?: auth.fullName?.takeIf(String::isNotBlank)
@@ -144,7 +147,7 @@ class ExercisesViewModel @Inject constructor(
                                     ?: auth.fullName?.firstOrNull()
                                     ?: auth.email?.firstOrNull()
                                     ?: 'U').uppercaseChar(),
-                                isAdmin = isAdminEmail(auth.email)
+                                isAdmin = isAdmin
                             )
                         }
                     }
@@ -170,12 +173,6 @@ class ExercisesViewModel @Inject constructor(
     fun refreshGraphs() {
         android.util.Log.d("ExercisesViewModel", "refreshGraphs() called")
         loadGraphs()
-    }
-
-    private fun isAdminEmail(email: String?): Boolean {
-        if (email.isNullOrBlank()) return false
-        val normalized = email.trim().lowercase().replace(" ", "")
-        return normalized == "admin" || normalized == "admin@poseapp.com"
     }
 
     fun onSearchQueryChanged(query: String) {

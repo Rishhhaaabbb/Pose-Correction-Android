@@ -424,11 +424,19 @@ private fun MainNavigation(
                 val skippedReps by viewModel.skippedRepCount.collectAsStateWithLifecycle()
                 val frameStatus by viewModel.frameStatus.collectAsStateWithLifecycle()
                 val cameraPermissionGranted by viewModel.cameraPermissionGranted.collectAsStateWithLifecycle()
+                var showSessionDisclaimer by remember { mutableStateOf(true) }
 
-                LaunchedEffect(graph, isFrontCamera, cameraPermissionGranted) {
-                    if (!cameraPermissionGranted) {
-                        // Permission not yet granted — show nothing, wait for the
-                        // launcher callback to flip the flag and re-trigger this effect.
+                if (showSessionDisclaimer) {
+                    com.posemonitor2.ui.components.DisclaimerDialog(
+                        title = stringResource(com.posemonitor2.R.string.disclaimer_session_title),
+                        body = stringResource(com.posemonitor2.R.string.disclaimer_session_body),
+                        confirmText = stringResource(com.posemonitor2.R.string.disclaimer_session_confirm),
+                        onConfirm = { showSessionDisclaimer = false },
+                    )
+                }
+
+                LaunchedEffect(graph, isFrontCamera, cameraPermissionGranted, showSessionDisclaimer) {
+                    if (!cameraPermissionGranted || showSessionDisclaimer) {
                         viewModel.initError.value = null
                         return@LaunchedEffect
                     }
@@ -437,7 +445,6 @@ private fun MainNavigation(
                     try {
                         viewModel.startPipeline(activity, graph)
                     } catch (e: Exception) {
-                        // Surface any start errors to the UI without crashing the process.
                         Log.e("MainActivity", "startPipeline failed: ${e.message}", e)
                         viewModel.initError.value = e.message
                     }

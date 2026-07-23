@@ -36,10 +36,6 @@
             android:windowSoftInputMode="adjustResize" />
 
         <!-- ── Admin flow ───────────────────────────────────────────────── -->
-        <activity
-            android:name=".HomeActivity"
-            android:exported="false"
-            android:label="Admin – Pose Monitor" />
         <activity android:name=".GraphGenerationActivity" android:exported="false" />
         <activity android:name=".onboarding.OnboardingActivity" android:exported="false" />
 

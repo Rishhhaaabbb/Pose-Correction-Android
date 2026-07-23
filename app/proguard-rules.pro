@@ -13,3 +13,12 @@
 -dontwarn org.slf4j.impl.StaticLoggerBinder
 
 # Include data module rules
+-include ../data/proguard-rules.pro
+
+# Strip Log.d/v/i/e calls in release builds (PII safety)
+-assumenosideeffects class android.util.Log {
+    public static int d(...);
+    public static int v(...);
+    public static int i(...);
+    public static int w(...);
+}

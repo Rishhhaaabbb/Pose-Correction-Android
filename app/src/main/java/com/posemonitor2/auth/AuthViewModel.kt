@@ -7,6 +7,7 @@ import com.domain.model.AuthUser
 import com.domain.model.UserProfile
 import com.domain.repository.AuthRepository
 import com.domain.usecase.EnsureProfileUseCase
+import com.domain.usecase.FetchUserRoleUseCase
 import com.domain.usecase.RestoreSessionUseCase
 import com.domain.usecase.SendPasswordResetUseCase
 import com.domain.usecase.SignInWithEmailUseCase
@@ -32,6 +33,7 @@ class AuthViewModel @Inject constructor(
     private val sendPasswordResetUseCase: SendPasswordResetUseCase,
     private val ensureProfileUseCase: EnsureProfileUseCase,
     private val authRepository: AuthRepository,
+    private val fetchUserRoleUseCase: FetchUserRoleUseCase,
 ) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(AuthUiState())
@@ -45,12 +47,16 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, errorMessage = null) }
             val restored = restoreSessionUseCase().getOrNull()
+            val isAdmin = restored?.id?.let { uid ->
+                fetchUserRoleUseCase(uid) == "admin"
+            } ?: false
             _state.update {
                 it.copy(
                     isLoading = false,
                     isAuthenticated = restored != null,
                     userId = restored?.id,
                     userEmail = restored?.email,
+                    isAdmin = isAdmin,
                 )
             }
         }
@@ -67,12 +73,14 @@ class AuthViewModel @Inject constructor(
 
             val authResult = signInWithGoogleUseCase(idToken)
             authResult.onSuccess { authUser ->
+                val isAdmin = fetchUserRoleUseCase(authUser.id) == "admin"
                 _state.update {
                     it.copy(
                         isLoading = false,
                         isAuthenticated = true,
                         userId = authUser.id,
                         userEmail = authUser.email,
+                        isAdmin = isAdmin,
                         errorMessage = null,
                     )
                 }
@@ -83,6 +91,7 @@ class AuthViewModel @Inject constructor(
                         isAuthenticated = false,
                         userId = null,
                         userEmail = null,
+                        isAdmin = false,
                         errorMessage = err.message ?: "Google sign-in failed",
                     )
                 }
@@ -108,12 +117,14 @@ class AuthViewModel @Inject constructor(
                             weeklyGoalSessions = null,
                         )
                     )
+                    val isAdmin = fetchUserRoleUseCase(authUser.id) == "admin"
                     _state.update {
                         it.copy(
                             isLoading = false,
                             isAuthenticated = true,
                             userId = authUser.id,
                             userEmail = authUser.email,
+                            isAdmin = isAdmin,
                             errorMessage = null,
                         )
                     }
@@ -131,12 +142,14 @@ class AuthViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true, errorMessage = null) }
             signInWithEmailUseCase(email, password)
                 .onSuccess { authUser ->
+                    val isAdmin = fetchUserRoleUseCase(authUser.id) == "admin"
                     _state.update {
                         it.copy(
                             isLoading = false,
                             isAuthenticated = true,
                             userId = authUser.id,
                             userEmail = authUser.email,
+                            isAdmin = isAdmin,
                             errorMessage = null,
                         )
                     }
@@ -183,6 +196,7 @@ class AuthViewModel @Inject constructor(
                     isAuthenticated = false,
                     userId = null,
                     userEmail = null,
+                    isAdmin = false,
                     errorMessage = null
                 )
             }
@@ -195,6 +209,7 @@ data class AuthUiState(
     val isAuthenticated: Boolean = false,
     val userId: String? = null,
     val userEmail: String? = null,
+    val isAdmin: Boolean = false,
     val errorMessage: String? = null,
     val resetEmailSent: Boolean = false,
 )

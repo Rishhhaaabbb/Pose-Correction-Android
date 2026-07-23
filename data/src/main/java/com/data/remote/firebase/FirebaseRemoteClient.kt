@@ -50,6 +50,14 @@ class FirebaseRemoteClient @Inject constructor(
         )
     }
 
+    /** Check if a user has the "admin" role in their Firestore profile. */
+    suspend fun fetchUserRole(userId: String): String? {
+        Log.d(TAG, "fetchUserRole: userId=$userId")
+        val snapshot = profiles.document(userId).get().await()
+        if (!snapshot.exists()) return null
+        return snapshot.getString("role")
+    }
+
     suspend fun upsertProfile(dto: FirestoreProfileDto) {
         requireFirebaseAuth()
         Log.d(TAG, "upsertProfile: id=${dto.id}")

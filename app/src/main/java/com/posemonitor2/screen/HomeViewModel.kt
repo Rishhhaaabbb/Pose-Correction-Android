@@ -16,6 +16,7 @@ import com.domain.usecase.ObserveProfileUseCase
 import com.domain.usecase.ObserveWorkoutSessionsUseCase
 import com.domain.usecase.RefreshProfileUseCase
 import com.domain.usecase.RestoreSessionUseCase
+import com.domain.usecase.FetchUserRoleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -44,6 +45,7 @@ class HomeViewModel @Inject constructor(
     private val onboardingRepository: OnboardingRepository,
     private val workoutSessionRepository: WorkoutSessionRepository,
     private val getRecommendedExercisesUseCase: GetRecommendedExercisesUseCase,
+    private val fetchUserRoleUseCase: FetchUserRoleUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -75,12 +77,13 @@ class HomeViewModel @Inject constructor(
                     } else {
                         // Fetch profile from Firestore into Room before observing
                         refreshProfileUseCase(userId)
+                        val isAdmin = fetchUserRoleUseCase(userId) == "admin"
                         combine(
                             observeProfileUseCase(userId),
                             observeWorkoutSessionsUseCase(userId, limit = 100),
                             flowOf(authUser),
                         ) { profile, sessions, auth ->
-                            buildHomeUiState(profile, sessions, auth!!)
+                            buildHomeUiState(profile, sessions, auth!!, isAdmin)
                         }.collect { newState ->
                             _uiState.value = newState
                         }
@@ -180,6 +183,7 @@ class HomeViewModel @Inject constructor(
         profile: UserProfile?,
         sessions: List<WorkoutSession>,
         authUser: AuthUser,
+        isAdmin: Boolean = false,
     ): HomeUiState {
         val displayName = profile?.displayName?.takeIf(String::isNotBlank)
             ?: authUser.fullName?.takeIf(String::isNotBlank)
@@ -197,6 +201,7 @@ class HomeViewModel @Inject constructor(
             currentStreak = streak.first,
             bestStreak = streak.second,
             userEmail = authUser.email,
+            isAdmin = isAdmin,
             todayMinutesDone = todayMinutes,
             dailyGoalProgress = computeGoalProgress(todayMinutes, goalMinutes),
         )
@@ -281,6 +286,7 @@ data class HomeUiState(
     val currentStreak: Int = 0,
     val bestStreak: Int = 0,
     val userEmail: String? = null,
+    val isAdmin: Boolean = false,
     // ΓöÇΓöÇ Personalization fields ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
     val recommendedExercises: List<Exercise> = emptyList(),
     val greetingSubtitle: String = "",

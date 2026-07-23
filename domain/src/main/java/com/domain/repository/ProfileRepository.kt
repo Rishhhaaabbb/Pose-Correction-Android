@@ -12,4 +12,7 @@ interface ProfileRepository {
 
     /** Patch only specific fields in the remote profile without touching others. */
     suspend fun patchProfileFields(userId: String, fields: Map<String, Any?>): Result<Unit>
+
+    /** Fetch the user's role from Firestore (e.g., "admin"). Returns null if no role set. */
+    suspend fun fetchUserRole(userId: String): String?
 }

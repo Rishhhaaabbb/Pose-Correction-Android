@@ -183,12 +183,6 @@ class LoginActivity : ComponentActivity() {
     }
 }
 
-private fun isAdminEmail(email: String?): Boolean {
-    if (email.isNullOrBlank()) return false
-    val normalized = email.trim().lowercase().replace(" ", "")
-    return normalized == "admin" || normalized == "admin@poseapp.com"
-}
-
 // ΓöÇΓöÇ Internal navigation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 private sealed class AuthScreen {
     object Landing        : AuthScreen()

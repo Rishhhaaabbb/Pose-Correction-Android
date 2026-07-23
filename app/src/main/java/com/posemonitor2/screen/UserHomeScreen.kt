@@ -256,10 +256,7 @@ fun UserHomeScreen(
             },
         )
 
-        val isAdmin = remember(uiState.userEmail) {
-            val normalized = uiState.userEmail?.trim()?.lowercase()
-            normalized == "admin" || normalized == "admin@poseapp.com"
-        }
+        val isAdmin = uiState.isAdmin
 
         if (isAdmin) {
             Spacer(Modifier.height(20.dp))

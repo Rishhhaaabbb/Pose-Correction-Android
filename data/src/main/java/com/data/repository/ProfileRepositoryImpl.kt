@@ -70,6 +70,9 @@ class ProfileRepositoryImpl @Inject constructor(
             }
         }
 
+    override suspend fun fetchUserRole(userId: String): String? =
+        runCatching { firebaseRemoteClient.fetchUserRole(userId) }.getOrNull()
+
     private suspend fun enqueueProfileUpsert(profile: UserProfile, now: Long, reason: String) {
         syncQueueDao.insert(
             SyncQueueEntity(

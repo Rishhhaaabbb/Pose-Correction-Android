@@ -410,4 +410,12 @@ Real-time posture feedback enabled.</string>
     <string name="monitor_streak">STREAK</string>
     <string name="monitor_streak_counter">%1$s  %2$d</string>
     <string name="monitor_skip">Skip</string>
+
+    <!-- Medical Disclaimer -->
+    <string name="disclaimer_title">Important Safety Notice</string>
+    <string name="disclaimer_body">This app provides movement guidance for educational and fitness purposes only. It is not a medical device and does not provide medical advice, diagnosis, or treatment.\n\nAlways consult a qualified healthcare professional before starting any exercise program, especially if you have pre-existing injuries, medical conditions, or chronic pain.\n\nStop exercising immediately if you feel pain, dizziness, or discomfort.</string>
+    <string name="disclaimer_acknowledge">I Understand</string>
+    <string name="disclaimer_session_title">Before You Start</string>
+    <string name="disclaimer_session_body">This session provides movement guidance only — not medical advice.\n\n• Keep your full body visible in the camera\n• Use a non-slip mat and clear space\n• Stop immediately if you feel pain or discomfort\n• Consult a doctor if you have any injuries or medical conditions</string>
+    <string name="disclaimer_session_confirm">Start Session</string>
 </resources>

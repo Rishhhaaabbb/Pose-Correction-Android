@@ -109,12 +109,7 @@ fun UserFlowNavigation() {
     val authViewModel: AuthViewModel = hiltViewModel()
     val authState by authViewModel.state.collectAsState()
 
-    val isAdmin = remember(authState.userEmail) {
-        authState.userEmail?.let {
-            val normalized = it.trim().lowercase()
-            normalized == "admin" || normalized == "admin@poseapp.com"
-        } ?: false
-    }
+    val isAdmin = authState.isAdmin
 
     LaunchedEffect(authState.isAuthenticated, authState.isLoading) {
         if (!authState.isLoading && !authState.isAuthenticated && activity?.isFinishing == false && activity?.isDestroyed == false) {
@@ -142,16 +137,25 @@ fun UserFlowNavigation() {
     }
 
     // Handle deep links from MainActivity
-    LaunchedEffect(activity?.intent) {
+    LaunchedEffect(activity?.intent, authState.isAdmin) {
         val targetRoute = activity?.intent?.getStringExtra("TARGET_ROUTE")
         if (targetRoute != null) {
             activity.intent.removeExtra("TARGET_ROUTE")
-            navController.navigate(targetRoute) {
-                popUpTo(UserRoute.Home.route) {
-                    saveState = true
+            val adminRoutes = setOf(
+                UserRoute.Library.route,
+                UserRoute.Graphs.route,
+                UserRoute.AdminStats.route,
+            )
+            if (adminRoutes.contains(targetRoute) && !authState.isAdmin) {
+                navController.navigate(UserRoute.Home.route)
+            } else {
+                navController.navigate(targetRoute) {
+                    popUpTo(UserRoute.Home.route) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
                 }
-                launchSingleTop = true
-                restoreState = true
             }
         }
     }
@@ -232,21 +236,33 @@ fun UserFlowNavigation() {
                 enterTransition = { fadeIn(animationSpec = tween(150)) },
                 exitTransition = { fadeOut(animationSpec = tween(150)) },
             ) {
-                LibraryScreen(navController = navController)
+                if (authState.isAdmin) {
+                    LibraryScreen(navController = navController)
+                } else {
+                    LaunchedEffect(Unit) { navController.popBackStack() }
+                }
             }
             composable(
                 UserRoute.Graphs.route,
                 enterTransition = { fadeIn(animationSpec = tween(150)) },
                 exitTransition = { fadeOut(animationSpec = tween(150)) },
             ) {
-                GraphsScreen(navController = navController)
+                if (authState.isAdmin) {
+                    GraphsScreen(navController = navController)
+                } else {
+                    LaunchedEffect(Unit) { navController.popBackStack() }
+                }
             }
             composable(
                 UserRoute.AdminStats.route,
                 enterTransition = { fadeIn(animationSpec = tween(150)) },
                 exitTransition = { fadeOut(animationSpec = tween(150)) },
             ) {
-                AdminStatsScreen(navController = navController)
+                if (authState.isAdmin) {
+                    AdminStatsScreen(navController = navController)
+                } else {
+                    LaunchedEffect(Unit) { navController.popBackStack() }
+                }
             }
             composable(
                 UserRoute.Profile.route,

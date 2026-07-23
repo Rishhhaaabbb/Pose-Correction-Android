@@ -19,6 +19,7 @@ local.properties
 *.keystore
 secrets.xml
 auth.json
+google-services.json
 
 # Credentials
 /credentials/
