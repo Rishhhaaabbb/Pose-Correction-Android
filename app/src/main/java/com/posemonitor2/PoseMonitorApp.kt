@@ -17,6 +17,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
 import com.data.local.ExerciseDataSeeder
 import com.posemonitor2.sync.SyncWorker
+import com.posemonitor2.sync.ReminderWorker
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -77,6 +78,8 @@ class PoseMonitorApp : Application(), Configuration.Provider {
 		}
 
 		applicationScope.launch { exerciseDataSeeder.seedIfNeeded() }
+
+		ReminderWorker.schedule(this)
 
 		ProcessLifecycleOwner.get().lifecycle.addObserver(AppForegroundObserver(this))
 	}

@@ -1,4 +1,6 @@
-// domain/src/main/java/com/domain/usecase/RunPipelineUseCase.kt
+// app/src/main/java/com/posemonitor2/RunPipelineUseCase.kt
+// Lives in :app because it depends on :data (PoseDetectorResult) and :core (PoseMonitorEngine).
+// Only used by DebugViewModel — no need for :domain interface split.
 
 package com.posemonitor2
 
