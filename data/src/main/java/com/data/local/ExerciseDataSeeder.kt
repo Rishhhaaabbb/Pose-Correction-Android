@@ -6,6 +6,7 @@ import com.data.local.entity.ExerciseEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -147,8 +148,72 @@ class ExerciseDataSeeder @Inject constructor(
             "leg-cradle" to "Lie on back, bring one knee to chest, use hands to cradle and stretch.",
         )
 
+        // Injury contraindication maps.
+        // Keys match onboarding injury options: Spine, Shoulder, Wrist, Knee, Ankle, Neck, Hip.
+        val contraindicatedMap = mapOf(
+            "squat" to listOf("Knee", "Hip"),
+            "wide-squat" to listOf("Knee", "Hip"),
+            "squat-hold" to listOf("Knee", "Hip"),
+            "lunge" to listOf("Knee", "Hip"),
+            "high-knees" to listOf("Knee", "Ankle", "Hip"),
+            "side-leg-raise" to listOf("Knee", "Hip"),
+            "lying-leg-raise" to listOf("Hip"),
+            "bridge" to listOf("Spine"),
+            "pushup" to listOf("Shoulder", "Wrist", "Spine"),
+            "knee-pushup" to listOf("Shoulder", "Wrist"),
+            "chair-dip" to listOf("Shoulder", "Wrist"),
+            "plank" to listOf("Shoulder", "Wrist", "Spine"),
+            "side-plank" to listOf("Shoulder", "Wrist", "Spine"),
+            "side-plank-raise" to listOf("Shoulder", "Wrist", "Spine"),
+            "deadbug" to listOf("Hip"),
+            "bird-dog" to listOf(),
+            "toe-touch-crunch" to listOf("Spine", "Neck"),
+            "side-touch" to listOf("Spine"),
+            "knee-hug" to listOf("Hip"),
+            "torso-twist" to listOf("Spine", "Neck"),
+            "tree" to listOf("Knee", "Ankle"),
+            "triangle" to listOf("Shoulder", "Wrist", "Knee", "Ankle", "Spine"),
+            "child" to listOf("Knee"),
+            "cobrapose" to listOf("Shoulder", "Wrist", "Spine"),
+            "tricep-stretch" to listOf("Shoulder"),
+            "shoulder-stretch" to listOf("Shoulder"),
+            "neck-stretch" to listOf("Neck"),
+            "leg-cradle" to listOf("Knee", "Hip"),
+        )
+
+        val safeForMap = mapOf(
+            "squat" to listOf("Shoulder", "Wrist", "Neck", "Spine"),
+            "wide-squat" to listOf("Shoulder", "Wrist", "Neck", "Spine"),
+            "squat-hold" to listOf("Shoulder", "Wrist", "Neck", "Spine"),
+            "lunge" to listOf("Shoulder", "Wrist", "Neck", "Spine"),
+            "high-knees" to listOf("Shoulder", "Wrist", "Neck", "Spine"),
+            "side-leg-raise" to listOf("Shoulder", "Wrist", "Neck", "Spine"),
+            "lying-leg-raise" to listOf("Shoulder", "Wrist", "Neck", "Knee", "Ankle"),
+            "bridge" to listOf("Shoulder", "Wrist", "Neck", "Knee", "Ankle"),
+            "pushup" to listOf("Neck", "Hip", "Knee", "Ankle"),
+            "knee-pushup" to listOf("Neck", "Hip", "Knee", "Ankle"),
+            "chair-dip" to listOf("Neck", "Hip", "Knee", "Ankle"),
+            "plank" to listOf("Neck", "Hip", "Knee", "Ankle"),
+            "side-plank" to listOf("Neck", "Hip", "Knee", "Ankle"),
+            "side-plank-raise" to listOf("Neck", "Hip", "Knee", "Ankle"),
+            "deadbug" to listOf("Shoulder", "Wrist", "Neck", "Knee", "Ankle"),
+            "bird-dog" to listOf("Shoulder", "Wrist", "Neck", "Knee", "Ankle", "Hip"),
+            "toe-touch-crunch" to listOf("Shoulder", "Wrist", "Knee", "Ankle", "Hip"),
+            "side-touch" to listOf("Shoulder", "Wrist", "Neck", "Knee", "Ankle", "Hip"),
+            "knee-hug" to listOf("Shoulder", "Wrist", "Neck", "Knee", "Ankle"),
+            "torso-twist" to listOf("Shoulder", "Wrist", "Knee", "Ankle", "Hip"),
+            "tree" to listOf("Shoulder", "Wrist", "Neck", "Spine", "Hip"),
+            "triangle" to listOf("Neck", "Hip"),
+            "child" to listOf("Shoulder", "Wrist", "Neck", "Spine", "Hip", "Ankle"),
+            "cobrapose" to listOf("Neck", "Hip", "Knee", "Ankle"),
+            "tricep-stretch" to listOf("Neck", "Wrist", "Hip", "Knee", "Ankle"),
+            "shoulder-stretch" to listOf("Neck", "Wrist", "Hip", "Knee", "Ankle"),
+            "neck-stretch" to listOf("Shoulder", "Wrist", "Spine", "Hip", "Knee", "Ankle"),
+            "leg-cradle" to listOf("Shoulder", "Wrist", "Neck", "Spine", "Ankle"),
+        )
+
         val result = mutableListOf<ExerciseEntity>()
-        
+
         try {
             context.assets.list("")?.filter { it.endsWith(".json") }?.forEach { name ->
                 val baseName = name.removeSuffix(".json")
@@ -161,6 +226,8 @@ class ExerciseDataSeeder @Inject constructor(
                         description = descriptionMap[baseName] ?: "",
                         caloriesPerRep = caloriesMap[baseName] ?: 2.0,
                         thumbnailUrl = null,
+                        safeForInjuries = JSONArray(safeForMap[baseName] ?: listOf<String>()).toString(),
+                        contraindicatedFor = JSONArray(contraindicatedMap[baseName] ?: listOf<String>()).toString(),
                     )
                 )
             }

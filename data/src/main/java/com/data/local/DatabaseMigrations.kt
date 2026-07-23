@@ -156,4 +156,11 @@ object DatabaseMigrations {
             )
         }
     }
+
+    val MIGRATION_7_8: Migration = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE exercises ADD COLUMN safe_for_injuries TEXT NOT NULL DEFAULT '[]'")
+            db.execSQL("ALTER TABLE exercises ADD COLUMN contraindicated_for TEXT NOT NULL DEFAULT '[]'")
+        }
+    }
 }

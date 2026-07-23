@@ -16,4 +16,8 @@ data class ExerciseEntity(
     val caloriesPerRep: Double,
     @ColumnInfo(name = "thumbnail_url")
     val thumbnailUrl: String?,
+    @ColumnInfo(name = "safe_for_injuries", defaultValue = "[]")
+    val safeForInjuries: String = "[]",
+    @ColumnInfo(name = "contraindicated_for", defaultValue = "[]")
+    val contraindicatedFor: String = "[]",
 )

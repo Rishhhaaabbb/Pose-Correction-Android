@@ -33,7 +33,7 @@ import com.data.local.entity.SyncQueueEntity
         OnboardingResponseEntity::class,
         CustomWorkoutEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class PoseDatabase : RoomDatabase() {
