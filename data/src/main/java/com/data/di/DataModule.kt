@@ -17,6 +17,7 @@ import com.data.local.dao.SyncQueueDao
 import com.data.remote.firebase.FirebaseRemoteClient
 import com.data.repository.AdminStatsRepositoryImpl
 import com.data.repository.AuthRepositoryImpl
+import com.data.repository.CustomWorkoutRepositoryImpl
 import com.data.repository.DailyStatsRepositoryImpl
 import com.data.repository.ExerciseRepositoryImpl
 import com.data.repository.OnboardingRepositoryImpl
@@ -26,6 +27,7 @@ import com.data.repository.SessionMetricsRepositoryImpl
 import com.data.repository.WorkoutSessionRepositoryImpl
 import com.domain.repository.AdminStatsRepository
 import com.domain.repository.AuthRepository
+import com.domain.repository.CustomWorkoutRepository
 import com.domain.repository.DailyStatsRepository
 import com.domain.repository.ExerciseRepository
 import com.domain.repository.OnboardingRepository
@@ -153,4 +155,8 @@ abstract class DataBindsModule {
     @Binds
     @Singleton
     abstract fun bindAdminStatsRepository(impl: AdminStatsRepositoryImpl): AdminStatsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindCustomWorkoutRepository(impl: CustomWorkoutRepositoryImpl): CustomWorkoutRepository
 }
