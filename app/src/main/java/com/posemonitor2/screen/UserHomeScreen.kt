@@ -62,14 +62,11 @@ import com.posemonitor2.UserRoute
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.posemonitor2.R
 import com.posemonitor2.onboarding.OnboardingActivity
+import com.posemonitor2.ui.theme.LocalAppColors
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.SelfImprovement
 import kotlin.math.cos
 import kotlin.math.sin
-
-private val Yellow      = Color(0xFFE8B840)
-private val Orange      = Color(0xFFE85A2E)
-private val TealChip    = Color(0xFF0D4A4E)
 
 @Composable
 private fun homeBgColor() = MaterialTheme.colorScheme.background
@@ -149,7 +146,7 @@ fun UserHomeScreen(
                     text = "See All",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Orange,
+                    color = LocalAppColors.current.accentVariant,
                     modifier = Modifier.clickable {
                         navController.navigate(UserRoute.Exercises.route)
                     },
@@ -311,10 +308,10 @@ private fun HomeHeader(userName: String, greetingSubtitle: String = "", onOpenHe
             modifier = Modifier
                 .size(46.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFD4C4B0)),
+                .background(LocalAppColors.current.warmMuted),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFF8A7A6A), modifier = Modifier.size(28.dp))
+            Icon(Icons.Default.Person, contentDescription = null, tint = LocalAppColors.current.warmText, modifier = Modifier.size(28.dp))
         }
 
         Spacer(Modifier.width(12.dp))
@@ -324,7 +321,7 @@ private fun HomeHeader(userName: String, greetingSubtitle: String = "", onOpenHe
                 text = stringResource(greetingResId),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
-                color = Orange,
+                color = LocalAppColors.current.accentVariant,
                 letterSpacing = 1.sp,
             )
             Text(
@@ -407,7 +404,7 @@ private fun DailyGoalProgressCard(
                     .fillMaxWidth()
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp)),
-                color = Orange,
+                color = LocalAppColors.current.accentVariant,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
         }
@@ -432,7 +429,7 @@ private fun HelpOptionsDialog(
                         onReplayOnboarding()
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8622E)),
+                    colors = ButtonDefaults.buttonColors(containerColor = LocalAppColors.current.accent),
                 ) {
                     Text(stringResource(R.string.home_replay_onboarding))
                 }
@@ -472,7 +469,7 @@ private fun HeroCard(modifier: Modifier = Modifier, onJoinSession: () -> Unit) {
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .background(Yellow)
+                    .background(LocalAppColors.current.warning)
                     .padding(16.dp),
             ) {
                 Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxHeight()) {
@@ -493,7 +490,7 @@ private fun HeroCard(modifier: Modifier = Modifier, onJoinSession: () -> Unit) {
                         text = stringResource(R.string.home_hero_title),
                         fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF0D3B34),
+                        color = LocalAppColors.current.primary,
                         fontFamily = FontFamily.Serif,
                         lineHeight = 26.sp,
                     )
@@ -501,7 +498,7 @@ private fun HeroCard(modifier: Modifier = Modifier, onJoinSession: () -> Unit) {
                     // Join button
                     Surface(
                         shape = RoundedCornerShape(50.dp),
-                        color = Orange,
+                        color = LocalAppColors.current.accentVariant,
                         modifier = Modifier.clickable { onJoinSession() },
                     ) {
                         Row(
@@ -521,7 +518,7 @@ private fun HeroCard(modifier: Modifier = Modifier, onJoinSession: () -> Unit) {
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .background(Color(0xFFC4A882)),
+                    .background(LocalAppColors.current.warmAccent),
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.homepageyogapose),
@@ -545,8 +542,8 @@ private fun QuickActionsGrid(
 ) {
     val tiles = listOf(
         Triple("Start Session",   Icons.Default.PlayArrow,     MaterialTheme.colorScheme.primary),
-        Triple("My Progress",     Icons.AutoMirrored.Filled.TrendingUp, Orange),
-        Triple("Custom Workout",  Icons.Default.FitnessCenter, Color(0xFF1A646A)),
+        Triple("My Progress",     Icons.AutoMirrored.Filled.TrendingUp, LocalAppColors.current.accentVariant),
+        Triple("Custom Workout",  Icons.Default.FitnessCenter, LocalAppColors.current.workoutTeal),
         Triple("My Profile",      Icons.Default.Person,        Color(0xFF4A3728)),
     )
     val actions = listOf(onStartSession, onMyProgress, onCustomWorkout, onMyProfile)
@@ -605,10 +602,10 @@ private fun RecommendedExerciseCard(
         context.resources.getIdentifier(name, "drawable", context.packageName)
     }
     val difficultyColor = when (exercise.difficulty?.trim()) {
-        "Beginner"     -> Color(0xFF4CAF50)
-        "Intermediate" -> Color(0xFFE8622E)
-        "Advanced"     -> Color(0xFFE85A2E)
-        else           -> Color(0xFF4CAF50)
+        "Beginner"     -> LocalAppColors.current.success
+        "Intermediate" -> LocalAppColors.current.accent
+        "Advanced"     -> LocalAppColors.current.accentVariant
+        else           -> LocalAppColors.current.success
     }
 
     Card(
@@ -690,7 +687,7 @@ private fun RecommendedExerciseCard(
 private fun SectionTitle(title: String, modifier: Modifier = Modifier) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(text = title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontFamily = FontFamily.Serif, modifier = Modifier.weight(1f))
-        Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null, tint = Orange, modifier = Modifier.size(22.dp))
+        Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null, tint = LocalAppColors.current.accentVariant, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -742,12 +739,12 @@ private fun VitalsCard(
                         .background(Color(0xFFEAEAEA)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Filled.SelfImprovement, contentDescription = null, tint = Color(0xFF999999), modifier = Modifier.size(32.dp))
+                    Icon(Icons.Filled.SelfImprovement, contentDescription = null, tint = LocalAppColors.current.grayMuted, modifier = Modifier.size(32.dp))
                 }
 
                 // BMI + progress
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.home_current_status), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Orange, letterSpacing = 0.8.sp)
+                    Text(stringResource(R.string.home_current_status), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = LocalAppColors.current.accentVariant, letterSpacing = 0.8.sp)
                     Text(
                         bmi?.let { String.format("%.1f", it) } ?: "--",
                         fontSize = 20.sp,
@@ -759,7 +756,7 @@ private fun VitalsCard(
                         LinearProgressIndicator(
                             progress = { progress.coerceIn(0f, 1f) },
                             modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
-                            color = Orange,
+                            color = LocalAppColors.current.accentVariant,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant,
                         )
                     }

@@ -48,10 +48,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.delay
 import com.posemonitor2.R
+import com.posemonitor2.ui.theme.LocalAppColors
 import com.posemonitor2.UserRoute
-
-private val Orange     = Color(0xFFE8622E)
-private val Yellow     = Color(0xFFE8B840)
 
 @Composable
 private fun exercisesBgColor() = MaterialTheme.colorScheme.background
@@ -335,6 +333,7 @@ private fun WorkoutCard(
     thumbBitmap: ImageBitmap?,
     onClick: () -> Unit,
 ) {
+    val appColors = LocalAppColors.current
     val thumbBg = when (category) {
         "Legs" -> Color(0xFFB8D4B8)
         "Chest" -> Color(0xFFD4B8B8)
@@ -379,7 +378,7 @@ private fun WorkoutCard(
                     category,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Orange,
+                    color = appColors.accent,
                     letterSpacing = 0.8.sp,
                 )
                 Spacer(Modifier.height(2.dp))
@@ -401,7 +400,7 @@ private fun WorkoutCard(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(Yellow),
+                    .background(appColors.warning),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -431,7 +430,7 @@ private fun WorkoutCardSkeleton() {
     val shimmerBrush = Brush.linearGradient(
         colors = listOf(
             Color(0xFFE8E8E8),
-            Color(0xFFF5F5F5),
+            LocalAppColors.current.surfaceVariant,
             Color(0xFFE8E8E8),
         ),
         start = Offset(shimmerX - 200f, 0f),

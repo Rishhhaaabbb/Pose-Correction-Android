@@ -26,16 +26,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.posemonitor2.R
-
-private val Yellow = Color(0xFFE8B840)
-private val Orange = Color(0xFFE85A2E)
-private val TealChip = Color(0xFF0D4A4E)
+import com.posemonitor2.ui.theme.LocalAppColors
 
 @Composable
 internal fun CustomWorkoutQuickCard(
     modifier: Modifier = Modifier,
     onOpenCustomWorkout: () -> Unit,
 ) {
+    val appColors = LocalAppColors.current
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -44,8 +42,8 @@ internal fun CustomWorkoutQuickCard(
             .background(
                 Brush.linearGradient(
                     colors = listOf(
-                        Color(0xFF0D4B50),
-                        Color(0xFF1A646A),
+                        appColors.workoutTealDark,
+                        appColors.workoutTeal,
                     )
                 )
             ),
@@ -84,7 +82,7 @@ internal fun CustomWorkoutQuickCard(
                     Icon(
                         imageVector = Icons.Filled.EmojiEvents,
                         contentDescription = null,
-                        tint = Yellow,
+                        tint = appColors.warning,
                         modifier = Modifier.size(12.dp),
                     )
                     Text(
@@ -151,25 +149,26 @@ internal fun CustomWorkoutQuickCard(
 
 @Composable
 internal fun CustomRoutineCard(modifier: Modifier = Modifier, onStart: () -> Unit) {
+    val appColors = LocalAppColors.current
     Box(
         modifier = modifier
             .fillMaxWidth()
             .shadow(4.dp, RoundedCornerShape(20.dp))
             .clip(RoundedCornerShape(20.dp))
-            .background(Brush.linearGradient(colors = listOf(Color(0xFF0A3D35), Color(0xFF1A5C40)))),
+            .background(Brush.linearGradient(colors = listOf(appColors.workoutGreenDark, appColors.workoutGreen))),
     ) {
         Text("\u2728", fontSize = 60.sp, color = Color(0x221A8A5A), modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 16.dp))
         Text("\u2728", fontSize = 36.sp, color = Color(0x221A8A5A), modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 28.dp, end = 50.dp))
 
         Column(modifier = Modifier.padding(18.dp)) {
-            Surface(shape = RoundedCornerShape(6.dp), color = TealChip) {
-                Text(stringResource(R.string.home_advanced), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Yellow, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
+            Surface(shape = RoundedCornerShape(6.dp), color = appColors.workoutChip) {
+                Text(stringResource(R.string.home_advanced), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = appColors.warning, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
             }
 
             Spacer(Modifier.height(10.dp))
 
             Text(stringResource(R.string.home_custom), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, fontFamily = FontFamily.Serif, lineHeight = 32.sp)
-            Text(stringResource(R.string.home_routine), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Yellow, fontFamily = FontFamily.Serif, lineHeight = 32.sp)
+            Text(stringResource(R.string.home_routine), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = appColors.warning, fontFamily = FontFamily.Serif, lineHeight = 32.sp)
 
             Spacer(Modifier.height(8.dp))
 
@@ -184,7 +183,7 @@ internal fun CustomRoutineCard(modifier: Modifier = Modifier, onStart: () -> Uni
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(modifier = Modifier.width(56.dp).height(28.dp)) {
-                    listOf(Color(0xFF4CAF50), Color(0xFF2196F3)).forEachIndexed { i, color ->
+                    listOf(appColors.success, appColors.info).forEachIndexed { i, color ->
                         Box(
                             modifier = Modifier.size(28.dp).offset(x = (i * 18).dp).clip(CircleShape).background(color),
                             contentAlignment = Alignment.Center,
@@ -201,7 +200,7 @@ internal fun CustomRoutineCard(modifier: Modifier = Modifier, onStart: () -> Uni
                 Spacer(Modifier.weight(1f))
 
                 Box(
-                    modifier = Modifier.size(44.dp).clip(CircleShape).background(Yellow).clickable { onStart() },
+                    modifier = Modifier.size(44.dp).clip(CircleShape).background(appColors.warning).clickable { onStart() },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
@@ -213,12 +212,13 @@ internal fun CustomRoutineCard(modifier: Modifier = Modifier, onStart: () -> Uni
 
 @Composable
 internal fun AuraAiCard(modifier: Modifier = Modifier, onStart: () -> Unit) {
+    val appColors = LocalAppColors.current
     Box(
         modifier = modifier
             .fillMaxWidth()
             .shadow(4.dp, RoundedCornerShape(20.dp))
             .clip(RoundedCornerShape(20.dp))
-            .background(Orange),
+            .background(appColors.accentVariant),
     ) {
         Box(
             modifier = Modifier
@@ -294,11 +294,12 @@ internal fun AuraAiCard(modifier: Modifier = Modifier, onStart: () -> Unit) {
 
 @Composable
 internal fun AdminStatsShortcutCard(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val appColors = LocalAppColors.current
     Surface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        color = Color(0xFF0A3D3F),
+        color = appColors.primary,
         shadowElevation = 6.dp
     ) {
         Row(
