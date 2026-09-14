@@ -64,6 +64,23 @@ class DebugViewModel @Inject constructor(
 
     val detector = PoseDetector(application)
 
+    // ── Keypoint smoother ─────────────────────────────────────────────────────
+    // One Euro Filter applied to each of the 17 keypoints × 2 axes before the
+    // skeleton is posted to the UI. Eliminates MediaPipe's high-frequency jitter
+    // while remaining responsive during fast movements.
+    private val skeletonSmoother = SkeletonSmoother(
+        minCutoff = 1.5,   // Hz — smoothing at rest (lower = smoother but more lag)
+        beta      = 0.07,  // speed coefficient (higher = less lag on fast moves)
+        dCutoff   = 1.0,   // derivative filter cutoff
+    )
+
+    // ── isCorrect debounce ────────────────────────────────────────────────────
+    // Prevents a single noisy frame from flashing the whole skeleton RED.
+    // The skeleton only turns RED after INCORRECT_FRAME_THRESHOLD consecutive
+    // incorrect frames. A correct frame immediately resets the streak → GREEN.
+    private var incorrectFrameStreak = 0
+    private val INCORRECT_FRAME_THRESHOLD = 4  // ≈133ms at 30fps
+
     // ── Public StateFlows ─────────────────────────────────────────────────────
 
     /** Tracks whether we have ever launched the camera permission request dialog. */
@@ -260,7 +277,7 @@ class DebugViewModel @Inject constructor(
         useCase = RunPipelineUseCase(
             graph = graph,
             config = MonitorConfig(
-                guidanceDurationSeconds = 2.0,
+                guidanceDurationSeconds = 4.0,
                 enableAdaptive = true,
                 progressiveTolerance = true,
                 maxReps = targetReps.value,
@@ -282,6 +299,10 @@ class DebugViewModel @Inject constructor(
         val activeUseCase = useCase ?: return
         val cameraSelector = buildCameraSelector()
         pipelineJob?.cancel()
+        // Reset smoother and debounce on every new camera binding
+        // (camera switch, session restart, orientation change, etc.)
+        skeletonSmoother.reset()
+        incorrectFrameStreak = 0
         pipelineJob = viewModelScope.launch {
             activeUseCase.process(detector.frameFlow(owner, cameraSelector))
                 .catch { e ->
@@ -291,14 +312,45 @@ class DebugViewModel @Inject constructor(
                 .collect { result ->
                     // Stop processing when session is completed
                     if (sessionCompleted.value) return@collect
-                    
-                    currentSkeleton.value      = result.skeleton
-                    frameStatus.value          = result.frameStatus
-                    lastDeviations.value       = result.frameStatus.deviations
+
+                    // ── Skeleton smoothing ─────────────────────────────────────
+                    // Apply One Euro Filter to raw keypoints before posting to UI.
+                    // This eliminates MediaPipe's per-frame jitter (±2–4% noise)
+                    // while keeping the skeleton responsive during fast movement.
+                    val rawSkeleton = result.skeleton
+                    val smoothedSkeleton = rawSkeleton?.let { skeletonSmoother.smooth(it) }
+                    currentSkeleton.value = smoothedSkeleton
+
+                    // ── isCorrect debounce ─────────────────────────────────────
+                    // Only turn the skeleton RED after INCORRECT_FRAME_THRESHOLD
+                    // consecutive incorrect frames (≈133ms at 30fps). This prevents
+                    // a single noisy frame from flashing the skeleton red due to
+                    // minor pose wobble or model detection variance.
+                    val rawIsCorrect = result.frameStatus.isCorrect
+                    if (rawIsCorrect) {
+                        incorrectFrameStreak = 0
+                    } else {
+                        incorrectFrameStreak++
+                    }
+                    val debouncedIsCorrect = rawIsCorrect || incorrectFrameStreak < INCORRECT_FRAME_THRESHOLD
+
+                    // Patch only the isCorrect field for the UI — engine deviations,
+                    // hold progress, and all other fields are unchanged.
+                    val debouncedStatus = if (debouncedIsCorrect != rawIsCorrect) {
+                        result.frameStatus.copy(isCorrect = debouncedIsCorrect)
+                    } else {
+                        result.frameStatus
+                    }
+
+                    frameStatus.value          = debouncedStatus
+                    lastDeviations.value       = debouncedStatus.deviations
                     targetState.value          = activeUseCase.engine.targetState
                     guidancePreviewState.value = activeUseCase.engine.guidancePreviewState
 
                     // ── Track Rep History & Diagnostic Logs ───────────────────
+                    // Use the RAW (undebounced) frameStatus for rep/accuracy
+                    // tracking — the engine logic must not be affected by the
+                    // visual debounce.
                     updateRepHistory(result.frameStatus)
                     persistSessionIfComplete(result.frameStatus)
 
@@ -312,7 +364,6 @@ class DebugViewModel @Inject constructor(
                     liveFeatureCount.value = result.features?.map?.size ?: 0
                     
                     // Force show results when target reps reached.
-                    // updateRepHistory already maintains currentRepCount, so we just check it here.
                     val repsDone = result.frameStatus.repsCompleted
                     if (!sessionCompleted.value && targetReps.value > 0 && repsDone >= targetReps.value) {
                         Log.d("RepTracker", "Target reached: $repsDone reps completed")

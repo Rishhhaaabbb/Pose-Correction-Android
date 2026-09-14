@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.ActivityInfo
 import android.util.Log
 import androidx.compose.animation.*
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -51,7 +52,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -80,15 +83,29 @@ import java.util.Locale
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
-private val COLOR_CORRECT      = Color(0xFF32CD32)
+private val COLOR_CORRECT      = Color(0xFF4CAF50)   // Material Green 500
 private val COLOR_WRONG        = Color(0xFF0064FF)
-private val COLOR_GRACE        = Color(0xFF00FFFF)
+private val COLOR_GRACE        = Color(0xFF26C6DA)   // Teal (softer than cyan)
 private val COLOR_BONE_OK      = Color(0xFF4CAF50)
 private val COLOR_JOINT_WHITE  = Color.White
-private val COLOR_ERROR_RED    = Color(0xFFFF0000)
-private val COLOR_ERROR_YELLOW = Color(0xFFFFFF00)
-private val COLOR_ERROR_GREEN  = Color(0xFF00FF00)
+private val COLOR_ERROR_RED    = Color(0xFFEF5350)   // Material Red 400 (softer than pure red)
+private val COLOR_ERROR_AMBER  = Color(0xFFFFA726)   // Amber (replaces harsh yellow)
+private val COLOR_ERROR_GREEN  = Color(0xFF66BB6A)   // Material Green 400
 private val COLOR_PANEL_TEXT   = Color(0xFF282828)
+
+// ── Visual tuning constants ────────────────────────────────────────────────────
+
+/**
+ * Extra tolerance buffer applied ONLY to per-joint coloring in the overlay.
+ *
+ * A joint only turns amber/red when its deviation exceeds
+ * (tolerance × (1 + JOINT_COLOR_BUFFER)). This adds a 20% visual headroom
+ * so small sub-threshold wobbles (a few degrees) don't immediately colour the
+ * joint red — only genuine form breaks do.
+ *
+ * This buffer is purely cosmetic and does NOT affect the engine's match logic.
+ */
+private const val JOINT_COLOR_BUFFER = 0.20  // 20% headroom
 
 // ── Joint → FeatureKey mapping ────────────────────────────────────────────────
 
@@ -176,6 +193,8 @@ fun MonitorOverlay(
     var settingsExpanded by rememberSaveable { mutableStateOf(false) }
     var tutorialMode by rememberSaveable { mutableStateOf(TutorialDisplayMode.OFF) }
     var showTargetPanel by rememberSaveable { mutableStateOf(true) }
+    // Guide overlay mode: 0 = OFF, 1 = Silhouette, 2 = Blue Ghost Skeleton
+    var guideOverlayMode by rememberSaveable { mutableIntStateOf(0) }
     val context = LocalContext.current
     var showHelpDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -270,8 +289,69 @@ fun MonitorOverlay(
                 isFrontCamera = isFrontCamera
             )
         } else {
-            // ── Performance ghost skeleton (Target template) ─────────────────
-            if (targetState != null && !isBodyMissing) {
+            // ── Guide Overlay (3-state toggle) ─────────────────────────────
+            // Mode 0: OFF — no guide overlay
+            // Mode 1: Silhouette — bold white/cyan glowing body outline
+            // Mode 2: Blue Ghost — original diamond-bone skeleton overlay
+            if (guideOverlayMode == 1 && targetState != null && !isBodyMissing) {
+                // ── Mode 1: Glowing Silhouette ──────────────────────────────
+                val rawKpts    = targetState.meanKeypoints
+                val normalized = remember(rawKpts) {
+                    rawKpts?.let { SkeletonNormalizer.normalize(it) }
+                }
+                if (normalized != null) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val cx         = size.width / 2f
+                        val cy         = size.height * 0.48f
+                        val figureSize = min(size.width, size.height) * 0.55f
+
+                        fun toScreen(kpt: Offset): Offset {
+                            val rawX = cx + kpt.x * figureSize * 2f
+                            val rawY = cy - kpt.y * figureSize * 2f
+                            return if (isFrontCamera) Offset(size.width - rawX, rawY)
+                            else Offset(rawX, rawY)
+                        }
+
+                        val pts = Array(normalized.size) { toScreen(normalized[it]) }
+                        val valid = BooleanArray(normalized.size) {
+                            normalized[it].x.isFinite() && normalized[it].y.isFinite() &&
+                            !(normalized[it].x == 0f && normalized[it].y == 0f)
+                        }
+
+                        val glowColor = Color(0xFF26C6DA).copy(alpha = 0.30f)
+                        val bodyColor = Color.White.copy(alpha = 0.55f)
+                        val jointColor = Color.White.copy(alpha = 0.60f)
+
+                        val bones = SkeletonConnections.boneIndices
+                        val boneWidths = floatArrayOf(
+                            6f, 6f, 5f, 5f, 10f, 10f, 14f, 13f, 10f,
+                            13f, 10f, 15f, 15f, 14f, 16f, 12f, 16f, 12f,
+                        )
+
+                        for (i in 0 until SkeletonConnections.boneCount) {
+                            val aIdx = bones[i * 2]
+                            val bIdx = bones[i * 2 + 1]
+                            if (!valid[aIdx] || !valid[bIdx]) continue
+                            val w = boneWidths.getOrElse(i) { 10f }
+                            drawLine(glowColor, pts[aIdx], pts[bIdx], w * 2.5f, StrokeCap.Round)
+                            drawLine(bodyColor, pts[aIdx], pts[bIdx], w, StrokeCap.Round)
+                        }
+
+                        for (i in pts.indices) {
+                            if (!valid[i]) continue
+                            val r = if (i == 0) 22f else 8f
+                            drawCircle(glowColor, r * 2f, pts[i])
+                            drawCircle(jointColor, r, pts[i])
+                        }
+
+                        if (valid[0]) {
+                            drawCircle(glowColor, 42f, pts[0])
+                            drawCircle(bodyColor, 28f, pts[0])
+                        }
+                    }
+                }
+            } else if (guideOverlayMode == 2 && targetState != null && !isBodyMissing) {
+                // ── Mode 2: Original Blue Ghost Skeleton ────────────────────
                 BlinkingGhostSkeleton(
                     targetState = targetState,
                     userSkeleton = skeleton,
@@ -359,6 +439,29 @@ fun MonitorOverlay(
                                 imageVector = Icons.Rounded.Settings,
                                 contentDescription = stringResource(R.string.cd_settings),
                                 tint = if (settingsExpanded) Color(0xFFE8622E) else Color.White,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+
+                        // ── Guide Overlay Toggle (Always Visible) ─────────
+                        // Cycles: OFF → Silhouette → Blue Ghost → OFF
+                        IconButton(
+                            onClick = { guideOverlayMode = (guideOverlayMode + 1) % 3 },
+                            modifier = Modifier
+                                .background(
+                                    if (guideOverlayMode != 0) Color(0x99000000) else Color(0x66000000),
+                                    RoundedCornerShape(50)
+                                )
+                                .size(44.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (guideOverlayMode == 0) Icons.Rounded.Search else Icons.Rounded.SearchOff,
+                                contentDescription = "Toggle pose guide",
+                                tint = when (guideOverlayMode) {
+                                    1 -> Color(0xFFE8622E)   // Orange = silhouette
+                                    2 -> Color(0xFF26C6DA)   // Cyan = blue ghost
+                                    else -> Color.White      // OFF
+                                },
                                 modifier = Modifier.size(26.dp)
                             )
                         }
@@ -1020,6 +1123,21 @@ private fun LiveSkeletonOverlay(
     inGrace: Boolean,
     isFrontCamera: Boolean,
 ) {
+    // ── Animated skeleton color ────────────────────────────────────────────────
+    // Smoothly interpolate between GREEN and RED over 300ms instead of
+    // hard-switching every frame. This makes the skeleton feel "alive" rather
+    // than jittery.
+    val targetSkeletonColor = when {
+        isCorrect -> COLOR_CORRECT
+        inGrace   -> COLOR_GRACE
+        else      -> COLOR_ERROR_RED
+    }
+    val skeletonColor by animateColorAsState(
+        targetValue   = targetSkeletonColor,
+        animationSpec = tween(durationMillis = 300),
+        label         = "skeleton_color"
+    )
+
     Canvas(modifier = Modifier.fillMaxSize()) {
         val screenW = size.width
         val screenH = size.height
@@ -1091,7 +1209,31 @@ private fun LiveSkeletonOverlay(
             return Offset(px, py)
         }
 
-        // Draw bones using Diamond style
+        // ── Capsule bones ─────────────────────────────────────────────────────
+        // Per-bone width multipliers produce naturally proportioned limbs:
+        // thick at the torso, tapering toward the extremities.
+        val boneWidthMultipliers = floatArrayOf(
+            0.25f, // 0:  nose → left_eye
+            0.25f, // 1:  nose → right_eye
+            0.20f, // 2:  left_eye → left_ear
+            0.20f, // 3:  right_eye → right_ear
+            0.40f, // 4:  nose → left_shoulder
+            0.40f, // 5:  nose → right_shoulder
+            0.55f, // 6:  left_shoulder → right_shoulder  (collarbone, wide)
+            0.55f, // 7:  left_shoulder → left_elbow      (upper arm)
+            0.38f, // 8:  left_elbow → left_wrist         (forearm, thinner)
+            0.55f, // 9:  right_shoulder → right_elbow
+            0.38f, // 10: right_elbow → right_wrist
+            0.60f, // 11: left_shoulder → left_hip        (torso side)
+            0.60f, // 12: right_shoulder → right_hip
+            0.55f, // 13: left_hip → right_hip            (hip bar)
+            0.65f, // 14: left_hip → left_knee            (upper leg, widest)
+            0.48f, // 15: left_knee → left_ankle          (lower leg)
+            0.65f, // 16: right_hip → right_knee
+            0.48f, // 17: right_knee → right_ankle
+        )
+        val baseWidth = 18f
+
         for (i in 0 until SkeletonConnections.boneCount) {
             val aIdx = SkeletonConnections.boneIndices[i * 2]
             val bIdx = SkeletonConnections.boneIndices[i * 2 + 1]
@@ -1102,25 +1244,19 @@ private fun LiveSkeletonOverlay(
 
             val start = kptToScreen(aKpt.x.toFloat(), aKpt.y.toFloat())
             val end   = kptToScreen(bKpt.x.toFloat(), bKpt.y.toFloat())
+            val w     = baseWidth * (boneWidthMultipliers.getOrElse(i) { 0.5f })
 
-            // ── Dynamic Bone Color ───────────────────────────────────────────
-            val skeletonColor = when {
-                isCorrect -> COLOR_CORRECT
-                inGrace   -> COLOR_GRACE
-                else      -> Color.Red
-            }
-
-            // Draw the volumetric diamond limb
-            drawDiamondBone(
-                start = start,
-                end = end,
-                auraColor = skeletonColor.copy(alpha = 0.5f),
-                coreColor = Color.White.copy(alpha = 0.8f),
-                maxWidth = 16f
+            drawCapsuleBone(
+                start      = start,
+                end        = end,
+                boneColor  = skeletonColor,
+                width      = w,
             )
         }
 
-        // Draw joints as glowing spheres with radial gradient
+        // ── Joints ────────────────────────────────────────────────────────────
+        // Per-joint color reflects deviation from target pose. The JOINT_COLOR_BUFFER
+        // (20%) means a joint stays green unless it's clearly out of form.
         skeleton.keypoints.forEachIndexed { idx, kpt ->
             if (kpt.confidence < 0.2f) return@forEachIndexed
             val center     = kptToScreen(kpt.x.toFloat(), kpt.y.toFloat())
@@ -1128,44 +1264,203 @@ private fun LiveSkeletonOverlay(
             val tolerance  = featureKey?.let { targetState?.featureTolerances?.get(it) }
             val deviation  = featureKey?.let { deviations[it] }
 
+            // Apply JOINT_COLOR_BUFFER: only turn amber/red when deviation
+            // meaningfully exceeds the tolerance (not right at the boundary).
             val (statusColor, radius) = when {
                 deviation != null && tolerance != null -> {
                     val ratio = abs(deviation) / tolerance
                     when {
-                        ratio > 1.0 -> COLOR_ERROR_RED    to 12f
-                        ratio > 0.7 -> COLOR_ERROR_YELLOW to 10f
-                        else        -> COLOR_ERROR_GREEN  to 8f
+                        ratio > 1.0 + JOINT_COLOR_BUFFER      -> COLOR_ERROR_RED   to 11f
+                        ratio > 0.75 + JOINT_COLOR_BUFFER / 2 -> COLOR_ERROR_AMBER to 9f
+                        else                                   -> COLOR_ERROR_GREEN to 7f
                     }
                 }
                 else -> COLOR_JOINT_WHITE to 6f
             }
 
+            // Outer soft glow
             drawCircle(
-                color = statusColor.copy(alpha = 0.3f),
-                radius = radius * 2.2f,
-                center = center
+                color  = statusColor.copy(alpha = 0.25f),
+                radius = radius * 2.0f,
+                center = center,
             )
+            // Inner crisp circle
             drawCircle(
-                color = statusColor.copy(alpha = 0.6f),
-                radius = radius * 1.2f,
-                center = center
+                color  = statusColor.copy(alpha = 0.85f),
+                radius = radius,
+                center = center,
             )
+            // White specular highlight
             drawCircle(
-                color = statusColor,
-                radius = radius * 0.8f,
-                center = center
+                color  = Color.White.copy(alpha = 0.75f),
+                radius = radius * 0.35f,
+                center = center,
             )
-            drawCircle(
-                color = Color.White.copy(alpha = 0.9f),
-                radius = radius * 0.3f,
-                center = center
-            )
+        }
+
+        // ── Per-Joint Correction Label ─────────────────────────────────────────
+        // Find the worst-deviating joint and draw a short correction cue near it.
+        // Only shown when the pose is incorrect and a joint clearly exceeds tolerance.
+        if (!isCorrect && targetState != null && deviations.isNotEmpty()) {
+            var worstKey: FeatureKey? = null
+            var worstRatio = 0f
+            var worstDev = 0.0
+
+            for ((key, dev) in deviations) {
+                if (key == FeatureKey.BODY_CENTER_Y) continue
+                val tol = targetState.featureTolerances[key] ?: continue
+                val ratio = (abs(dev) / tol).toFloat()
+                if (ratio > 1.1f && ratio > worstRatio) {
+                    worstRatio = ratio
+                    worstKey = key
+                    worstDev = dev
+                }
+            }
+
+            if (worstKey != null) {
+                // Map FeatureKey → keypoint index for label placement
+                val kptIdx = JOINT_FEATURE_MAP.entries
+                    .firstOrNull { it.value == worstKey }?.key
+
+                if (kptIdx != null) {
+                    val kpt = skeleton.keypoints[kptIdx]
+                    if (kpt.confidence >= 0.2f) {
+                        val labelCenter = kptToScreen(kpt.x.toFloat(), kpt.y.toFloat())
+
+                        // Generate short cue text
+                        val cue = getShortCorrectionCue(worstKey!!, worstDev)
+
+                        // Draw label using native canvas
+                        drawIntoCanvas { canvas ->
+                            val textPaint = android.graphics.Paint().apply {
+                                color = android.graphics.Color.WHITE
+                                textSize = 36f
+                                isAntiAlias = true
+                                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                                textAlign = android.graphics.Paint.Align.CENTER
+                                setShadowLayer(6f, 0f, 2f, android.graphics.Color.BLACK)
+                            }
+
+                            // Background pill
+                            val textWidth = textPaint.measureText(cue)
+                            val bgPaint = android.graphics.Paint().apply {
+                                color = android.graphics.Color.argb(180, 0, 0, 0)
+                                isAntiAlias = true
+                            }
+                            val labelX = labelCenter.x
+                            val labelY = labelCenter.y - 40f  // Above the joint
+                            val padH = 16f
+                            val padV = 8f
+                            canvas.nativeCanvas.drawRoundRect(
+                                labelX - textWidth / 2f - padH,
+                                labelY - 28f - padV,
+                                labelX + textWidth / 2f + padH,
+                                labelY + 6f + padV,
+                                20f, 20f,
+                                bgPaint
+                            )
+
+                            // Text
+                            canvas.nativeCanvas.drawText(
+                                cue,
+                                labelX,
+                                labelY,
+                                textPaint
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 /**
- * Draws a diamond-shaped limb (bipyramid) with a central bone core.
+ * Returns a short correction cue for the given feature key and deviation.
+ * Positive deviation = observed angle is larger than target (too straight / too wide).
+ * Negative deviation = observed angle is smaller than target (too bent / too narrow).
+ */
+private fun getShortCorrectionCue(key: FeatureKey, deviation: Double): String {
+    val side = when {
+        key.name.contains("LEFT")  -> "L"
+        key.name.contains("RIGHT") -> "R"
+        else -> ""
+    }
+    return when (key) {
+        FeatureKey.LEFT_ELBOW_ANGLE, FeatureKey.RIGHT_ELBOW_ANGLE ->
+            if (deviation > 0) "$side Bend elbow ↓" else "$side Straighten arm ↑"
+
+        FeatureKey.LEFT_KNEE_ANGLE, FeatureKey.RIGHT_KNEE_ANGLE ->
+            if (deviation > 0) "$side Bend knee ↓" else "$side Straighten leg ↑"
+
+        FeatureKey.LEFT_HIP_ANGLE, FeatureKey.RIGHT_HIP_ANGLE ->
+            if (deviation > 0) "$side Bend hip ↓" else "$side Stand upright ↑"
+
+        FeatureKey.LEFT_SHOULDER_ANGLE, FeatureKey.RIGHT_SHOULDER_ANGLE ->
+            if (deviation > 0) "$side Lower arm ↓" else "$side Lift arm ↑"
+
+        FeatureKey.TORSO_ANGLE ->
+            if (deviation > 0) "Stand upright ↑" else "Lean forward ↓"
+
+        FeatureKey.LEFT_ARM_ELEVATION, FeatureKey.RIGHT_ARM_ELEVATION ->
+            if (deviation > 0) "$side Lower hand ↓" else "$side Raise hand ↑"
+
+        FeatureKey.LEFT_LEG_SPREAD, FeatureKey.RIGHT_LEG_SPREAD ->
+            if (deviation > 0) "Feet closer ←→" else "Widen stance ↔"
+
+        else -> "Adjust position"
+    }
+}
+
+/**
+ * Draws a smooth tapered capsule bone segment.
+ *
+ * Uses two rounded strokes — a wide coloured aura + a thin white core —
+ * to produce a natural, anatomical-looking limb. StrokeCap.Round gives the
+ * rounded-end capsule appearance without requiring an explicit Path.
+ *
+ * @param start      Start joint position in screen pixels.
+ * @param end        End joint position in screen pixels.
+ * @param boneColor  The current skeleton state color (green/amber/red).
+ * @param width      Desired bone width in pixels (varies per-bone for proportions).
+ */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCapsuleBone(
+    start: Offset,
+    end: Offset,
+    boneColor: Color,
+    width: Float,
+) {
+    val length = (end - start).getDistance()
+    if (length < 1f) return
+
+    // Outer coloured aura — semi-transparent, slightly wider
+    drawLine(
+        color       = boneColor.copy(alpha = 0.45f),
+        start       = start,
+        end         = end,
+        strokeWidth = width * 1.6f,
+        cap         = StrokeCap.Round,
+    )
+    // Mid fill — main bone body
+    drawLine(
+        color       = boneColor.copy(alpha = 0.80f),
+        start       = start,
+        end         = end,
+        strokeWidth = width,
+        cap         = StrokeCap.Round,
+    )
+    // Inner white core — gives depth / 3D feel
+    drawLine(
+        color       = Color.White.copy(alpha = 0.55f),
+        start       = start,
+        end         = end,
+        strokeWidth = width * 0.30f,
+        cap         = StrokeCap.Round,
+    )
+}
+
+/**
+ * Draws a diamond-shaped limb (bipyramid) — retained for the ghost skeleton overlay.
  */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawDiamondBone(
     start: Offset,
@@ -1237,8 +1532,8 @@ private fun ReferencePosePanel(
     )
 
     // Lerp all four dimensions from the single progress float.
-    val panelWidth  : Dp = lerp(120f, 260f, progress).dp
-    val panelHeight : Dp = lerp(160f, 380f, progress).dp
+    val panelWidth  : Dp = lerp(160f, 300f, progress).dp
+    val panelHeight : Dp = lerp(210f, 420f, progress).dp
     val topPad      : Dp = lerp(56f,  80f,  progress).dp
     val endPad      : Dp = lerp(8f,   16f,  progress).dp
 
@@ -1329,18 +1624,11 @@ private fun GuidanceOverlay(
                 }
             }
 
-            BlinkingGhostSkeleton(
-                targetState = previewState,
-                userSkeleton = userSkeleton,
-                cameraFrameSize = cameraFrameSize,
-                deviations = deviations,
-                isFrontCamera = isFrontCamera,
-                isAligned = isCorrect
-            )
+            // Ghost skeleton removed — the anatomical figure above already
+            // provides a clear visual reference for the target pose.
         }
 
-        // Guidance overlay text removed to eliminate on-screen textual cues.
-        // Visual preview (anatomical figure and ghost skeleton) remains.
+        // Visual preview (anatomical figure) remains as the sole guidance cue.
     }
 }
 
