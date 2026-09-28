@@ -6,6 +6,7 @@ package com.posemonitor2
 
 import android.util.Log
 import com.core.poseengine.FeatureExtractor
+import com.core.poseengine.FeatureSmoother
 import com.core.poseengine.PoseGraph
 import com.core.poseengine.model.RawFeatureMap
 import com.core.poseengine.model.Skeleton2d
@@ -40,12 +41,14 @@ import kotlinx.coroutines.flow.map
  *
  * Set DEBUG_LOG = true only during active debugging. Never ship with it on.
  */
+
 class RunPipelineUseCase(
     graph: PoseGraph,
     config: MonitorConfig = MonitorConfig.DEFAULT,
     holdTimeOverrideSeconds: Double? = null,
 ) {
     private val extractor = FeatureExtractor(confidenceThreshold = 0.25)
+    private val featureSmoother = FeatureSmoother(windowSize = 3)
     val engine = PoseMonitorEngine(
         graph = graph,
         config = config,
@@ -103,10 +106,11 @@ class RunPipelineUseCase(
                     val skeleton = detectorResult.skeleton
 
                     // Layer 3 — Feature extraction
-                    val features = extractor.extractFeaturesWithFallback(skeleton)
+                    val rawFeatures = extractor.extractFeaturesWithFallback(skeleton)
 
-                    if (features == null) {
+                    if (rawFeatures == null) {
                         if (DEBUG_LOG) Log.d(TAG, "Layer 3 ❌ — feature extraction failed")
+                        featureSmoother.reset() // Clear history so stale data doesn't bleed through
                         val status = engine.processFeatures(null)
                         PipelineResult(
                             detectorResult = detectorResult,
@@ -116,8 +120,14 @@ class RunPipelineUseCase(
                             layerLog = if (DEBUG_LOG) "Layer 3 ❌ Feature extraction failed" else "",
                         )
                     } else {
-                        // Layer 4 — Engine
-                        val status = engine.processFeatures(features)
+                        // Smooth features over 3-frame rolling window to kill angle jitter
+                        val features = featureSmoother.smooth(rawFeatures)
+
+                        // Compute per-feature confidence from keypoint confidences
+                        val featureConfidences = extractor.computeFeatureConfidences(skeleton)
+
+                        // Layer 4 — Engine (with smoothed features + confidence-weighted matching)
+                        val status = engine.processFeatures(features, featureConfidences)
 
                         // All string work is skipped entirely in production.
                         // buildLayerLog iterates every feature key with padEnd+format —

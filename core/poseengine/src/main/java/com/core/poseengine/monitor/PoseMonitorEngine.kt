@@ -199,7 +199,10 @@ class PoseMonitorEngine(
      *   pose detection failed (no valid skeleton visible).
      * @return [FrameStatus] describing the outcome of this frame.
      */
-    fun processFeatures(features: RawFeatureMap?): FrameStatus {
+    fun processFeatures(
+        features: RawFeatureMap?,
+        featureConfidences: Map<FeatureKey, Double>? = null,
+    ): FrameStatus {
         val now = time.nowSeconds()
 
         if (frameTimes.size >= 30) frameTimes.removeFirst()
@@ -237,7 +240,7 @@ class PoseMonitorEngine(
                 if (features != null && !features.isEmpty) {
                     val previewState = nextStateForGuidance
                     if (previewState != null) {
-                        val matchResult = previewState.matches(features, strict = false)
+                        val matchResult = previewState.matches(features, strict = false, featureConfidences = featureConfidences)
                         lastDeviations = matchResult.deviations
                         matchDuringGuidance = matchResult.matched
 
@@ -289,7 +292,7 @@ class PoseMonitorEngine(
 
         val perKeyScaledState = getScaledState(currentState, progressiveMult, graceMult)
 
-        val matchResult = perKeyScaledState.matches(features, strict = false)
+        val matchResult = perKeyScaledState.matches(features, strict = false, featureConfidences = featureConfidences)
 
         lastDeviations = matchResult.deviations
 
@@ -560,8 +563,8 @@ class PoseMonitorEngine(
     companion object {
         // Android-calibrated tolerance floors.
         // Angle features: degrees. Ratio/elevation/spread features: normalized units.
-        private const val MIN_ANGLE_TOLERANCE = 18.0 // Increased from 14.0
-        private const val MIN_RATIO_TOLERANCE = 0.55 // Increased from 0.45
+        private const val MIN_ANGLE_TOLERANCE = 22.0 // Widened from 18.0 for more wiggle room
+        private const val MIN_RATIO_TOLERANCE = 0.65 // Widened from 0.55 for camera distance variance
     }
 
     private fun buildStatus(

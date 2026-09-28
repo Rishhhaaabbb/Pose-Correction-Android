@@ -46,8 +46,6 @@ data class PoseState(
     val effectiveMinHoldDuration: Double
         get() = userOverrideHoldDuration?.takeIf { it > 0.0 } ?: minHoldDuration
 
-    // ── Matching ──────────────────────────────────────────────────────────────
-
     /**
      * Check whether [features] match this state within tolerance.
      *
@@ -55,17 +53,26 @@ data class PoseState(
      *
      * Non-strict mode (default):
      *   - Enforces 100% participation for structural joints ([FeatureKey.isJointAngle]).
-     *     If any joint is missing or outside of its (1.1x expanded) tolerance,
+     *     If any joint is missing or outside of its (1.25x expanded) tolerance,
      *     the match fails immediately.
-     *   - Overall features use a 60% match ratio threshold ([MATCH_RATIO_THRESHOLD]).
+     *   - Overall features use a 65% match ratio threshold ([MATCH_RATIO_THRESHOLD]).
+     *   - When [featureConfidences] is provided, tolerance is widened for
+     *     low-confidence features (confidence < 0.7 → up to 1.5x wider).
      *
      * Strict mode: ALL features present in [meanFeatures] must be within
      * tolerance. If any expected feature is missing from [features], returns
      * immediately with no match.
      *
+     * @param featureConfidences Optional per-feature confidence scores [0,1].
+     *   When provided, features with low confidence get wider tolerance so
+     *   unreliable keypoint positions don't block correct matches.
      * @return [MatchResult] containing the match decision and per-feature deviations.
      */
-    fun matches(features: RawFeatureMap, strict: Boolean = false): MatchResult {
+    fun matches(
+        features: RawFeatureMap,
+        strict: Boolean = false,
+        featureConfidences: Map<FeatureKey, Double>? = null,
+    ): MatchResult {
         var matchesCount = 0
         var totalCount = 0
         var jointAngleFailed = false
@@ -82,7 +89,7 @@ data class PoseState(
             }
 
             totalCount++
-            val tolerance = featureTolerances[featureKey] ?: continue
+            val baseTolerance = featureTolerances[featureKey] ?: continue
             var rawDeviation = current - meanVal
             if (featureKey.isAngle) {
                 if (rawDeviation > 180.0) rawDeviation -= 360.0
@@ -90,9 +97,26 @@ data class PoseState(
             }
             deviations[featureKey] = rawDeviation
 
+            // Confidence-based tolerance scaling:
+            // High confidence (≥0.7) → no extra tolerance (scale = 1.0)
+            // Low confidence (0.3)   → 1.5x wider tolerance
+            // Linearly interpolated between 0.3 and 0.7
+            val confidenceScale = if (featureConfidences != null) {
+                val conf = featureConfidences[featureKey] ?: 1.0
+                if (conf >= HIGH_CONFIDENCE) 1.0
+                else if (conf <= LOW_CONFIDENCE) MAX_CONFIDENCE_SCALE
+                else {
+                    // Linear interpolation: lower confidence → higher scale
+                    val t = (HIGH_CONFIDENCE - conf) / (HIGH_CONFIDENCE - LOW_CONFIDENCE)
+                    1.0 + t * (MAX_CONFIDENCE_SCALE - 1.0)
+                }
+            } else 1.0
+
+            val tolerance = baseTolerance * confidenceScale
+
             if (featureKey.isJointAngle) {
-                // ~10% expanded tolerance margin for realistic human movement
-                if (abs(rawDeviation) <= (tolerance * 1.1)) {
+                // ~25% expanded tolerance margin for realistic phone-based movement
+                if (abs(rawDeviation) <= (tolerance * 1.25)) {
                     matchesCount++
                 } else {
                     jointAngleFailed = true
@@ -147,7 +171,12 @@ data class PoseState(
 
     companion object {
 
-        private const val MATCH_RATIO_THRESHOLD = 0.75
+        private const val MATCH_RATIO_THRESHOLD = 0.65
+
+        // Confidence-weighted tolerance constants
+        private const val HIGH_CONFIDENCE = 0.7    // Above this → no extra tolerance
+        private const val LOW_CONFIDENCE = 0.3     // Below this → max tolerance expansion
+        private const val MAX_CONFIDENCE_SCALE = 1.5 // Max tolerance multiplier for low confidence
 
         fun fromSerializable(dto: PoseStateDto): PoseState = PoseState(
             stateId = dto.stateId,

@@ -920,11 +920,16 @@ fun MonitorScreen(
         voiceManager.speakInstruction(activeInstruction, exerciseName)
     }
 
-    // ── Beep on rep completion ────────────────────────────────────────────────
+    // ── Beep + Voice on rep completion ─────────────────────────────────────────
     LaunchedEffect(currentReps) {
         if (currentReps > lastBeepedReps) {
             toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 120)
             lastBeepedReps = currentReps
+            if (!isMuted) {
+                kotlinx.coroutines.delay(200) // Let beep finish
+                // Use presence channel so rep announcements don't block correction feedback
+                voiceManager.speakPresence("$currentReps")
+            }
         }
     }
 
@@ -951,10 +956,21 @@ fun MonitorScreen(
     // VoiceManager.speakCorrection() handles cooldowns internally.
     var lastCorrectState by remember { mutableStateOf(false) }
     var lastGoodTime     by remember { mutableLongStateOf(0L) }
+    var encourageIndex   by remember { mutableIntStateOf(0) }
+
+    // Varied encouragement phrases so TTS doesn't repeat the same thing
+    val encouragements = remember { listOf(
+        "Great form, keep it up!",
+        "Perfect, hold that position!",
+        "You're doing awesome!",
+        "Excellent, keep going!",
+        "That's it, stay steady!",
+        "Nice work, maintain that pose!",
+    ) }
 
     LaunchedEffect(isMuted, sessionCompleted) {
         while (true) {
-            kotlinx.coroutines.delay(2_500)
+            kotlinx.coroutines.delay(2_000)
 
             if (isMuted || sessionCompleted) continue
             if (frameStatus?.phase == com.core.poseengine.monitor.MonitorPhase.SESSION_COMPLETE) continue
@@ -967,25 +983,33 @@ fun MonitorScreen(
             val now       = System.currentTimeMillis()
 
             if (isCorrect) {
-                if (lastCorrectState && now - lastGoodTime > 10_000L) {
-                    voiceManager.speakCorrection("Excellent, keep going!")
-                    lastGoodTime = now
-                } else if (!lastCorrectState) {
+                if (!lastCorrectState) {
+                    // Just became correct — speak encouragement after 3s hold
                     lastCorrectState = true
+                    lastGoodTime = now
+                } else if (now - lastGoodTime > 3_000L) {
+                    // Holding correct for 3+ seconds — varied encouragement
+                    voiceManager.speakCorrection(encouragements[encourageIndex % encouragements.size])
+                    encourageIndex++
                     lastGoodTime = now
                 }
             } else {
                 lastCorrectState = false
-                // Skip non-actionable strings — VoiceManager also filters these,
-                // but filtering here avoids the function call overhead at 30fps.
+                // Skip only presence/countdown strings — let joint-specific feedback through
                 if (feedback.isBlank() ||
                     feedback.startsWith("Get ready") ||
-                    feedback.startsWith("Hold steady") ||
-                    feedback.startsWith("Focus on") ||
                     feedback.startsWith("Step into") ||
                     feedback.startsWith("Please make sure")
                 ) continue
-                voiceManager.speakCorrection(feedback)
+                // Mirror mode: swap left↔right when front camera so voice
+                // matches what the user sees on the mirrored screen.
+                // Uses word-boundary regex to avoid corrupting "upright"→"upleft" etc.
+                val spoken = if (isFrontCamera) {
+                    feedback.replace(Regex("\\bleft\\b"), "\u0000")
+                            .replace(Regex("\\bright\\b"), "left")
+                            .replace("\u0000", "right")
+                } else feedback
+                voiceManager.speakCorrection(spoken)
             }
         }
     }

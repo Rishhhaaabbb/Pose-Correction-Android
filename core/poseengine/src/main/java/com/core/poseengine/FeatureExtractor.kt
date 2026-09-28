@@ -175,6 +175,66 @@ class FeatureExtractor(
         return features2d + features3d
     }
 
+    /**
+     * Compute per-feature confidence scores for the given skeleton.
+     *
+     * For each [FeatureKey], returns the minimum keypoint confidence of the
+     * joints that contribute to that feature's calculation. A feature built
+     * from a low-confidence keypoint produces unreliable values and should
+     * be treated with wider tolerance during matching.
+     *
+     * @return Map of FeatureKey → confidence in [0.0, 1.0]. Only includes
+     *   features whose contributing keypoints are all present.
+     */
+    fun computeFeatureConfidences(skeleton: Skeleton2d): Map<FeatureKey, Double> {
+        val confidences = mutableMapOf<FeatureKey, Double>()
+
+        fun minConf(vararg indices: KeypointIndex): Double =
+            indices.minOf { skeleton[it].confidence }
+
+        // Joint angles — 3 keypoints each
+        confidences[FeatureKey.LEFT_ELBOW_ANGLE] =
+            minConf(KeypointIndex.LEFT_SHOULDER, KeypointIndex.LEFT_ELBOW, KeypointIndex.LEFT_WRIST)
+        confidences[FeatureKey.RIGHT_ELBOW_ANGLE] =
+            minConf(KeypointIndex.RIGHT_SHOULDER, KeypointIndex.RIGHT_ELBOW, KeypointIndex.RIGHT_WRIST)
+        confidences[FeatureKey.LEFT_KNEE_ANGLE] =
+            minConf(KeypointIndex.LEFT_HIP, KeypointIndex.LEFT_KNEE, KeypointIndex.LEFT_ANKLE)
+        confidences[FeatureKey.RIGHT_KNEE_ANGLE] =
+            minConf(KeypointIndex.RIGHT_HIP, KeypointIndex.RIGHT_KNEE, KeypointIndex.RIGHT_ANKLE)
+        confidences[FeatureKey.LEFT_SHOULDER_ANGLE] =
+            minConf(KeypointIndex.LEFT_HIP, KeypointIndex.LEFT_SHOULDER, KeypointIndex.LEFT_ELBOW)
+        confidences[FeatureKey.RIGHT_SHOULDER_ANGLE] =
+            minConf(KeypointIndex.RIGHT_HIP, KeypointIndex.RIGHT_SHOULDER, KeypointIndex.RIGHT_ELBOW)
+        confidences[FeatureKey.LEFT_HIP_ANGLE] =
+            minConf(KeypointIndex.LEFT_SHOULDER, KeypointIndex.LEFT_HIP, KeypointIndex.LEFT_KNEE)
+        confidences[FeatureKey.RIGHT_HIP_ANGLE] =
+            minConf(KeypointIndex.RIGHT_SHOULDER, KeypointIndex.RIGHT_HIP, KeypointIndex.RIGHT_KNEE)
+
+        // Torso — 4 keypoints
+        confidences[FeatureKey.TORSO_ANGLE] =
+            minConf(KeypointIndex.LEFT_SHOULDER, KeypointIndex.RIGHT_SHOULDER,
+                    KeypointIndex.LEFT_HIP, KeypointIndex.RIGHT_HIP)
+
+        // Arm elevation — 2 keypoints each
+        confidences[FeatureKey.LEFT_ARM_ELEVATION] =
+            minConf(KeypointIndex.LEFT_WRIST, KeypointIndex.LEFT_SHOULDER)
+        confidences[FeatureKey.RIGHT_ARM_ELEVATION] =
+            minConf(KeypointIndex.RIGHT_WRIST, KeypointIndex.RIGHT_SHOULDER)
+
+        // Leg spread — 2 keypoints each
+        confidences[FeatureKey.LEFT_LEG_SPREAD] =
+            minConf(KeypointIndex.LEFT_HIP, KeypointIndex.LEFT_ANKLE)
+        confidences[FeatureKey.RIGHT_LEG_SPREAD] =
+            minConf(KeypointIndex.RIGHT_HIP, KeypointIndex.RIGHT_ANKLE)
+
+        // Body center — 4 keypoints
+        confidences[FeatureKey.BODY_CENTER_Y] =
+            minConf(KeypointIndex.LEFT_SHOULDER, KeypointIndex.RIGHT_SHOULDER,
+                    KeypointIndex.LEFT_HIP, KeypointIndex.RIGHT_HIP)
+
+        return confidences
+    }
+
     // ── Validation ────────────────────────────────────────────────────────────
 
     /**

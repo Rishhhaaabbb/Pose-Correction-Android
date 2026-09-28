@@ -193,8 +193,7 @@ fun MonitorOverlay(
     var settingsExpanded by rememberSaveable { mutableStateOf(false) }
     var tutorialMode by rememberSaveable { mutableStateOf(TutorialDisplayMode.OFF) }
     var showTargetPanel by rememberSaveable { mutableStateOf(true) }
-    // Guide overlay mode: 0 = OFF, 1 = Silhouette, 2 = Blue Ghost Skeleton
-    var guideOverlayMode by rememberSaveable { mutableIntStateOf(0) }
+    var showGhostSkeleton by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     var showHelpDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -289,69 +288,8 @@ fun MonitorOverlay(
                 isFrontCamera = isFrontCamera
             )
         } else {
-            // ── Guide Overlay (3-state toggle) ─────────────────────────────
-            // Mode 0: OFF — no guide overlay
-            // Mode 1: Silhouette — bold white/cyan glowing body outline
-            // Mode 2: Blue Ghost — original diamond-bone skeleton overlay
-            if (guideOverlayMode == 1 && targetState != null && !isBodyMissing) {
-                // ── Mode 1: Glowing Silhouette ──────────────────────────────
-                val rawKpts    = targetState.meanKeypoints
-                val normalized = remember(rawKpts) {
-                    rawKpts?.let { SkeletonNormalizer.normalize(it) }
-                }
-                if (normalized != null) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val cx         = size.width / 2f
-                        val cy         = size.height * 0.48f
-                        val figureSize = min(size.width, size.height) * 0.55f
-
-                        fun toScreen(kpt: Offset): Offset {
-                            val rawX = cx + kpt.x * figureSize * 2f
-                            val rawY = cy - kpt.y * figureSize * 2f
-                            return if (isFrontCamera) Offset(size.width - rawX, rawY)
-                            else Offset(rawX, rawY)
-                        }
-
-                        val pts = Array(normalized.size) { toScreen(normalized[it]) }
-                        val valid = BooleanArray(normalized.size) {
-                            normalized[it].x.isFinite() && normalized[it].y.isFinite() &&
-                            !(normalized[it].x == 0f && normalized[it].y == 0f)
-                        }
-
-                        val glowColor = Color(0xFF26C6DA).copy(alpha = 0.30f)
-                        val bodyColor = Color.White.copy(alpha = 0.55f)
-                        val jointColor = Color.White.copy(alpha = 0.60f)
-
-                        val bones = SkeletonConnections.boneIndices
-                        val boneWidths = floatArrayOf(
-                            6f, 6f, 5f, 5f, 10f, 10f, 14f, 13f, 10f,
-                            13f, 10f, 15f, 15f, 14f, 16f, 12f, 16f, 12f,
-                        )
-
-                        for (i in 0 until SkeletonConnections.boneCount) {
-                            val aIdx = bones[i * 2]
-                            val bIdx = bones[i * 2 + 1]
-                            if (!valid[aIdx] || !valid[bIdx]) continue
-                            val w = boneWidths.getOrElse(i) { 10f }
-                            drawLine(glowColor, pts[aIdx], pts[bIdx], w * 2.5f, StrokeCap.Round)
-                            drawLine(bodyColor, pts[aIdx], pts[bIdx], w, StrokeCap.Round)
-                        }
-
-                        for (i in pts.indices) {
-                            if (!valid[i]) continue
-                            val r = if (i == 0) 22f else 8f
-                            drawCircle(glowColor, r * 2f, pts[i])
-                            drawCircle(jointColor, r, pts[i])
-                        }
-
-                        if (valid[0]) {
-                            drawCircle(glowColor, 42f, pts[0])
-                            drawCircle(bodyColor, 28f, pts[0])
-                        }
-                    }
-                }
-            } else if (guideOverlayMode == 2 && targetState != null && !isBodyMissing) {
-                // ── Mode 2: Original Blue Ghost Skeleton ────────────────────
+            // ── Blue Ghost Skeleton Toggle ───────────────────────────────
+            if (showGhostSkeleton && targetState != null && !isBodyMissing) {
                 BlinkingGhostSkeleton(
                     targetState = targetState,
                     userSkeleton = skeleton,
@@ -443,25 +381,20 @@ fun MonitorOverlay(
                             )
                         }
 
-                        // ── Guide Overlay Toggle (Always Visible) ─────────
-                        // Cycles: OFF → Silhouette → Blue Ghost → OFF
+                        // ── Ghost Skeleton Toggle (Always Visible) ─────────
                         IconButton(
-                            onClick = { guideOverlayMode = (guideOverlayMode + 1) % 3 },
+                            onClick = { showGhostSkeleton = !showGhostSkeleton },
                             modifier = Modifier
                                 .background(
-                                    if (guideOverlayMode != 0) Color(0x99000000) else Color(0x66000000),
+                                    if (showGhostSkeleton) Color(0x99000000) else Color(0x66000000),
                                     RoundedCornerShape(50)
                                 )
                                 .size(44.dp)
                         ) {
                             Icon(
-                                imageVector = if (guideOverlayMode == 0) Icons.Rounded.Search else Icons.Rounded.SearchOff,
-                                contentDescription = "Toggle pose guide",
-                                tint = when (guideOverlayMode) {
-                                    1 -> Color(0xFFE8622E)   // Orange = silhouette
-                                    2 -> Color(0xFF26C6DA)   // Cyan = blue ghost
-                                    else -> Color.White      // OFF
-                                },
+                                imageVector = if (showGhostSkeleton) Icons.Rounded.SearchOff else Icons.Rounded.Search,
+                                contentDescription = "Toggle ghost skeleton",
+                                tint = if (showGhostSkeleton) Color(0xFF26C6DA) else Color.White,
                                 modifier = Modifier.size(26.dp)
                             )
                         }
@@ -1327,8 +1260,8 @@ private fun LiveSkeletonOverlay(
                     if (kpt.confidence >= 0.2f) {
                         val labelCenter = kptToScreen(kpt.x.toFloat(), kpt.y.toFloat())
 
-                        // Generate short cue text
-                        val cue = getShortCorrectionCue(worstKey!!, worstDev)
+                        // Generate short cue text (swap L/R for front camera)
+                        val cue = getShortCorrectionCue(worstKey!!, worstDev, isFrontCamera)
 
                         // Draw label using native canvas
                         drawIntoCanvas { canvas ->
@@ -1380,10 +1313,10 @@ private fun LiveSkeletonOverlay(
  * Positive deviation = observed angle is larger than target (too straight / too wide).
  * Negative deviation = observed angle is smaller than target (too bent / too narrow).
  */
-private fun getShortCorrectionCue(key: FeatureKey, deviation: Double): String {
+private fun getShortCorrectionCue(key: FeatureKey, deviation: Double, isFrontCamera: Boolean = false): String {
     val side = when {
-        key.name.contains("LEFT")  -> "L"
-        key.name.contains("RIGHT") -> "R"
+        key.name.contains("LEFT")  -> if (isFrontCamera) "R" else "L"
+        key.name.contains("RIGHT") -> if (isFrontCamera) "L" else "R"
         else -> ""
     }
     return when (key) {

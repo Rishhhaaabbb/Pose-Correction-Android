@@ -17,8 +17,12 @@ import kotlin.math.sqrt
  * ── Feature prioritization ───────────────────────────────────────────────────
  * Core features (hip, knee, elbow, torso) are prioritized over peripheral
  * features. Within the same priority tier, the feature with the largest
- * deviation is selected. The last-used feature is rotated away to avoid
- * repeating the same instruction every frame.
+ * deviation is selected.
+ *
+ * ── Joint rotation ───────────────────────────────────────────────────────────
+ * After speaking about the same joint 3 times in a row, the generator rotates
+ * to the next-worst joint. This ensures the user hears about ALL their
+ * mistakes across different exercises, not just the single worst one.
  *
  * ── Thread safety ─────────────────────────────────────────────────────────────
  * [FeedbackGenerator] is stateful (feature history, last-feedback rotation).
@@ -31,20 +35,19 @@ class FeedbackGenerator(
     private val historyLength: Int = 15,
 ) {
     // Rolling feature history for instability detection
-    // Matches Python: self.feature_history deque with pop(0) eviction
     private val featureHistory = ArrayDeque<RawFeatureMap>(historyLength)
-
-    // Last three features used for feedback — rotated to avoid repetition
-    // Matches Python: self.last_feedback_features (maxlen=3)
-    private val lastFeedbackKeys = ArrayDeque<FeatureKey>(3)
 
     // Current active mistake key that the user is being prompted to correct
     private var activeMistakeKey: FeatureKey? = null
 
+    // How many consecutive times we've spoken about the same joint
+    private var sameJointCount: Int = 0
+
+    // Maximum times to repeat the same joint before rotating
+    private val maxSameJointRepeat = 3
+
     /**
      * Add current frame features to the rolling history.
-     *
-     * Matches Python: update_history()
      */
     fun updateHistory(features: RawFeatureMap) {
         if (featureHistory.size >= historyLength) featureHistory.removeFirst()
@@ -54,20 +57,8 @@ class FeedbackGenerator(
     /**
      * Generate a corrective feedback string for the current frame.
      *
-     * Matches Python: generate_feedback()
-     *
-     * @param deviations      Per-feature absolute deviation from state mean.
-     * @param currentFeatures Current frame's extracted features (unused in
-     *   feedback string generation but kept for API symmetry with Python).
-     */
-    /**
-     * Generate a corrective feedback string for the current frame.
-     *
-     * Matches Python: generate_feedback()
-     *
-     * @param deviations      Per-feature absolute deviation from state mean.
-     * @param currentFeatures Current frame's extracted features (unused in
-     *   feedback string generation but kept for API symmetry with Python).
+     * @param deviations      Per-feature deviation from state mean (signed).
+     * @param currentFeatures Current frame's extracted features.
      * @param tolerances      The tolerances for the current state, used to normalize deviations.
      */
     fun generateFeedback(
@@ -75,157 +66,143 @@ class FeedbackGenerator(
         currentFeatures: RawFeatureMap,
         tolerances: Map<FeatureKey, Double> = emptyMap()
     ): String {
-        // Instability check — matches Python: if self._is_unstable()
+        // Instability check
         if (isUnstable()) return "Hold steady"
 
         if (deviations.isEmpty()) return "Focus on your pose"
 
-        // Priority weights: 
-        // 1. Core structural joints (Hip/Knee/Elbow) - 1.8x
-        // 2. Torso (Posture) - 1.5x
-        // 3. Peripheral (Elevation/Spread/Center) - 1.0x
-        fun getPriority(key: FeatureKey) = when (key) {
-            FeatureKey.LEFT_HIP_ANGLE, FeatureKey.RIGHT_HIP_ANGLE,
-            FeatureKey.LEFT_KNEE_ANGLE, FeatureKey.RIGHT_KNEE_ANGLE,
-            FeatureKey.LEFT_ELBOW_ANGLE, FeatureKey.RIGHT_ELBOW_ANGLE -> 1.8
-            FeatureKey.TORSO_ANGLE -> 1.5
-            FeatureKey.LEFT_LEG_SPREAD, FeatureKey.RIGHT_LEG_SPREAD -> 0.5 // Deprioritize noisy spread
-            else -> 1.0
-        }
-
-        // If we have an active mistake, check if it's still significant
-        activeMistakeKey?.let { activeKey ->
-            val dev = deviations[activeKey]
-            if (dev != null) {
-                val tol = tolerances[activeKey] ?: (if (activeKey.isAngle) 10.0 else 0.15)
-                val ratio = abs(dev) / tol
-                
-                // If it's still a mistake, keep it UNLESS a core joint is now significantly worse
-                if (ratio > 1.0) {
-                    val activeScore = ratio * getPriority(activeKey)
-                    
-                    // Look for anything significantly worse (>30% worse)
-                    val betterAlternative = deviations.entries.maxByOrNull { (k, d) ->
-                        val t = tolerances[k] ?: (if (k.isAngle) 10.0 else 0.15)
-                        (abs(d) / t) * getPriority(k)
-                    }
-                    
-                    if (betterAlternative != null) {
-                        val alternativeScore = (abs(betterAlternative.value) / (tolerances[betterAlternative.key] ?: (if (betterAlternative.key.isAngle) 10.0 else 0.15))) * getPriority(betterAlternative.key)
-                        if (alternativeScore > activeScore * 1.3) {
-                            activeMistakeKey = betterAlternative.key
-                        } else {
-                            return generateSpecificFeedback(activeKey, dev)
-                        }
-                    } else {
-                        return generateSpecificFeedback(activeKey, dev)
-                    }
-                }
-            }
-            activeMistakeKey = null
-        }
-
-        var worstKey: FeatureKey? = null
-        var maxScore = 0.0
-
-        for ((key, dev) in deviations) {
-            if (key == FeatureKey.BODY_CENTER_Y) continue
-            
-            val tol = tolerances[key] ?: (if (key.isAngle) 10.0 else 0.15)
+        // Build scored list of all deviating features
+        val scored = deviations.mapNotNull { (key, dev) ->
+            if (key == FeatureKey.BODY_CENTER_Y) return@mapNotNull null
+            val tol = tolerances[key] ?: defaultTolerance(key)
             val ratio = abs(dev) / tol
-            
-            // Only consider it a mistake if it's 30% beyond the tolerance
-            // This reduces "flickering" feedback for poses like pushups/cobra
-            if (ratio > 1.3) {
-                val score = ratio * getPriority(key)
-                if (score > maxScore) {
-                    maxScore = score
-                    worstKey = key
+            if (ratio > 1.0) Triple(key, dev, ratio * getPriority(key)) else null
+        }.sortedByDescending { it.third }
+
+        if (scored.isEmpty()) {
+            return "Almost there, keep adjusting"
+        }
+
+        // If active mistake is still significant, keep it — but rotate after 3 repeats
+        activeMistakeKey?.let { activeKey ->
+            val activeEntry = scored.find { it.first == activeKey }
+            if (activeEntry != null) {
+                val activeRatio = abs(activeEntry.second) / (tolerances[activeKey] ?: defaultTolerance(activeKey))
+
+                // Still a mistake?
+                if (activeRatio > 1.0) {
+                    // Force rotation after maxSameJointRepeat consecutive times
+                    if (sameJointCount >= maxSameJointRepeat && scored.size > 1) {
+                        // Pick the next-worst joint that's different
+                        val next = scored.first { it.first != activeKey }
+                        activeMistakeKey = next.first
+                        sameJointCount = 1
+                        return generateSpecificFeedback(next.first, next.second)
+                    }
+
+                    // Check if something else is now much worse (>15% worse)
+                    val best = scored.first()
+                    if (best.first != activeKey && best.third > activeEntry.third * 1.15) {
+                        activeMistakeKey = best.first
+                        sameJointCount = 1
+                        return generateSpecificFeedback(best.first, best.second)
+                    }
+
+                    // Keep the active one
+                    sameJointCount++
+                    return generateSpecificFeedback(activeKey, activeEntry.second)
                 }
             }
+            // Active mistake is now fixed
+            activeMistakeKey = null
+            sameJointCount = 0
         }
 
-        if (worstKey == null) {
-            // If no feature is strictly over 1.3, pick the one closest to failing
-            // only if it's at least over the 1.0 threshold.
-            worstKey = deviations.filter { it.key != FeatureKey.BODY_CENTER_Y }.maxByOrNull { (key, dev) ->
-                val tol = tolerances[key] ?: (if (key.isAngle) 10.0 else 0.15)
-                val ratio = abs(dev) / tol
-                if (ratio > 1.0) ratio else -1.0
-            }?.key
-            
-            // If even the "worst" is below 1.0, then it's actually correct or too close to tell
-            if (worstKey != null) {
-                val dev = deviations[worstKey]!!
-                val tol = tolerances[worstKey] ?: (if (worstKey.isAngle) 10.0 else 0.15)
-                if (abs(dev) / tol <= 1.0) worstKey = null
-            }
-        }
-
-        if (worstKey == null) {
-            return "Adjust your body position"
-        }
-
-        activeMistakeKey = worstKey
-        val deviation = deviations[worstKey] ?: 0.0
-        return generateSpecificFeedback(worstKey, deviation)
+        // Pick the worst scoring feature
+        val worst = scored.first()
+        activeMistakeKey = worst.first
+        sameJointCount = 1
+        return generateSpecificFeedback(worst.first, worst.second)
     }
 
     /**
+     * Priority weights for different feature types.
+     * Core structural joints get highest priority for feedback.
+     */
+    private fun getPriority(key: FeatureKey) = when (key) {
+        FeatureKey.LEFT_HIP_ANGLE, FeatureKey.RIGHT_HIP_ANGLE,
+        FeatureKey.LEFT_KNEE_ANGLE, FeatureKey.RIGHT_KNEE_ANGLE,
+        FeatureKey.LEFT_ELBOW_ANGLE, FeatureKey.RIGHT_ELBOW_ANGLE -> 1.8
+        FeatureKey.LEFT_SHOULDER_ANGLE, FeatureKey.RIGHT_SHOULDER_ANGLE -> 1.6
+        FeatureKey.TORSO_ANGLE -> 1.5
+        FeatureKey.HIP_ASYMMETRY_DELTA, FeatureKey.KNEE_ASYMMETRY_DELTA -> 1.3
+        FeatureKey.LEFT_ARM_ELEVATION, FeatureKey.RIGHT_ARM_ELEVATION -> 1.0
+        FeatureKey.LEFT_LEG_SPREAD, FeatureKey.RIGHT_LEG_SPREAD -> 0.5
+        else -> 0.8
+    }
+
+    /** Default tolerance when the tolerances map doesn't contain a key. */
+    private fun defaultTolerance(key: FeatureKey): Double =
+        if (key.isAngle) 15.0 else 0.20
+
+    /**
      * Generate the specific instruction string for a feature+deviation pair.
-     *
-     * Matches Python: _generate_specific_feedback()
-     *
-     * Uses [FeatureKey] enum instead of string 'in' checks — compile-safe.
+     * All messages are short (<8 words) for quick TTS playback.
+     * Covers ALL 16 FeatureKey values including asymmetry deltas.
      */
     private fun generateSpecificFeedback(key: FeatureKey, deviation: Double): String {
-        val side = if (key.name.contains("LEFT")) "left" else if (key.name.contains("RIGHT")) "right" else ""
-        
+        val side = when {
+            key.name.contains("LEFT") -> "left"
+            key.name.contains("RIGHT") -> "right"
+            else -> ""
+        }
+
         return when (key) {
             FeatureKey.LEFT_ELBOW_ANGLE, FeatureKey.RIGHT_ELBOW_ANGLE ->
-                if (deviation > 0) "Your $side arm is too straight. Bend your elbow more." 
-                else "Your $side arm is too bent. Straighten it out."
+                if (deviation > 0) "Bend your $side elbow more"
+                else "Straighten your $side arm"
 
             FeatureKey.LEFT_KNEE_ANGLE, FeatureKey.RIGHT_KNEE_ANGLE ->
-                if (deviation > 0) "Your $side leg is too straight. Bend your knee more." 
-                else "Your $side leg is too bent. Straighten your leg more."
+                if (deviation > 0) "Bend your $side knee more"
+                else "Straighten your $side leg"
 
             FeatureKey.LEFT_HIP_ANGLE, FeatureKey.RIGHT_HIP_ANGLE ->
-                if (deviation > 0) "You need to bend more at your $side hip." 
-                else "You are bending too much at the $side hip. Stand more upright."
+                if (deviation > 0) "Bend more at your $side hip"
+                else "Extend your $side hip"
 
             FeatureKey.LEFT_SHOULDER_ANGLE, FeatureKey.RIGHT_SHOULDER_ANGLE ->
-                if (deviation > 0) "Your $side arm is too high relative to your torso. Lower it." 
-                else "Your $side arm is too low relative to your torso. Lift it higher."
+                if (deviation > 0) "Lower your $side arm"
+                else "Lift your $side arm higher"
 
             FeatureKey.TORSO_ANGLE ->
-                if (deviation > 0) "Your torso is leaning too far. Stand more upright." 
-                else "You are too upright. Lean your torso forward more."
+                if (deviation > 0) "Straighten your back"
+                else "Lean forward more"
 
             FeatureKey.LEFT_ARM_ELEVATION, FeatureKey.RIGHT_ARM_ELEVATION ->
-                if (deviation > 0) "Your $side hand is too high. Lower your hand." 
-                else "Your $side hand is too low. Raise your hand higher."
+                if (deviation > 0) "Lower your $side hand"
+                else "Raise your $side hand"
 
             FeatureKey.LEFT_LEG_SPREAD, FeatureKey.RIGHT_LEG_SPREAD ->
-                if (deviation > 0) "Your feet are too wide apart. Bring them closer." 
-                else "Your feet are too close together. Widen your stance."
+                if (deviation > 0) "Bring your feet closer"
+                else "Widen your stance"
 
             FeatureKey.BODY_CENTER_Y ->
-                if (deviation > 0) "Your whole body is too low in the frame. Stand taller." 
-                else "Your whole body is too high in the frame. Crouch lower."
+                if (deviation > 0) "Stand a bit taller"
+                else "Lower your body"
 
-            else -> "Your body position is incorrect. Adjust to align."
+            FeatureKey.HIP_ASYMMETRY_DELTA ->
+                if (deviation > 0) "Level your hips, right side higher"
+                else "Level your hips, left side higher"
+
+            FeatureKey.KNEE_ASYMMETRY_DELTA ->
+                if (deviation > 0) "Match your knee angles"
+                else "Match your knee angles"
         }
     }
 
     /**
      * Returns true if the torso is oscillating rapidly — indicates subject
      * is not yet settled into the pose.
-     *
-     * Matches Python: _is_unstable()
-     *   - Requires >= 5 frames in history
-     *   - Requires >= 3 torso_angle values
-     *   - Returns True if population std > 8.0
      */
     private fun isUnstable(): Boolean {
         if (featureHistory.size < 5) return false
@@ -233,7 +210,6 @@ class FeedbackGenerator(
         val torsoVals = featureHistory.mapNotNull { it[FeatureKey.TORSO_ANGLE] }
         if (torsoVals.size < 3) return false
 
-        // Population std — matches Python np.std() with ddof=0
         val mean = torsoVals.average()
         val std = populationStd(torsoVals, mean)
         return std > INSTABILITY_THRESHOLD
@@ -241,17 +217,14 @@ class FeedbackGenerator(
 
     fun reset() {
         featureHistory.clear()
-        lastFeedbackKeys.clear()
         activeMistakeKey = null
+        sameJointCount = 0
     }
 
     companion object {
         private const val INSTABILITY_THRESHOLD = 8.0
 
-        /**
-         * Population std (ddof=0). Matches np.std().
-         * Replicates the same function from StateDiscovery to avoid cross-module dependency.
-         */
+        /** Population std (ddof=0). Matches np.std(). */
         private fun populationStd(values: List<Double>, mean: Double): Double {
             if (values.size <= 1) return 0.0
             var sumSq = 0.0
@@ -260,4 +233,3 @@ class FeedbackGenerator(
         }
     }
 }
-

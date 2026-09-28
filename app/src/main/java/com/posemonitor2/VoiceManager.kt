@@ -7,6 +7,7 @@ import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
@@ -47,8 +48,8 @@ class VoiceManager(context: Context) : TextToSpeech.OnInitListener {
 
     private val presenceCooldownMs        = 3_000L
     private val instructionSameCooldownMs = 8_000L
-    private val correctionGlobalCooldownMs = 2_500L
-    private val correctionSameCooldownMs   = 6_000L
+    private val correctionGlobalCooldownMs = 2_000L
+    private val correctionSameCooldownMs   = 5_000L
 
     // ── TTS init ──────────────────────────────────────────────────────────────
 
@@ -67,7 +68,7 @@ class VoiceManager(context: Context) : TextToSpeech.OnInitListener {
             } else {
                 Log.d(TAG, "TTS locale: ${chosen.toLanguageTag()}")
             }
-            tts?.setSpeechRate(1.0f)
+            tts?.setSpeechRate(1.05f)
             tts?.setPitch(1.0f)
             isInitialized = true
             Log.d(TAG, "TTS ready")
@@ -168,6 +169,7 @@ class VoiceManager(context: Context) : TextToSpeech.OnInitListener {
     }
 
     fun shutdown() {
+        scope.cancel() // Cancel any in-flight Groq API requests
         synchronized(lock) {
             tts?.stop()
             tts?.shutdown()
@@ -191,9 +193,7 @@ class VoiceManager(context: Context) : TextToSpeech.OnInitListener {
 
         /** Short generic strings that should never be spoken aloud. */
         private val GENERIC_FALLBACKS = setOf(
-            "Hold steady",
             "Focus on your pose",
-            "Adjust your body position",
             "Adjust to align",
             "Your body position is incorrect. Adjust to align.",
         )
