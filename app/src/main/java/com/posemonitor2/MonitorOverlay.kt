@@ -1464,11 +1464,11 @@ private fun ReferencePosePanel(
         label = "panelProgress",
     )
 
-    // Lerp all four dimensions from the single progress float.
-    val panelWidth  : Dp = lerp(160f, 300f, progress).dp
-    val panelHeight : Dp = lerp(210f, 420f, progress).dp
-    val topPad      : Dp = lerp(56f,  80f,  progress).dp
-    val endPad      : Dp = lerp(8f,   16f,  progress).dp
+    // Compact dimensions: collapsed is small enough to not block the camera
+    val panelWidth  : Dp = lerp(110f, 200f, progress).dp
+    val panelHeight : Dp = lerp(140f, 280f, progress).dp
+    val topPad      : Dp = lerp(52f,  70f,  progress).dp
+    val endPad      : Dp = lerp(6f,   12f,  progress).dp
 
     val rawKpts    = state.meanKeypoints
     val normalized = remember(rawKpts) { rawKpts?.let { SkeletonNormalizer.normalize(it) } }
@@ -1478,28 +1478,28 @@ private fun ReferencePosePanel(
             .padding(top = topPad, end = endPad)
             .width(panelWidth)
             .height(panelHeight)
-            .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
+            .background(Color(0xE6F5F5F5), RoundedCornerShape(10.dp))
             .clickable(onClick = onToggle),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(if (expanded) 12.dp else 4.dp),
+                .padding(if (expanded) 8.dp else 3.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
                 stringResource(R.string.monitor_target),
-                fontSize     = if (expanded) 13.sp else 9.sp,
+                fontSize     = if (expanded) 11.sp else 8.sp,
                 fontWeight   = FontWeight.Bold,
                 color        = COLOR_PANEL_TEXT,
                 letterSpacing = 1.sp,
             )
             Text(
                 stringResource(R.string.monitor_state_label, state.stateId + 1),
-                fontSize = if (expanded) 11.sp else 8.sp,
+                fontSize = if (expanded) 10.sp else 7.sp,
                 color    = Color(0xFF666666),
             )
-            if (expanded) Text(stringResource(R.string.monitor_tap_to_close), fontSize = 9.sp, color = Color(0xFF999999))
+            if (expanded) Text(stringResource(R.string.monitor_tap_to_close), fontSize = 8.sp, color = Color(0xFF999999))
 
             if (normalized != null) {
                 val isExpanded = expanded

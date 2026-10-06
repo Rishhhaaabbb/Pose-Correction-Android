@@ -563,7 +563,9 @@ class PoseMonitorEngine(
     companion object {
         // Android-calibrated tolerance floors.
         // Angle features: degrees. Ratio/elevation/spread features: normalized units.
-        private const val MIN_ANGLE_TOLERANCE = 22.0 // Widened from 18.0 for more wiggle room
+        // With 1.25x joint expansion in matches(), 28° floor → 35° effective minimum.
+        // This ensures poses "close to correct" show green instead of red.
+        private const val MIN_ANGLE_TOLERANCE = 28.0 // Widened from 22.0 — user feedback: too strict
         private const val MIN_RATIO_TOLERANCE = 0.65 // Widened from 0.55 for camera distance variance
     }
 

@@ -11,6 +11,7 @@
     "num_segments": 3,
     "created_at": "2026-06-01T12:05:37.431337",
     "stability_threshold": 0.15,
+    "orientation": "portrait",
     "temporal_sequence": [
       0,
       1,
